@@ -59,6 +59,28 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(context);
+        var rid = ValidateExportContext(context);
+        var manifest = MASS4.Bricks.PackageManifest.Load(BrickDirectory, ["turian"]);
+        foreach (var (id, version) in manifest.PlatformNuget[Id])
+        {
+            project.AddItemGroup().AddItem("PackageReference", id).AddMetadata("Version", version, true);
+        }
+        ReferenceRuntimeAssemblies(project, context.Settings, manifest);
+        ConfigureProperties(project, context, rid);
+        var assets = project.AddItemGroup().AddItem("AndroidAsset", "AndroidAssets/**/*");
+        assets.AddMetadata("LogicalName",
+            "$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\\', '/'))", true);
+        var nativeDirectory = Path.Combine(BrickDirectory, "Native~");
+        if (!Directory.Exists(nativeDirectory))
+        {
+            nativeDirectory = Path.Combine(Path.GetDirectoryName(typeof(AndroidBuildPlatform).Assembly.Location)!,
+                "AndroidNative");
+        }
+        project.AddImport(Path.Combine(nativeDirectory, "AndroidNative.targets"));
+    }
+
+    string? ValidateExportContext(BuildPlatformContext context)
+    {
         if (ValidateSettings(context.Settings) is { } invalid)
         {
             throw new InvalidOperationException(invalid);
@@ -68,18 +90,22 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
             throw new InvalidOperationException("Android requires an exported CoreCLR client profile.");
         }
 
-        var rid = context.Profile?.RuntimeIdentifier?.Trim();
+        return ValidateRuntimeIdentifier(context.Profile?.RuntimeIdentifier);
+    }
+
+    string? ValidateRuntimeIdentifier(string? runtimeIdentifier)
+    {
+        var rid = runtimeIdentifier?.Trim();
         if (!string.IsNullOrEmpty(rid) && !RuntimeIdentifiers.Contains(rid))
         {
             throw new InvalidOperationException($"Unsupported Android runtime identifier '{rid}'.");
         }
 
-        var manifest = MASS4.Bricks.PackageManifest.Load(BrickDirectory, ["turian"]);
-        foreach (var (id, version) in manifest.PlatformNuget[Id])
-        {
-            project.AddItemGroup().AddItem("PackageReference", id).AddMetadata("Version", version, true);
-        }
-        ReferenceRuntimeAssemblies(project, context.Settings, manifest);
+        return rid;
+    }
+
+    void ConfigureProperties(ProjectRootElement project, BuildPlatformContext context, string? rid)
+    {
         var player = context.Settings.Get<PlayerSettings>();
         var properties = project.AddPropertyGroup();
         properties.AddProperty("TargetFramework", TargetFramework);
@@ -99,12 +125,12 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         properties.AddProperty("AndroidManifest", "AndroidManifest.xml");
         properties.AddProperty("AndroidStoreUncompressedFileExtensions",
             "$(AndroidStoreUncompressedFileExtensions);.oap;.json;.png");
+        properties.AddProperty("_AndroidUseLibZipSharp", "true").Condition =
+            "$([MSBuild]::IsOSPlatform('Windows'))";
         properties.AddProperty("ImplicitUsings", "disable");
         properties.AddProperty("Nullable", "enable");
         properties.AddProperty("AllowUnsafeBlocks", "true");
         properties.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
-        var assets = project.AddItemGroup().AddItem("AndroidAsset", "AndroidAssets/**/*");
-        assets.AddMetadata("LogicalName", "%(RecursiveDir)%(Filename)%(Extension)", true);
     }
 
     /// <inheritdoc />

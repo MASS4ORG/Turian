@@ -35,6 +35,9 @@ public sealed class AndroidBuildPlatformTests : IDisposable
         Assert.Equal("android-arm64", properties["RuntimeIdentifiers"]);
         Assert.Contains(".oap", properties["AndroidStoreUncompressedFileExtensions"]);
         Assert.Contains(project.Items, static item => item.ItemType == "AndroidAsset");
+        var nativeImport = Assert.Single(project.Imports);
+        Assert.EndsWith("AndroidNative.targets", nativeImport.Project);
+        Assert.True(File.Exists(nativeImport.Project));
         foreach (var name in new[] { "Turian.Android.Host", "Turian.Engine.Vulkan" })
         {
             var reference = Assert.Single(project.Items, item => item.ItemType == "Reference" && item.Include == name);
@@ -46,6 +49,28 @@ public sealed class AndroidBuildPlatformTests : IDisposable
         Assert.Contains(platform.Dependencies.Assemblies, static item => item.Item2 == "Turian.Engine.Core");
         Assert.Contains(platform.Dependencies.Assemblies, static item => item.Item2 == "Turian.Engine.Vulkan");
         Assert.Contains(project.Items, static item => item.ItemType == "PackageReference" && item.Include == "SkiaSharp.NativeAssets.Android");
+    }
+
+    /// <summary>Nested APK assets use portable entry names so packaging preserves their storage method.</summary>
+    [Fact]
+    public void NormalizesNestedAssetNames()
+    {
+        var assets = Path.Combine(directory, "AndroidAssets", "Content", "nested");
+        Directory.CreateDirectory(assets);
+        File.WriteAllText(Path.Combine(assets, "example.oap"), "content");
+        var settings = new BuildAppSettings { ProjectAbsoluteDir = directory, Title = "Example" };
+        settings.Loaded.Use(new PlayerSettings { ApplicationIdentifier = "org.example.app" });
+        var project = Microsoft.Build.Construction.ProjectRootElement.Create(Path.Combine(directory, "app.csproj"));
+        new AndroidBuildPlatform().ConfigureProject(project, new BuildPlatformContext(settings, NullLogger.Instance,
+            project.FullPath, directory, "Debug", new BuildProfile { Platform = "android" }));
+
+        using var collection = new Microsoft.Build.Evaluation.ProjectCollection();
+        var evaluated = new Microsoft.Build.Evaluation.Project(project, null, null, collection);
+        var asset = Assert.Single(evaluated.GetItems("AndroidAsset"));
+
+        Assert.Equal("Content/nested/example.oap", asset.GetMetadataValue("LogicalName"));
+        Assert.Equal(OperatingSystem.IsWindows() ? "true" : string.Empty,
+            evaluated.GetPropertyValue("_AndroidUseLibZipSharp"));
     }
 
     /// <summary>Generated exports carry their own SDK pin and stage content before APK publication.</summary>
@@ -115,7 +140,11 @@ public sealed class AndroidBuildPlatformTests : IDisposable
     {
         var settings = new BuildAppSettings();
         settings.Loaded.Use(new PlayerSettings { ApplicationIdentifier = id });
-        Assert.NotNull(new AndroidBuildPlatform().ValidateSettings(settings));
+        var platform = new AndroidBuildPlatform();
+        Assert.NotNull(platform.ValidateSettings(settings));
+        var project = Microsoft.Build.Construction.ProjectRootElement.Create(Path.Combine(directory, "app.csproj"));
+        Assert.Throws<InvalidOperationException>(() => platform.ConfigureProject(project,
+            new BuildPlatformContext(settings, NullLogger.Instance, project.FullPath, directory, "Debug", null)));
     }
 
     /// <summary>APK validation checks the compression method, rather than comparing compressed lengths.</summary>

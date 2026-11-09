@@ -1,16 +1,23 @@
 using System.Buffers.Binary;
+using System.IO.Compression;
 using System.Text;
 
 namespace Turian.Editor.Core;
 
-/// <summary>Checks that an APK contains the runtime content and stores OAP entries without ZIP compression.</summary>
+/// <summary>Checks APK runtime content and native-library page alignment.</summary>
 public static class AndroidPackageValidator
 {
-    /// <summary>Rejects missing runtime content, ZIP64 archives and compressed OAP entries.</summary>
+    /// <summary>Rejects incomplete content, compressed OAPs and native libraries incompatible with 16 KB pages.</summary>
     /// <param name="path">The APK to inspect.</param>
     public static void Validate(string path)
     {
         using var stream = File.OpenRead(path);
+        ValidateContentDirectory(stream);
+        ValidateNativeLibraries(stream);
+    }
+
+    static (ushort Count, uint Offset) ReadDirectoryLocation(Stream stream)
+    {
         var tail = new byte[(int)Math.Min(stream.Length, 65557)];
         stream.Position = stream.Length - tail.Length;
         stream.ReadExactly(tail);
@@ -21,6 +28,12 @@ public static class AndroidPackageValidator
         {
             throw new InvalidDataException("ZIP64 APKs are not supported by the Android content validator.");
         }
+        return (count, offset);
+    }
+
+    static void ValidateContentDirectory(Stream stream)
+    {
+        var (count, offset) = ReadDirectoryLocation(stream);
         stream.Position = offset;
         using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
         var storedPackages = 0;
@@ -30,33 +43,88 @@ public static class AndroidPackageValidator
         };
         for (var i = 0; i < count; i++)
         {
-            var header = reader.ReadBytes(46);
-            if (header.Length != 46 || BinaryPrimitives.ReadUInt32LittleEndian(header) != 0x02014b50)
+            var entry = ReadEntry(reader);
+            if (entry.Method == 0 && IsNativeLibrary(entry.Name))
             {
-                throw new InvalidDataException("Invalid APK central directory.");
+                ValidateNativeZipAlignment(stream, entry.Header, entry.Name);
             }
-            var method = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(10));
-            var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(28));
-            var extraLength = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(30));
-            var commentLength = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(32));
-            var name = Encoding.UTF8.GetString(reader.ReadBytes(nameLength));
-            stream.Seek(extraLength + commentLength, SeekOrigin.Current);
-            required.Remove(name);
-            if (!name.StartsWith("assets/", StringComparison.Ordinal)
-                || !name.EndsWith(".oap", StringComparison.OrdinalIgnoreCase))
+            required.Remove(entry.Name);
+            if (ValidateContentEntry(entry))
             {
-                continue;
+                storedPackages++;
             }
-            if (method != 0)
-            {
-                throw new InvalidDataException($"APK entry '{name}' is compressed. Add .oap to AndroidStoreUncompressedFileExtensions.");
-            }
-            storedPackages++;
         }
         if (storedPackages == 0 || required.Count != 0)
         {
             throw new InvalidDataException("APK runtime content is incomplete: OAP packages, settings, type manifest and runtime catalog are required.");
         }
+    }
+
+    static CentralEntry ReadEntry(BinaryReader reader)
+    {
+        var header = reader.ReadBytes(46);
+        if (header.Length != 46 || BinaryPrimitives.ReadUInt32LittleEndian(header) != 0x02014b50)
+        {
+            throw new InvalidDataException("Invalid APK central directory.");
+        }
+        var method = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(10));
+        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(28));
+        var extraLength = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(30));
+        var commentLength = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(32));
+        var name = Encoding.UTF8.GetString(reader.ReadBytes(nameLength));
+        reader.BaseStream.Seek(extraLength + commentLength, SeekOrigin.Current);
+        return new(header, name, method);
+    }
+
+    static bool ValidateContentEntry(CentralEntry entry)
+    {
+        if (!entry.Name.StartsWith("assets/", StringComparison.Ordinal)
+            || !entry.Name.EndsWith(".oap", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        if (entry.Method != 0)
+        {
+            throw new InvalidDataException($"APK entry '{entry.Name}' is compressed. Add .oap to AndroidStoreUncompressedFileExtensions.");
+        }
+        return true;
+    }
+
+    static bool IsNativeLibrary(string name) => name.StartsWith("lib/", StringComparison.Ordinal)
+        && name.EndsWith(".so", StringComparison.Ordinal);
+
+    static void ValidateNativeLibraries(Stream stream)
+    {
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+        foreach (var entry in archive.Entries.Where(static entry => IsNativeLibrary(entry.FullName)))
+        {
+            using var source = entry.Open();
+            using var image = new MemoryStream();
+            source.CopyTo(image);
+            image.Position = 0;
+            AndroidNativeLibraryValidator.Validate(image, entry.FullName);
+        }
+    }
+
+    readonly record struct CentralEntry(byte[] Header, string Name, ushort Method);
+
+    static void ValidateNativeZipAlignment(Stream stream, byte[] centralHeader, string name)
+    {
+        var position = stream.Position;
+        stream.Position = BinaryPrimitives.ReadUInt32LittleEndian(centralHeader.AsSpan(42));
+        Span<byte> localHeader = stackalloc byte[30];
+        stream.ReadExactly(localHeader);
+        if (BinaryPrimitives.ReadUInt32LittleEndian(localHeader) != 0x04034b50)
+        {
+            throw new InvalidDataException($"APK entry '{name}' has an invalid local ZIP header.");
+        }
+        var dataOffset = stream.Position + BinaryPrimitives.ReadUInt16LittleEndian(localHeader[26..])
+            + BinaryPrimitives.ReadUInt16LittleEndian(localHeader[28..]);
+        if (dataOffset % 16384 != 0)
+        {
+            throw new InvalidDataException($"APK native entry '{name}' is not ZIP-aligned to 16 KB. Run zipalign -P 16.");
+        }
+        stream.Position = position;
     }
 
     static int FindEnd(byte[] tail)

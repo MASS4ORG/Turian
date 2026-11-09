@@ -17,6 +17,7 @@
     <AssemblyMetadata Include="TurianAndroidSdk" Value="$(NETCoreSdkVersion)" />
     <InternalsVisibleTo Include="Turian.Tests" />
     <Content Include="../../Launcher~/*" Link="AndroidLauncher/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../Native~/**/*" Link="AndroidNative/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="EmbedAndroidDependencies" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
     <MSBuild Projects="../Turian.Android.Dependencies/Turian.Android.Dependencies.csproj" Targets="GetTurianRuntimeDependencies" BuildInParallel="false">
