@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: brick native libraries in Android exports #61.
 - Fixed: Android startup hang and UI-thread blocking on slow game startup #255.
 - Fixed: Vulkan render-finished semaphores are per swapchain image.
+- Added: Android release signing and App Bundle output #271.
+- Added: Android launcher and adaptive icons #272.
 
 ## [3.11.0] - 2026-11-09
 

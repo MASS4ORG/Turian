@@ -69,6 +69,7 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         }
         ReferenceRuntimeAssemblies(project, context.Settings, manifest);
         ConfigureProperties(project, context, rid);
+        project.AddItemGroup().AddItem("AndroidResource", AndroidIcons.ResourceGlob);
         var assets = project.AddItemGroup().AddItem("AndroidAsset", "AndroidAssets/**/*");
         assets.AddMetadata("LogicalName",
             "$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\\', '/'))", true);
@@ -147,8 +148,7 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         properties.AddProperty("PublishAot", "false");
         properties.AddProperty("PublishTrimmed", "false");
         properties.AddProperty("EmbedAssembliesIntoApk", "true");
-        properties.AddProperty("AndroidPackageFormats", "apk");
-        properties.AddProperty("AndroidKeyStore", "false");
+        ConfigureSigning(properties, context);
         properties.AddProperty("AndroidManifest", "AndroidManifest.xml");
         properties.AddProperty("AndroidStoreUncompressedFileExtensions",
             "$(AndroidStoreUncompressedFileExtensions);.oap;.json;.png");
@@ -201,6 +201,11 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         {
             throw new InvalidOperationException("Compile and import the project's assets before exporting Android.");
         }
+        if (ReleaseSigningProblem(context) is { } signing)
+        {
+            throw new InvalidOperationException(signing);
+        }
+        AndroidIcons.Write(context.Settings, Path.GetDirectoryName(context.ProjectFile)!);
         var assets = Path.Combine(Path.GetDirectoryName(context.ProjectFile)!, "AndroidAssets");
         var cacheRoot = Path.GetFullPath(context.Settings.CacheAbsoluteDir) + Path.DirectorySeparatorChar;
         if (!Path.GetFullPath(assets).StartsWith(cacheRoot, StringComparison.OrdinalIgnoreCase))
@@ -234,6 +239,12 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         foreach (var package in packages)
         {
             AndroidPackageValidator.Validate(package, context.Profile?.Development == true);
+        }
+        if (context.Profile?.Development != true
+            && context.Settings.Get<AndroidPlayerSettings>().PackageFormat == AndroidPackageFormat.Aab
+            && Directory.GetFiles(context.OutputDirectory, "*-Signed.aab").Length == 0)
+        {
+            throw new InvalidDataException("Android publish produced no signed App Bundle.");
         }
         return Task.FromResult(new BuildArtifact(context.OutputDirectory));
     }
