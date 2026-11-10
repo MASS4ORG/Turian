@@ -63,6 +63,29 @@ public sealed class PlayerFramesTests : IDisposable
         Assert.Equal(0, closed);
     }
 
+    /// <summary>Once another scene replaces the startup scene, the overlay is built from the scene now active.</summary>
+    [Fact]
+    public void OverlayFollowsTheActiveSceneAfterTheStartupSceneIsReplaced()
+    {
+        var runtime = Runtime();
+        var path = Path.Combine(project, "Assets", "scene.prefab");
+        Serializer.Save(path, new Node { Name = "Startup" });
+        var prefab = new Prefab { RelativePath = path };
+        Assert.True(runtime.Assets.RegisterAsset(prefab));
+        runtime.Settings.Get<PlayerSettings>().StartupScene = new AssetReference<Prefab>(prefab.Id);
+        runtime.LoadStartupScene();
+        var presenter = Substitute.For<IUiPresenter>();
+        var frames = Frames(runtime, presenter);
+
+        frames.Frame(0.1);
+        presenter.Received(1).TryRenderOverlay(runtime.StartupRoot!, 320, 200, 0.1f);
+
+        var replacement = new Node { Name = "Next" };
+        runtime.Scenes.AdoptScene(Guid.NewGuid(), replacement);
+        frames.Frame(0.1);
+        presenter.Received(1).TryRenderOverlay(replacement, 320, 200, 0.1f);
+    }
+
     /// <summary>
     /// No overlay is drawn without a presenter or while the window is minimized; roots without a camera are skipped.
     /// </summary>

@@ -142,7 +142,7 @@ public sealed class PlayerFrames(
         }
 
         var scenes = runtime.Scenes;
-        var root = runtime.StartupRoot ?? scenes.ActiveScene?.RootNode ?? scenes.PersistentRoot;
+        var root = scenes.ActiveScene?.RootNode ?? scenes.PersistentRoot;
         setOverlay(presenter.TryRenderOverlay(root, size.X, size.Y, (float)deltaTime));
     }
 
