@@ -18,7 +18,6 @@ public sealed class AndroidPlayer(AndroidSurfaceHost surface, BufferedInputSourc
             services.AddSingleton(sp => new Vulkan(surface, context.Logger, sp.GetService<IAppSettings>()));
             services.AddSingleton<IRenderDevice>(static sp => sp.GetRequiredService<Vulkan>());
         });
-        using var dataAssets = runtime.Services.GetRequiredService<DataAssetSession>();
         var vulkan = runtime.Services.GetRequiredService<Vulkan>();
         input.TouchEmulatesMouse = runtime.Settings.Get<InputSettings>().TouchEmulatesMouse;
         var safeArea = runtime.Services.GetRequiredService<SafeAreaService>();
@@ -53,6 +52,8 @@ public sealed class AndroidPlayer(AndroidSurfaceHost surface, BufferedInputSourc
         finally
         {
             surface.InsetsChanged -= safeArea.SetInsets;
+            // Session features stop first, while the services they use are still alive.
+            runtime.Dispose();
             vulkan.Device.Dispose();
             (runtime.Services as IDisposable)?.Dispose();
         }

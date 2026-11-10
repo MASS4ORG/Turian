@@ -63,6 +63,33 @@ public sealed class PlayerFramesTests : IDisposable
         Assert.Equal(0, closed);
     }
 
+    sealed class PauseRecorder : IEngineSessionParticipant, IEngineSessionPauseParticipant
+    {
+        public List<bool> Changes { get; } = [];
+        public void Start() { }
+        public void Stop() { }
+        public void SetPaused(bool paused) => Changes.Add(paused);
+    }
+
+    /// <summary>Session features hear once when the application leaves the foreground and once when it returns.</summary>
+    [Fact]
+    public void SessionFeaturesFollowTheForeground()
+    {
+        var recorder = new PauseRecorder();
+        var runtime = GameRuntime.StartClient(
+            new GamePlayerContext(project, NullLogger.Instance, static services => services.BuildServiceProvider()),
+            new BufferedInputSource(),
+            services => services.AddSingleton<IEngineSessionParticipant>(recorder));
+        var frames = Frames(runtime, null);
+
+        frames.Paused = false;
+        frames.Paused = true;
+        frames.Paused = true;
+        frames.Paused = false;
+
+        Assert.Equal([true, false], recorder.Changes);
+    }
+
     /// <summary>A player that owns its window opens an interactive client session on the input it supplies.</summary>
     [Fact]
     public void PlayersOwningTheirWindowOpenInteractiveClientSessions()

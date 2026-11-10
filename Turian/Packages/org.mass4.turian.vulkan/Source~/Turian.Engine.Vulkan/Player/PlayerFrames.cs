@@ -51,12 +51,14 @@ public sealed class PlayerFrames(
         get => paused;
         set
         {
-            if (paused && !value)
+            if (paused == value)
             {
-                resumed = true;
+                return;
             }
 
+            resumed = !value;
             paused = value;
+            runtime.Services.GetService<EngineSessionLifetime>()?.SetPaused(value);
         }
     }
 
