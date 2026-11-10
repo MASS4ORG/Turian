@@ -24,6 +24,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed: players draw the interface of the active scene after a scene change.
 - Fixed: Android runs a client session, so audio reaches the device #255.
 - Fixed: landscape on devices whose display reports a rotated surface #255.
+- Fixed: meta files store project-relative paths with forward slashes and repair machine-specific ones.
+- Fixed: saving through a temporary file no longer gives an asset a new id.
+- Fixed: closing an Android game no longer reports a failure from stopped session features #255.
+- Added: session features can stop device work while the application is in the background.
+- Fixed: Studio's file dialog no longer hangs empty when a Linux mount does not answer.
 
 ## [3.11.0] - 2026-11-09
 

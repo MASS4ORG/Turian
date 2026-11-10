@@ -19,7 +19,11 @@ sealed class FileDialogChrome : IChromeItem
 
     /// <summary>Raises the dialog. Called from the commands that need a path.</summary>
     /// <param name="request">What to ask the user for.</param>
-    public void Show(FileDialogRequest request) => state.Open(request);
+    public void Show(FileDialogRequest request) => state.Open(request with
+    {
+        Places = request.Places ?? StudioFilePlaces.ForThisSystem(),
+        StartPath = request.StartPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    });
 
     /// <inheritdoc />
     public void Render(Gui gui)
