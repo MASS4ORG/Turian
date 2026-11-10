@@ -51,10 +51,12 @@ public sealed class MetaFilePathTests : IDisposable
     [InlineData(@"Assets\\Scenes\\notes.txt")]
     public void MachineSpecificPathsAreRepairedOnScan(string stored)
     {
-        var source = Source("notes.txt");
+        // The meta lands first, as a checkout would write it: a source alone lets the watcher create a fresh meta.
+        var source = Path.Combine(project, "Assets", "Scenes", "notes.txt");
         var id = Guid.NewGuid();
         File.WriteAllText($"{source}.meta",
             $$"""{ "__TypeId": "2af5e114-fb34-54c7-8f14-04aed6c7eb74", "RelativePath": "{{stored}}", "Labels": [], "Id": "{{id}}" }""");
+        Source("notes.txt");
 
         importer.GenerateMetaFiles(Path.Combine(project, "Assets"));
 
