@@ -1,7 +1,7 @@
 # Turian CLI: headless editor automation (compile, playmode, screenshot, pick, oap, brick)
 # for gamedevs to build their Turian projects in their own CI/CD, plus brick-release for brick release workflows.
 # Built with Podman.
-ARG DOTNET_VERSION=11.0.100-rc.3
+ARG DOTNET_VERSION=11.0.100
 
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
 ARG VERSION=0.0.0
