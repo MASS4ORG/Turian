@@ -88,7 +88,10 @@ public sealed partial class AssetImporter
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(path, SerializeMetaFile(asset, GetAssetPathFromMeta(path)));
+        // Written aside and moved in, because the watcher and the scan can read a meta while it is being saved.
+        var temporary = $"{path}.{Guid.NewGuid():N}.tmp";
+        File.WriteAllText(temporary, SerializeMetaFile(asset, GetAssetPathFromMeta(path)));
+        File.Move(temporary, path, overwrite: true);
     }
 
     bool CanImportSource(string path) =>

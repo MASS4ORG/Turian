@@ -26,7 +26,7 @@ public sealed class NativeAuthoringAssetTests : IDisposable
         var source = Path.Combine(project, "Assets", "authoring" + extension);
         byte[] sourceBytes = [.. "native authoring document"u8];
         File.WriteAllBytes(source, sourceBytes);
-        var asset = new ModelImportAsset { RelativePath = source };
+        var asset = new ModelImportAsset { RelativePath = "Assets/authoring" + extension };
         if (typedMetadata)
         {
             Serializer.Save(source + ".meta", asset);

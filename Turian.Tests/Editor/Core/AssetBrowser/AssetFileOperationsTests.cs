@@ -6,12 +6,13 @@ public class AssetFileOperationsTests : IDisposable
     readonly string project = Path.Combine(Path.GetTempPath(), $"turian-fileops-{Guid.NewGuid():N}");
     readonly AssetManager assets = new();
     readonly UndoService undo;
+    readonly AssetImporter importer;
     readonly AssetFileSystem files;
     readonly AssetFileOperations operations;
 
     string Assets => Path.Combine(project, "Assets");
 
-    /// <summary>A project on disk; nothing here reaches the importer.</summary>
+    /// <summary>A project on disk, with an importer that has no project to scan and only writes meta files.</summary>
     public AssetFileOperationsTests()
     {
         Directory.CreateDirectory(Assets);
@@ -21,7 +22,8 @@ public class AssetFileOperationsTests : IDisposable
         var sceneTree = new SceneTreeController(assets, settings, assetImporter: null!,
             assetLoader: loader, sceneManager: Substitute.For<ISceneManager>(), database: new AssetDatabase());
         undo = new UndoService(sceneTree, new NodeInspectorController(assets), assets, loader);
-        files = new AssetFileSystem(settings, assetImporter: null!);
+        importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), new SettingsService());
+        files = new AssetFileSystem(settings, importer);
         operations = new AssetFileOperations(files, undo);
     }
 
@@ -29,6 +31,7 @@ public class AssetFileOperationsTests : IDisposable
     public void Dispose()
     {
         undo.Dispose();
+        importer.Dispose();
         if (Directory.Exists(project))
         {
             Directory.Delete(project, recursive: true);
@@ -51,14 +54,14 @@ public class AssetFileOperationsTests : IDisposable
     public void Delete_IsUndoneFromTheTrash()
     {
         var path = AddAsset("stats.dataasset");
-        var meta = File.ReadAllText($"{path}.meta");
+        var id = MetaId(path);
 
         Assert.True(operations.Delete(path));
         Assert.False(File.Exists(path));
 
         undo.Undo();
         Assert.True(File.Exists(path));
-        Assert.Equal(meta, File.ReadAllText($"{path}.meta"));
+        Assert.Equal(id, MetaId(path));
 
         undo.Redo();
         Assert.False(File.Exists(path));
