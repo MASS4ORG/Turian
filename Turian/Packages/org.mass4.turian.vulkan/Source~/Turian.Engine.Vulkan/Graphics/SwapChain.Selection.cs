@@ -68,11 +68,51 @@ public partial class SwapChain
         return PresentModeKHR.FifoKhr;
     }
 
+    /// <summary>
+    /// The transform images are presented with. The renderer draws upright, so identity is taken when offered and the
+    /// compositor turns the picture to match the device.
+    /// </summary>
+    /// <param name="capabilities">The surface's capabilities.</param>
+    /// <returns>The transform to create the swapchain with.</returns>
+    internal static SurfaceTransformFlagsKHR ChoosePreTransform(SurfaceCapabilitiesKHR capabilities) =>
+        capabilities.SupportedTransforms.HasFlag(SurfaceTransformFlagsKHR.IdentityBitKhr)
+            ? SurfaceTransformFlagsKHR.IdentityBitKhr
+            : capabilities.CurrentTransform;
+
+    /// <summary>
+    /// The surface's extent as upright images need it. A surface turned a quarter reports its extent in the display's
+    /// native orientation, which is swapped relative to what the renderer draws.
+    /// </summary>
+    /// <param name="capabilities">The surface's capabilities.</param>
+    /// <returns>The extent to create the swapchain with.</returns>
+    internal static Extent2D UprightExtent(SurfaceCapabilitiesKHR capabilities)
+    {
+        const SurfaceTransformFlagsKHR quarterTurns = SurfaceTransformFlagsKHR.Rotate90BitKhr
+            | SurfaceTransformFlagsKHR.Rotate270BitKhr
+            | SurfaceTransformFlagsKHR.HorizontalMirrorRotate90BitKhr
+            | SurfaceTransformFlagsKHR.HorizontalMirrorRotate270BitKhr;
+        var extent = capabilities.CurrentExtent;
+        return ChoosePreTransform(capabilities) == SurfaceTransformFlagsKHR.IdentityBitKhr
+               && (capabilities.CurrentTransform & quarterTurns) != 0
+            ? new Extent2D(extent.Height, extent.Width)
+            : extent;
+    }
+
+    /// <summary>
+    /// Reads a present result. A swapchain left to the compositor to rotate stays suboptimal for as long as the device
+    /// is turned, which is expected and must not rebuild it every frame.
+    /// </summary>
+    /// <param name="result">The result of presenting.</param>
+    /// <param name="compositorRotates">Whether the compositor turns this swapchain's images.</param>
+    /// <returns>The result the surface lifecycle should act on.</returns>
+    internal static Result PresentResult(Result result, bool compositorRotates) =>
+        compositorRotates && result == Result.SuboptimalKhr ? Result.Success : result;
+
     Extent2D ChooseSwapExtent(SurfaceCapabilitiesKHR capabilities)
     {
         if (capabilities.CurrentExtent.Width != uint.MaxValue)
         {
-            return capabilities.CurrentExtent;
+            return UprightExtent(capabilities);
         }
         else
         {

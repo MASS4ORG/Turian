@@ -91,6 +91,7 @@ public partial class SwapChain : IDisposable
     Image[] swapChainImages = null!;
     Format swapChainDepthFormat;
     Extent2D swapChainExtent;
+    bool compositorRotates;
     ImageView[] swapChainImageViews = null!;
     Framebuffer[] swapChainFramebuffers = null!;
     RenderPass renderPass;
@@ -157,7 +158,7 @@ public partial class SwapChain : IDisposable
             ref imageIndex
         );
 
-        return result;
+        return PresentResult(result, compositorRotates);
     }
 
     /// <summary>
@@ -230,7 +231,7 @@ public partial class SwapChain : IDisposable
 
         currentFrame = (currentFrame + 1) % MaxFramesInFlight;
 
-        return result;
+        return PresentResult(result, compositorRotates);
     }
 
     /// <summary>

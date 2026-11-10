@@ -67,9 +67,11 @@ public partial class SwapChain
             creatInfo.ImageSharingMode = SharingMode.Exclusive;
         }
 
+        var preTransform = ChoosePreTransform(swapChainSupport.Capabilities);
+        compositorRotates = preTransform != swapChainSupport.Capabilities.CurrentTransform;
         creatInfo = creatInfo with
         {
-            PreTransform = swapChainSupport.Capabilities.CurrentTransform,
+            PreTransform = preTransform,
             CompositeAlpha = ChooseCompositeAlpha(swapChainSupport.Capabilities.SupportedCompositeAlpha),
             PresentMode = presentMode,
             Clipped = true,
