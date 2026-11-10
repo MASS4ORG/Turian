@@ -13,7 +13,7 @@ public sealed class AndroidPlayer(AndroidSurfaceHost surface, BufferedInputSourc
         {
             return Application.ExitCode;
         }
-        var runtime = GameRuntime.Start(context, input, services =>
+        var runtime = GameRuntime.StartClient(context, input, services =>
         {
             services.AddSingleton(sp => new Vulkan(surface, context.Logger, sp.GetService<IAppSettings>()));
             services.AddSingleton<IRenderDevice>(static sp => sp.GetRequiredService<Vulkan>());

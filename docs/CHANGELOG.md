@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: Android export smoke job and pinned toolchain #275.
 - Changed: CI and the CLI image build with the .NET 11 SDK.
 - Fixed: players draw the interface of the active scene after a scene change.
+- Fixed: Android runs a client session, so audio reaches the device #255.
 
 ## [3.11.0] - 2026-11-09
 

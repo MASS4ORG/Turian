@@ -63,6 +63,21 @@ public sealed class PlayerFramesTests : IDisposable
         Assert.Equal(0, closed);
     }
 
+    /// <summary>A player that owns its window opens an interactive client session on the input it supplies.</summary>
+    [Fact]
+    public void PlayersOwningTheirWindowOpenInteractiveClientSessions()
+    {
+        var input = new BufferedInputSource();
+
+        var runtime = GameRuntime.StartClient(
+            new GamePlayerContext(project, NullLogger.Instance, static services => services.BuildServiceProvider()), input);
+
+        var session = runtime.Services.GetRequiredService<EngineSessionContext>();
+        Assert.Equal(EngineSessionKind.Client, session.Kind);
+        Assert.True(session.Interactive);
+        Assert.Same(input, runtime.Services.GetRequiredService<IInputSource>());
+    }
+
     /// <summary>Once another scene replaces the startup scene, the overlay is built from the scene now active.</summary>
     [Fact]
     public void OverlayFollowsTheActiveSceneAfterTheStartupSceneIsReplaced()
