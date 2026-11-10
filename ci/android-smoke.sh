@@ -18,7 +18,8 @@ sed -i -e 's/"Name": "Client"/"Name": "Android"/' -e 's/"Platform": "desktop"/"P
   -e 's/"RuntimeIdentifier": null/"RuntimeIdentifier": "android-arm64"/' -e 's/"Development": false/"Development": true/' "$profile"
 sed -i "s/\"ApplicationIdentifier\": \"[^\"]*\"/\"ApplicationIdentifier\": \"$application\"/" sample/Assets/Settings/PlayerSettings.dataasset
 
-$cli brick restore --project sample
+# A new project has no lock yet, and the CLI restores locked whenever CI is true.
+CI=false $cli brick restore --project sample
 $cli export sample --profile Android --configuration Debug
 
 apk=$(find sample/Output -name '*-Signed.apk' | head -n1)

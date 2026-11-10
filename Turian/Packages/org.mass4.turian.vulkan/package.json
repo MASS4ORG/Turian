@@ -15,8 +15,8 @@
     "Silk.NET.Windowing.Common": "2.23.0",
     "Silk.NET.Windowing.Glfw": "2.23.0",
     "StbImageSharp": "2.30.16",
-    "SkiaSharp": "4.154.0",
-    "SkiaSharp.NativeAssets.Linux": "4.154.0"
+    "SkiaSharp": "4.155.0",
+    "SkiaSharp.NativeAssets.Linux": "4.155.0"
   },
   "categories": [
     "turian:graphics"
