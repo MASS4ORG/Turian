@@ -18,8 +18,8 @@ public class AndroidPlayerSettings : ProjectSettingsAsset
     /// <summary>The positive version code Android uses to order application updates.</summary>
     public int VersionCode { get; set; } = 1;
 
-    /// <summary>Whether system Back quits the session; false delivers an Escape input event.</summary>
-    public bool BackButtonQuits { get; set; } = true;
+    /// <summary>Whether system Back quits the session; false delivers an Escape input event, as on a keyboard.</summary>
+    public bool BackButtonQuits { get; set; }
 
     /// <summary>The package a non-development export produces.</summary>
     public AndroidPackageFormat PackageFormat { get; set; } = AndroidPackageFormat.Apk;

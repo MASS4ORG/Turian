@@ -29,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed: closing an Android game no longer reports a failure from stopped session features #255.
 - Added: session features can stop device work while the application is in the background.
 - Fixed: Studio's file dialog no longer hangs empty when a Linux mount does not answer.
+- Changed: Android presents in step with the display.
+- Changed: Android system Back sends Escape unless the project sets it to quit.
 
 ## [3.11.0] - 2026-11-09
 

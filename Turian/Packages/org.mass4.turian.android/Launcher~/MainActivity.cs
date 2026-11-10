@@ -28,7 +28,7 @@ public class MainActivity : Activity, ISurfaceHolderCallback
     readonly BufferedInputSource input = new();
     Thread? gameThread;
     BackCallback? back;
-    bool backQuits = true;
+    bool backQuits;
 
     /// <summary>Supplies the key for encrypted OAP packages before any content is opened.</summary>
     /// <returns>A 32-byte key, or null for unencrypted content.</returns>
@@ -160,7 +160,7 @@ public class MainActivity : Activity, ISurfaceHolderCallback
                 static services => services.BuildServiceProvider(), Development, Content: content);
             if (content.Probe("android-player.json") is not null)
             {
-                backQuits = content.ReadAllText("android-player.json").Trim() != "false";
+                backQuits = content.ReadAllText("android-player.json").Trim() == "true";
             }
             new AndroidPlayer(surface!, input).Run(context);
         }

@@ -289,7 +289,8 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
 
     void InitializeRenderer()
     {
-        Renderer = new Renderer(vulkan.Vk, vulkan.Device, surfaceHost, useFifo);
+        // A phone paces itself to the display: rendering faster only costs heat and battery.
+        Renderer = new Renderer(vulkan.Vk, vulkan.Device, surfaceHost, useFifo || OperatingSystem.IsAndroid());
         Renderer.Initialize();
         Renderer.RenderPassChanged += RebuildRenderSystems;
         logger.Lap("startup", "got renderer");
