@@ -80,7 +80,7 @@ public sealed partial class AssetImporter
         }
     }
 
-    static void SaveAssetMetadata(Asset asset, string path)
+    void SaveAssetMetadata(Asset asset, string path)
     {
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -88,7 +88,7 @@ public sealed partial class AssetImporter
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(path, SerializeAssetMetadata(asset));
+        File.WriteAllText(path, SerializeMetaFile(asset, GetAssetPathFromMeta(path)));
     }
 
     bool CanImportSource(string path) =>
@@ -162,6 +162,7 @@ public sealed partial class AssetImporter
         }
 
         var assetPath = GetAssetPathFromMeta(metaFilePath);
+        var storedPath = asset.RelativePath;
         asset = ApplyImportOverrides(asset, assetPath);
         asset.RelativePath = assetPath;
 
@@ -170,6 +171,11 @@ public sealed partial class AssetImporter
             CleanupImportedArtifactsForAsset(asset);
             RebuildDatabase();
             return false;
+        }
+
+        if (IsMachineSpecificPath(storedPath) && PackageRootOf(assetPath) is not { ReadOnly: true })
+        {
+            SaveAssetMetadata(asset, metaFilePath);
         }
 
         if (!TryImportAssetToCache(asset, assetPath, out var imported, out var indexValid))

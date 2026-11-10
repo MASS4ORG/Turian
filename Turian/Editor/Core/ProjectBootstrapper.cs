@@ -51,7 +51,11 @@ public sealed class ProjectBootstrapper
 
             await Serializer.SaveAsync(sceneFilePath, CreateDefaultScene());
 
-            var sceneMeta = new Prefab { Id = startupSceneId, RelativePath = sceneFilePath };
+            var sceneMeta = new Prefab
+            {
+                Id = startupSceneId,
+                RelativePath = Path.GetRelativePath(projectDirectory, sceneFilePath).Replace('\\', '/'),
+            };
             await Serializer.SaveAsync($"{sceneFilePath}.meta", sceneMeta);
 
             var settings = new AppSettings { Title = title, ProjectAbsoluteDir = Path.GetFullPath(projectDirectory) };

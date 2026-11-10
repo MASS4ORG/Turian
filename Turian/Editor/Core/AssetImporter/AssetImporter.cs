@@ -555,6 +555,12 @@ public sealed partial class AssetImporter : IDisposable
             return;
         }
 
+        // Editors save by renaming the file to a temporary name and writing a new one: the asset has not moved.
+        if (HasIgnoredExtension(newPath))
+        {
+            return;
+        }
+
         var oldMetaPath = GetMetaFilePath(oldPath);
         var newMetaPath = GetMetaFilePath(newPath);
 

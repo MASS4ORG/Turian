@@ -323,7 +323,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
         try
         {
             var path = GetUniquePath(targetDirectory, name, isDirectory: false);
-            var material = new MaterialAsset { Id = Guid.NewGuid(), RelativePath = path };
+            var material = new MaterialAsset { Id = Guid.NewGuid(), RelativePath = assetImporter.StoredPathOf(path) };
 
             // The content file and its meta carry the same id, so the importer adopts the asset
             // the watcher sees rather than minting a second id for it.
@@ -429,7 +429,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
 
     // ── Private file ops ──────────────────────────────────────────────────────
 
-    static void MoveAssetPreservingMetadata(string src, string dest)
+    void MoveAssetPreservingMetadata(string src, string dest)
     {
         var srcMeta = $"{src}.meta";
         var destMeta = $"{dest}.meta";
@@ -442,7 +442,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
         }
     }
 
-    static void RenameAssetPreservingMetadata(string src, string dest)
+    void RenameAssetPreservingMetadata(string src, string dest)
         => MoveAssetPreservingMetadata(src, dest);
 
     void MoveEntry(string src, string dest, bool isDirectory)
@@ -473,7 +473,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
         }
     }
 
-    static bool TryCloneMeta(string sourceMeta, string dest, List<(string Path, Guid Old, Guid New)>? copied)
+    bool TryCloneMeta(string sourceMeta, string dest, List<(string Path, Guid Old, Guid New)>? copied)
     {
         if (!File.Exists(sourceMeta))
         {
@@ -539,7 +539,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
         var asset = CreateAssetMetadata(assetPath);
         asset.Id = Guid.NewGuid();
         asset.RelativePath = assetPath;
-        File.WriteAllText(metaPath, SerializeAssetMetadata(asset));
+        File.WriteAllText(metaPath, assetImporter.SerializeMetaFile(asset, assetPath));
     }
 
     Asset CreateAssetMetadata(string assetPath)
@@ -551,9 +551,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
             ?? throw new InvalidOperationException("CreateAssetMetadata returned null.");
     }
 
-    static string SerializeAssetMetadata(Asset asset) => AssetImporter.SerializeAssetMetadata(asset);
-
-    static void UpdateMetaRelativePath(string metaPath, string assetPath)
+    void UpdateMetaRelativePath(string metaPath, string assetPath)
     {
         var asset = Serializer.Load<Asset>(metaPath);
         if (asset is null)
@@ -562,7 +560,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
         }
 
         asset.RelativePath = assetPath;
-        File.WriteAllText(metaPath, SerializeAssetMetadata(asset));
+        File.WriteAllText(metaPath, assetImporter.SerializeMetaFile(asset, assetPath));
     }
 
     static void ScanRecursive(DirectoryInfo dir, List<AssetEntry> result, string? parentPath)
