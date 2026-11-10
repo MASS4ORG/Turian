@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Changed: builds use the .NET 11.0.100 SDK and Android workload set 11.0.100 #275.
 - Added: Android CoreCLR export platform #254.
 - Added: Android launcher and surface lifecycle #255.
 - Added: in-place APK content reads #257.
