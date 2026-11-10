@@ -42,8 +42,43 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
     /// <inheritdoc />
     public RuntimeDependencies Dependencies => Graph.Value;
 
+    /// <summary>The user's Android choices, one instance that Studio and the CLI fill in place.</summary>
+    public static AndroidToolchainSettings Settings { get; } = new();
+
     /// <inheritdoc />
-    public IReadOnlyList<BuildDevice>? Devices => [];
+    public object UserSettings => Settings;
+
+    /// <inheritdoc />
+    public bool Deploys => true;
+
+    /// <inheritdoc />
+    public BuildDeployment? ConfiguredDeployment => Settings.InstallOnDevice ? new BuildDeployment(null) : null;
+
+    static string? Sdk => AndroidToolchain.FindSdk(Settings.SdkDirectory);
+
+    static string? Jdk => AndroidToolchain.FindJdk(Settings.JdkDirectory);
+
+    /// <inheritdoc />
+    public IReadOnlyList<BuildDevice>? Devices
+    {
+        get
+        {
+            if (AndroidToolchain.FindAdb(Sdk) is not { } adb)
+            {
+                return [];
+            }
+
+            try
+            {
+                return AndroidToolchain.ListDevices(adb);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or TimeoutException
+                                                  or System.ComponentModel.Win32Exception)
+            {
+                return [];
+            }
+        }
+    }
 
     /// <inheritdoc />
     public string LauncherDirectory
@@ -161,10 +196,43 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<string> PublishArguments(BuildPlatformContext context) =>
-        ["publish", context.ProjectFile, "-o", context.OutputDirectory, "-c", context.Configuration,
+    public IReadOnlyList<string> PublishArguments(BuildPlatformContext context)
+    {
+        List<string> arguments =
+        [
+            "publish", context.ProjectFile, "-o", context.OutputDirectory, "-c", context.Configuration,
             "--no-restore", "-m:4", "-nodeReuse:false",
-            $"-p:TurianDefines={string.Join("%3B", context.Profile?.Symbols ?? [])}"];
+            $"-p:TurianDefines={string.Join("%3B", context.Profile?.Symbols ?? [])}",
+        ];
+
+        // The tools found here, so the Android build does not depend on how the editor was started.
+        if (Sdk is { } sdk)
+        {
+            arguments.Add($"-p:AndroidSdkDirectory={sdk}");
+        }
+
+        if (Jdk is { } jdk)
+        {
+            arguments.Add($"-p:JavaSdkDirectory={jdk}");
+        }
+
+        return arguments;
+    }
+
+    /// <summary>What is missing among the Android SDK and the JDK, or null when both are found.</summary>
+    static string? MissingTools() =>
+        (Sdk, Jdk) switch
+        {
+            (null, null) => $"{MissingSdk} {MissingJdk}",
+            (null, _) => MissingSdk,
+            (_, null) => MissingJdk,
+            _ => null,
+        };
+
+    const string MissingSdk = "The Android SDK was not found: install it with Android Studio or the command-line "
+                              + "tools, or set its folder in Settings, Build, Android.";
+
+    const string MissingJdk = "No JDK 17 or newer was found: install one, or set its folder in Settings, Build, Android.";
 
     /// <inheritdoc />
     public BuildPlatformStatus CheckToolchain()
@@ -177,9 +245,14 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
                 && Directory.EnumerateDirectories(packs, "Microsoft.Android.Sdk.*")
                     .Any(static pack => Directory.EnumerateDirectories(pack)
                         .Any(static version => Path.GetFileName(version).StartsWith("37.", StringComparison.Ordinal)));
-            return installed
-                ? new(true, "The .NET 11 Android SDK pack is installed; export validates the Android SDK and JDK.")
-                : new(false, "Install the .NET 11 Android workload, Android SDK platform 36 and a compatible JDK.");
+            if (!installed)
+            {
+                return new(false, "Install the .NET 11 Android workload: dotnet workload install android.");
+            }
+
+            return MissingTools() is { } missing
+                ? new(false, missing)
+                : new(true, $"Android SDK at {Sdk}, JDK at {Jdk}.");
         }
         catch (InvalidOperationException exception)
         {
@@ -204,6 +277,10 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         if (ReleaseSigningProblem(context) is { } signing)
         {
             throw new InvalidOperationException(signing);
+        }
+        if (MissingTools() is { } missing)
+        {
+            throw new InvalidOperationException(missing);
         }
         AndroidIcons.Write(context.Settings, Path.GetDirectoryName(context.ProjectFile)!);
         var assets = Path.Combine(Path.GetDirectoryName(context.ProjectFile)!, "AndroidAssets");
@@ -248,6 +325,47 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         }
         return Task.FromResult(new BuildArtifact(context.OutputDirectory));
     }
+
+    /// <inheritdoc />
+    public Task<string> DeployAsync(BuildPlatformContext context, BuildArtifact artifact, string? device,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(artifact);
+        var adb = Adb();
+        var package = Directory.GetFiles(artifact.OutputDirectory, "*-Signed.apk").SingleOrDefault()
+            ?? throw new InvalidOperationException($"No single signed APK to install in {artifact.OutputDirectory}.");
+        var application = context.Settings.Get<PlayerSettings>().ApplicationIdentifier!;
+        return Task.Run(() =>
+        {
+            var serial = AndroidToolchain.ChooseDevice(AndroidToolchain.ListAllDevices(adb),
+                string.IsNullOrWhiteSpace(device) ? Settings.Device : device);
+            context.Logger.LogInformation("Installing {Package} on {Device}", Path.GetFileName(package), serial);
+            AndroidToolchain.Install(adb, serial, package);
+            if (AndroidToolchain.Start(adb, serial, application) is { } milliseconds)
+            {
+                context.Logger.LogInformation("Started {Application} on {Device} in {Milliseconds} ms", application,
+                    serial, milliseconds);
+            }
+            else
+            {
+                context.Logger.LogInformation("Started {Application} on {Device}", application, serial);
+            }
+            return serial;
+        }, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task FollowAsync(BuildPlatformContext context, string device, Action<string> write,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return AndroidToolchain.FollowAsync(Adb(), device, context.Settings.Get<PlayerSettings>().ApplicationIdentifier!,
+            write, cancellationToken);
+    }
+
+    static string Adb() => AndroidToolchain.FindAdb(Sdk) ?? throw new InvalidOperationException(
+        Sdk is null ? MissingSdk : $"The Android SDK at {Sdk} has no platform tools: install them with the SDK manager.");
 
     void ReferenceRuntimeAssemblies(ProjectRootElement project, IBuildAppSettings settings,
         MASS4.Bricks.PackageManifest manifest)

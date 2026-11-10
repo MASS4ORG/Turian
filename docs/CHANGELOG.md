@@ -6,32 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Changed: builds use the .NET 11.0.100 SDK and Android workload set 11.0.100 #275.
-- Added: Android CoreCLR export platform #254.
-- Added: Android launcher and surface lifecycle #255.
-- Added: in-place APK content reads #257.
-- Fixed: Android native libraries and APK validation for 16 KB pages #274.
-- Added: Android logcat logger provider #258.
-- Added: Vulkan validation layers setting and Android development packaging #261.
-- Added: touch input with action bindings and mouse emulation #269.
-- Added: runtime safe-area service #343.
-- Added: brick native libraries in Android exports #61.
-- Fixed: Android startup hang and UI-thread blocking on slow game startup #255.
-- Fixed: Vulkan render-finished semaphores are per swapchain image.
-- Added: Android release signing and App Bundle output #271.
-- Added: Android launcher and adaptive icons #272.
-- Added: Android export smoke job and pinned toolchain #275.
-- Changed: CI and the CLI image build with the .NET 11 SDK.
-- Fixed: players draw the interface of the active scene after a scene change.
-- Fixed: Android runs a client session, so audio reaches the device #255.
-- Fixed: landscape on devices whose display reports a rotated surface #255.
-- Fixed: meta files store project-relative paths with forward slashes and repair machine-specific ones.
-- Fixed: saving through a temporary file no longer gives an asset a new id.
-- Fixed: closing an Android game no longer reports a failure from stopped session features #255.
-- Added: session features can stop device work while the application is in the background.
-- Fixed: Studio's file dialog no longer hangs empty when a Linux mount does not answer.
-- Changed: Android presents in step with the display.
-- Changed: Android system Back sends Escape unless the project sets it to quit.
+- Added: dotnet 11
+- Added: android export #254 #255 #257 #258 #261 #269 #271 #272 #274 #275 #343
+- Fixed: Studio's file dialog no longer hangs on Linux mounts
+- Fixed: Vulkan semaphores are per swapchain image
 
 ## [3.11.0] - 2026-11-09
 

@@ -312,6 +312,12 @@ public sealed class GayaPlugin : IPlugin
         context.Settings.Register(inspector);
         context.Settings.Register(recent);
         context.Settings.Register(output);
+
+        // Export platforms keep per-user choices too, such as where their tools are installed.
+        foreach (var page in BuildPlatforms.All().Select(static platform => platform.UserSettings).OfType<object>())
+        {
+            context.Settings.Register(page);
+        }
     }
 
     /// <summary>

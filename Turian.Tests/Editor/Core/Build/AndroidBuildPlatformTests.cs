@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Android export contracts independent of the Android workload and devices.</summary>
+[Collection(SerialTests.Name)]
 public sealed class AndroidBuildPlatformTests : IDisposable
 {
     readonly string directory = Path.Combine(Path.GetTempPath(), "turian-android-" + Guid.NewGuid().ToString("N"));
@@ -102,6 +103,7 @@ public sealed class AndroidBuildPlatformTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => platform.PrepareAsync(context, TestContext.Current.CancellationToken));
         File.WriteAllText(Path.Combine(settings.CacheAbsoluteDir, "assetCatalog.json"), "{\"Records\":[]}");
         File.WriteAllText(Path.Combine(settings.CacheAbsoluteDir, ProjectSettingsLoader.IndexFileName), "{}");
+        using var tools = AndroidFakeTools.Use(Path.Combine(directory, "tools"));
         await platform.PrepareAsync(context, TestContext.Current.CancellationToken);
         var assets = Path.Combine(Path.GetDirectoryName(generated.FullPath)!, "AndroidAssets");
         Assert.True(File.Exists(Path.Combine(assets, "Content", "Example.oap")));

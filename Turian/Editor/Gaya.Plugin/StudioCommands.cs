@@ -435,6 +435,13 @@ static class StudioCommands
 
         services.GetRequiredService<AssetManager>().SaveAllAssets();
 
+        // A device platform runs the game on the device: export, install and start it there.
+        if (build.ActiveProfileDeploys)
+        {
+            RunExport(services.GetRequiredService<BackgroundTaskRunner>(), () => build.ExportAsync(install: true));
+            return;
+        }
+
         services.GetRequiredService<BackgroundTaskRunner>().Run(
             new BackgroundTaskSpec
             {
