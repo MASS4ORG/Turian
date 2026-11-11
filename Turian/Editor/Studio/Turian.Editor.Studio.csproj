@@ -13,11 +13,6 @@
         <ApplicationIcon>$(SolutionDir)/Gaya/Gaya.Host/Resources/logo.ico</ApplicationIcon>
     </PropertyGroup>
 
-    <!-- Internal libraries -->
-    <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.android/Source~/Turian.Editor.Build.Platform.Android/Turian.Editor.Build.Platform.Android.csproj"
-                          ReferenceOutputAssembly="false" PrivateAssets="all" />
-    </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Gaya.Plugin/Gaya.Plugin.Turian.csproj"/>

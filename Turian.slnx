@@ -36,9 +36,6 @@
     <Project Path="Turian/Engine/Core/Turian.Engine.Core.csproj" />
   </Folder>
   <Folder Name="/Packages/">
-    <Project Path="Turian/Packages/org.mass4.turian.android/Source~/Turian.Android.Host/Turian.Android.Host.csproj" />
-    <Project Path="Turian/Packages/org.mass4.turian.android/Source~/Turian.Editor.Build.Platform.Android/Turian.Editor.Build.Platform.Android.csproj" />
-    <Project Path="Turian/Packages/org.mass4.turian.android/Source~/Turian.Android.Dependencies/Turian.Android.Dependencies.csproj" />
     <Project Path="Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj" />
   </Folder>
   <Project Path=".nuke/Build.csproj" />

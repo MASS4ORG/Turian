@@ -30,7 +30,7 @@ public static partial class Program
             CompileCommand(projectArg),
             ExportCommand(projectArg, configOption),
             DeployCommand(projectArg, configOption),
-            DevicesCommand(),
+            DevicesCommand(projectArg),
             PlayCommand(projectArg),
             PlayModeCommand(projectArg),
             SceneCommand(projectArg),
@@ -207,11 +207,12 @@ public static partial class Program
     {
         var settings = CreateSettings(project);
         var profiles = profileNames.Select(name => BuildProfiles.Find(settings, name)).ToList();
-        LoadUserSettings();
         Log.Logger.LogInformation("Exporting {Title} [{Config}]…", settings.Title, config);
 
         using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
             .ConfigureAwait(false);
+        // After the project's bricks are loaded, since platforms such as Android come from them.
+        LoadUserSettings();
 
         // Compile library first
         var slotDir = Path.Combine(settings.CacheAbsoluteDir, "bin", "CLI");
@@ -285,11 +286,18 @@ public static partial class Program
         return cmd;
     }
 
-    static Command DevicesCommand()
+    static Command DevicesCommand(Argument<FileSystemInfo> projectArg)
     {
-        var cmd = new Command("devices", "List the devices each export platform can install on");
-        cmd.SetAction(_ =>
+        var cmd = new Command("devices",
+            "List the devices each export platform of a project can install on; platforms come from its bricks")
         {
+            projectArg
+        };
+        cmd.SetAction(result =>
+        {
+            var settings = CreateSettings(result.GetValue(projectArg)!);
+            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), Log.Logger,
+                settings.ProjectAbsoluteDir);
             LoadUserSettings();
             foreach (var platform in BuildPlatforms.All().Where(static platform => platform.Deploys))
             {

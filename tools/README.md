@@ -4,7 +4,6 @@ C# helpers; single-file tools use .NET 10 file-based apps. Run from the reposito
 
 | Tool | What it does |
 |---|---|
-| `dotnet run tools/android-native.cs -- <NDK directory> <CMake executable>` | Rebuilds Android arm64/x64 SDL and launcher native libraries with 16 KB ELF alignment, using NDK 29.0.14206865 and pinned upstream sources. Writes the platform's `Native~` payload and source/hash manifest. |
 | `dotnet run tools/crap.cs -- [--base main] [--max 15] [--all]` | CRAP scores of the methods changed since `--base` (working tree and untracked files included), from `coverage/coverage.xml`. Exits 1 when one is over `--max`. Run `./build.sh test` first. |
 | `dotnet run tools/imgdiff.cs -- <expected.png> <actual.png> [--tolerance 2] [--out mask.png]` | Pixel comparison of two images: differing count, largest delta, bounding box, optional mask. Exits 1 when they differ. |
 | `dotnet run tools/render-bench.cs -- <project> [--runs 3] [--frames 300]` | Runs headless play mode in Release several times and summarizes the median render time and per-frame allocations. |

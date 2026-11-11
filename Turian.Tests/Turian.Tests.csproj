@@ -21,7 +21,6 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.android/Source~/Turian.Editor.Build.Platform.Android/Turian.Editor.Build.Platform.Android.csproj" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/tools/BrickRelease/BrickRelease.csproj" />
@@ -37,7 +36,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.android/Source~/Turian.Android.Host/Turian.Android.Host.csproj" />
     </ItemGroup>
 
     <!-- External libraries -->
