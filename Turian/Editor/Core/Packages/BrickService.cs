@@ -663,7 +663,7 @@ public static partial class BrickService
     /// runtimes/ folders are never used.
     /// </summary>
     internal static readonly string[] PreferredLibFrameworks =
-        ["net10.0", "net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0"];
+        ["net11.0", "net10.0", "net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0"];
 
     static IReadOnlyList<BrickRuntimeFile> CopyPackageAssemblies(IReadOnlyList<string> packageDirectories, string lib,
         ILogger logger)

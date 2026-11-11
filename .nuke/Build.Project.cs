@@ -105,7 +105,7 @@ sealed partial class Build
     /// <summary>Copies the platform assets next to the Studio build, where the editor looks for them.</summary>
     void CopyPlatformAssets()
     {
-        var studioOutputDirectory = StudioProject.Directory / "bin" / Config / "net10.0";
+        var studioOutputDirectory = StudioProject.Directory / "bin" / Config / "net11.0";
         var platformSourceDirectory = CliProject.Directory / "Platform";
         var platformTargetDirectory = studioOutputDirectory / "Platform";
 

@@ -162,7 +162,7 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.Equal("Desktop", desktop.DisplayName);
         Assert.True(Directory.Exists(desktop.LauncherDirectory));
         // Platforms other than desktop come from installed bricks; one that is not installed names those that are.
-        Assert.Contains("desktop", Assert.Throws<InvalidOperationException>(() => BuildPlatforms.Find("handheld")).Message);
+        Assert.Contains("desktop", Assert.Throws<InvalidOperationException>(static () => BuildPlatforms.Find("handheld")).Message);
         Assert.Equal(["publish", "game.csproj", "-o", "out", "-c", "Release", "--no-restore"],
             desktop.PublishArguments(new BuildPlatformContext(Settings, NullLogger.Instance,
                 "game.csproj", "out", "Release", null)));

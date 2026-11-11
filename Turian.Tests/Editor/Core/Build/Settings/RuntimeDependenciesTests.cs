@@ -84,7 +84,10 @@ public class RuntimeDependenciesTests
 
         Assert.Equal(resolved["Microsoft.Extensions.Hosting"], packages["Microsoft.Extensions.Hosting"]);
         Assert.All(settings.PackageReferences, package => Assert.Equal(resolved[package.Item1], package.Item2));
-        Assert.Contains("Microsoft.Extensions.DependencyInjection.Abstractions", packages.Keys);
+        // Games get the dependency-injection contracts as a package, or from the runtime itself from .NET 11 on.
+        Assert.True(packages.ContainsKey("Microsoft.Extensions.DependencyInjection.Abstractions")
+                    || File.Exists(Path.Combine(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(),
+                        "Microsoft.Extensions.DependencyInjection.Abstractions.dll")));
         // The renderer and window come from the render brick, so the launcher graph carries no native graphics.
         Assert.DoesNotContain("Ultz.Native.GLFW", packages.Keys);
         Assert.DoesNotContain("Silk.NET.Vulkan", packages.Keys);
