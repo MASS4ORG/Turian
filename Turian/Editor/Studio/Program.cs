@@ -27,7 +27,7 @@ var panelAccessor = new PanelAccessor();
 using var app = PluginHost.Load(pluginAssemblies, Log.Logger,
     services =>
     {
-        services.AddSingleton(new EngineSessionContext(EngineSessionKind.Editor,
+        services.AddSingleton(new ApplicationContext(ApplicationKind.Editor,
             Interactive: args is not ["--dump" or "--script", ..]));
         services.AddSingleton<IShellHost>(shell);
         services.AddSingleton<ICommandDispatcher>(dispatcher);

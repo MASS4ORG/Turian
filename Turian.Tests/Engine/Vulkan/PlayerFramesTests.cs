@@ -63,7 +63,7 @@ public sealed class PlayerFramesTests : IDisposable
         Assert.Equal(0, closed);
     }
 
-    sealed class PauseRecorder : IEngineSessionParticipant, IEngineSessionPauseParticipant
+    sealed class PauseRecorder : IApplicationParticipant, IApplicationPauseParticipant
     {
         public List<bool> Changes { get; } = [];
         public void Start() { }
@@ -79,7 +79,7 @@ public sealed class PlayerFramesTests : IDisposable
         var runtime = GameRuntime.StartClient(
             new GamePlayerContext(project, NullLogger.Instance, static services => services.BuildServiceProvider()),
             new BufferedInputSource(),
-            services => services.AddSingleton<IEngineSessionParticipant>(recorder));
+            services => services.AddSingleton<IApplicationParticipant>(recorder));
         var frames = Frames(runtime, null);
 
         frames.Paused = false;
@@ -99,8 +99,8 @@ public sealed class PlayerFramesTests : IDisposable
         var runtime = GameRuntime.StartClient(
             new GamePlayerContext(project, NullLogger.Instance, static services => services.BuildServiceProvider()), input);
 
-        var session = runtime.Services.GetRequiredService<EngineSessionContext>();
-        Assert.Equal(EngineSessionKind.Client, session.Kind);
+        var session = runtime.Services.GetRequiredService<ApplicationContext>();
+        Assert.Equal(ApplicationKind.Client, session.Kind);
         Assert.True(session.Interactive);
         Assert.Same(input, runtime.Services.GetRequiredService<IInputSource>());
     }

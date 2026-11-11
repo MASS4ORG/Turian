@@ -58,7 +58,7 @@ public sealed class PlayerFrames(
 
             resumed = !value;
             paused = value;
-            runtime.Services.GetService<EngineSessionLifetime>()?.SetPaused(value);
+            runtime.Services.GetService<ApplicationLifetime>()?.SetPaused(value);
         }
     }
 

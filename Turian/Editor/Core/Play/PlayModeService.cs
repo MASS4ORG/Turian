@@ -340,7 +340,7 @@ public sealed class PlayModeService(
     {
         playServices = BuildPlayServices();
         _ = playServices.GetRequiredService<SimulationClock>();
-        playServices.GetRequiredService<EngineSessionLifetime>().Start();
+        playServices.GetRequiredService<ApplicationLifetime>().Start();
         var sceneManager = playServices.GetRequiredService<ISceneManager>();
         if (sceneManager is SceneManager concreteSceneManager)
         {
@@ -397,9 +397,9 @@ public sealed class PlayModeService(
     ServiceProvider BuildPlayServices()
     {
         var services = new ServiceCollection()
-            .AddSingleton(new EngineSessionContext(EngineSessionKind.Editor,
-                Interactive: editorServices.GetService<EngineSessionContext>()?.Interactive == true))
-            .AddSingleton<EngineSessionLifetime>()
+            .AddSingleton(new ApplicationContext(ApplicationKind.Editor,
+                Interactive: editorServices.GetService<ApplicationContext>()?.Interactive == true))
+            .AddSingleton<ApplicationLifetime>()
             .AddSingleton(logger)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(new SceneManager(assetDatabase))
