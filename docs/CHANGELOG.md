@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-11
+
 - Added: dotnet 11
 - Added: android `org.mass4.turian.android brick` #254 #255 #257 #258 #259 #260 #261 #269 #271 #272 #274 #275 #343
 - Fixed: Studio's file dialog no longer hangs on Linux mounts
@@ -199,7 +201,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.11.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/MASS4ORG/Turian/compare/v3.11.0...v4.0.0
 [3.11.0]: https://github.com/MASS4ORG/Turian/compare/v3.10.0...v3.11.0
 [3.10.0]: https://github.com/MASS4ORG/Turian/compare/v3.9.0...v3.10.0
 [3.9.0]: https://github.com/MASS4ORG/Turian/compare/v3.8.0...v3.9.0
