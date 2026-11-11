@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Version>3.11.0</Version>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -13,7 +13,6 @@
         <ApplicationIcon>$(SolutionDir)/Gaya/Gaya.Host/Resources/logo.ico</ApplicationIcon>
     </PropertyGroup>
 
-    <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Gaya.Plugin/Gaya.Plugin.Turian.csproj"/>

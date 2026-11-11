@@ -131,8 +131,13 @@ public static class ProjectIcon
     }
 
     /// <summary>The image fitted, centered and letterboxed, into a transparent square, as PNG.</summary>
-    static byte[] EncodePng(SKBitmap image, int size)
+    /// <param name="image">The source image.</param>
+    /// <param name="size">The square's side in pixels.</param>
+    /// <returns>The PNG's bytes.</returns>
+    public static byte[] EncodePng(SKBitmap image, int size)
     {
+        ArgumentNullException.ThrowIfNull(image);
+
         using var surface = SKSurface.Create(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
         var scale = (float)size / Math.Max(image.Width, image.Height);
         var width = image.Width * scale;

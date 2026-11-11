@@ -10,4 +10,7 @@ public class InputSettings : ProjectSettingsAsset
     /// resolve to nothing; gameplay can still read the bound <see cref="IInputSource"/> directly.
     /// </summary>
     public AssetReference<DataAssetAsset>? Actions { get; set; }
+
+    /// <summary>Whether the first finger on a touch screen also drives the mouse, so pointer-based interfaces respond to taps.</summary>
+    public bool TouchEmulatesMouse { get; set; } = true;
 }

@@ -43,4 +43,27 @@ public sealed class BrickNativeAssetsTests
         }
         finally { root.Delete(true); }
     }
+
+    /// <summary>Android payloads become native libraries of the matching ABI, so they land in the APK's lib folder.</summary>
+    [Theory]
+    [InlineData("android-arm64", "arm64-v8a")]
+    [InlineData("android-x64", "x86_64")]
+    public void StagesAndroidPayloadsAsNativeLibraries(string rid, string abi)
+    {
+        var root = Directory.CreateTempSubdirectory("turian-native-assets-");
+        try
+        {
+            var native = Directory.CreateDirectory(Path.Combine(root.FullName, "a", "runtimes", rid, "native"));
+            File.WriteAllBytes(Path.Combine(native.FullName, "libsound.so"), [1]);
+            File.WriteAllText(Path.Combine(native.FullName, "libsound.so.meta"), "{}");
+            var project = ProjectRootElement.Create();
+
+            BrickNativeAssets.AddToProject(project, [Brick(Path.Combine(root.FullName, "a"), "a.native")], rid);
+
+            var item = Assert.Single(project.Items);
+            Assert.Equal("AndroidNativeLibrary", item.ItemType);
+            Assert.Equal(abi, Assert.Single(item.Metadata, static metadata => metadata.Name == "Abi").Value);
+        }
+        finally { root.Delete(true); }
+    }
 }

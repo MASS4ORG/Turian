@@ -47,6 +47,7 @@ public sealed class GayaPlugin : IPlugin
 
         context.Services.AddSingleton(sp => new UserSettingsBridge(
             sp.GetRequiredService<UserSettingsCatalog>(), context.Settings, context.Logger));
+        context.Services.AddSingleton(_ => new PlatformSettingsBridge(context.Settings));
 
         context.Services.AddSingleton(sp => new UserPanelBridge(
             sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands, context.Menus,
@@ -312,6 +313,7 @@ public sealed class GayaPlugin : IPlugin
         context.Settings.Register(inspector);
         context.Settings.Register(recent);
         context.Settings.Register(output);
+
     }
 
     /// <summary>
@@ -340,6 +342,7 @@ public sealed class GayaPlugin : IPlugin
         services.GetRequiredService<AssetAutoSave>().Flush();
         services.GetRequiredService<UserMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
+        services.GetRequiredService<PlatformSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();
     }
 
@@ -389,6 +392,7 @@ public sealed class GayaPlugin : IPlugin
             services.GetRequiredService<AssetAutoSave>().MarkChanged;
         services.GetRequiredService<UserMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
+        services.GetRequiredService<PlatformSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();
 
         // Resolving the bridge is what starts it: it applies the stored theme and follows the menu.

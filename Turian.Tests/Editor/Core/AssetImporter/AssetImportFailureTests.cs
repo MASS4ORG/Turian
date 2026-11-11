@@ -16,7 +16,7 @@ public sealed class AssetImportFailureTests : IDisposable
         var assets = Directory.CreateDirectory(Path.Combine(root, "Assets")).FullName;
         var failingSource = Path.Combine(assets, "model.failed-model");
         File.WriteAllText(failingSource, "source");
-        var model = new ModelImportAsset { Id = Guid.NewGuid(), RelativePath = failingSource };
+        var model = new ModelImportAsset { Id = Guid.NewGuid(), RelativePath = "Assets/" + Path.GetFileName(failingSource) };
         Serializer.Save(failingSource + ".meta", model);
         File.AppendAllText(failingSource + ".meta", "\n");
         var metadata = File.ReadAllBytes(failingSource + ".meta");
@@ -41,7 +41,7 @@ public sealed class AssetImportFailureTests : IDisposable
         var assets = Directory.CreateDirectory(Path.Combine(root, "Assets")).FullName;
         var source = Path.Combine(assets, "model.failed-model");
         File.WriteAllText(source, "cancel");
-        Serializer.Save(source + ".meta", new ModelImportAsset { RelativePath = source });
+        Serializer.Save(source + ".meta", new ModelImportAsset { RelativePath = "Assets/" + Path.GetFileName(source) });
         File.AppendAllText(source + ".meta", "\n");
         var metadata = File.ReadAllBytes(source + ".meta");
         using var importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), new SettingsService());

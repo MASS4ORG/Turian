@@ -49,6 +49,14 @@ public static partial class BrickAssemblies
     public const string TypesFile = "types.json";
 
     static readonly Lock LoadLock = new();
+
+    static int generation;
+
+    /// <summary>
+    /// Counts the loads that brought new assemblies into the editor, so a host can notice them, for example to show the
+    /// settings of a build platform an installed brick provides.
+    /// </summary>
+    public static int Generation => Volatile.Read(ref generation);
     static readonly Lock ProbeLock = new();
     static readonly HashSet<string> ProbeDirectories = new(StringComparer.Ordinal);
     static readonly Dictionary<string, AssemblyDependencyResolver> Resolvers = new(StringComparer.Ordinal);
@@ -120,6 +128,11 @@ public static partial class BrickAssemblies
                 RegisterTypes(brick, logger);
                 RegisterModules(brick);
             }
+        }
+
+        if (loadedAny)
+        {
+            Interlocked.Increment(ref generation);
         }
 
         return loadedAny;

@@ -4,11 +4,21 @@ namespace Turian.Tests;
 public class AssetFileSystemRenameTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-rename-{Guid.NewGuid():N}");
-    readonly AssetFileSystem fileSystem = new(new SettingsService(), assetImporter: null!);
+    readonly AssetImporter importer;
+    readonly AssetFileSystem fileSystem;
+
+    /// <summary>A file system whose importer only writes meta files.</summary>
+    public AssetFileSystemRenameTests()
+    {
+        var settings = new SettingsService();
+        importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), settings);
+        fileSystem = new AssetFileSystem(settings, importer);
+    }
 
     /// <summary>Deletes the folder the test worked in.</summary>
     public void Dispose()
     {
+        importer.Dispose();
         if (Directory.Exists(root))
         {
             Directory.Delete(root, recursive: true);

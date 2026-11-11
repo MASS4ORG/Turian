@@ -16,6 +16,49 @@ public sealed class SwapChainSelectionTests
         Surface(Format.R16G16B16A16Sfloat),
     ];
 
+    /// <summary>A surface turned a quarter gets upright images in the swapped extent, presented with identity.</summary>
+    [Theory]
+    [InlineData(SurfaceTransformFlagsKHR.Rotate90BitKhr)]
+    [InlineData(SurfaceTransformFlagsKHR.Rotate270BitKhr)]
+    public void QuarterTurnedSurfacesKeepUprightImages(SurfaceTransformFlagsKHR transform)
+    {
+        var capabilities = Turned(transform, SurfaceTransformFlagsKHR.IdentityBitKhr | transform);
+
+        Assert.Equal(SurfaceTransformFlagsKHR.IdentityBitKhr, SwapChain.ChoosePreTransform(capabilities));
+        Assert.Equal(new Extent2D(2340, 1080), SwapChain.UprightExtent(capabilities));
+    }
+
+    /// <summary>Upright and half-turned surfaces keep their extent; a surface without identity keeps its transform.</summary>
+    [Fact]
+    public void OtherSurfacesKeepTheirExtentAndTransform()
+    {
+        var upright = Turned(SurfaceTransformFlagsKHR.IdentityBitKhr, SurfaceTransformFlagsKHR.IdentityBitKhr);
+        var halfTurned = Turned(SurfaceTransformFlagsKHR.Rotate180BitKhr,
+            SurfaceTransformFlagsKHR.IdentityBitKhr | SurfaceTransformFlagsKHR.Rotate180BitKhr);
+        var fixedTurn = Turned(SurfaceTransformFlagsKHR.Rotate90BitKhr, SurfaceTransformFlagsKHR.Rotate90BitKhr);
+
+        Assert.Equal(new Extent2D(1080, 2340), SwapChain.UprightExtent(upright));
+        Assert.Equal(new Extent2D(1080, 2340), SwapChain.UprightExtent(halfTurned));
+        Assert.Equal(new Extent2D(1080, 2340), SwapChain.UprightExtent(fixedTurn));
+        Assert.Equal(SurfaceTransformFlagsKHR.Rotate90BitKhr, SwapChain.ChoosePreTransform(fixedTurn));
+    }
+
+    /// <summary>Only a swapchain the compositor rotates ignores suboptimal presents; other results always pass through.</summary>
+    [Fact]
+    public void SuboptimalIsExpectedOnlyWhileTheCompositorRotates()
+    {
+        Assert.Equal(Result.Success, SwapChain.PresentResult(Result.SuboptimalKhr, compositorRotates: true));
+        Assert.Equal(Result.SuboptimalKhr, SwapChain.PresentResult(Result.SuboptimalKhr, compositorRotates: false));
+        Assert.Equal(Result.ErrorOutOfDateKhr, SwapChain.PresentResult(Result.ErrorOutOfDateKhr, compositorRotates: true));
+    }
+
+    static SurfaceCapabilitiesKHR Turned(SurfaceTransformFlagsKHR current, SurfaceTransformFlagsKHR supported) => new()
+    {
+        CurrentExtent = new Extent2D(1080, 2340),
+        CurrentTransform = current,
+        SupportedTransforms = supported,
+    };
+
     /// <summary>Desktop capabilities keep the preferred BGRA sRGB format and opaque alpha.</summary>
     [Fact]
     public void DesktopCapabilitiesKeepBgraSrgbAndOpaque()

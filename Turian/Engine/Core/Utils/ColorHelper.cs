@@ -1,4 +1,4 @@
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member: they are obvious
+#pragma warning disable CS1591
 namespace Turian.Engine.Core;
 
 /// <summary>

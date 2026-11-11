@@ -29,6 +29,8 @@ public static partial class Program
             NewCommand(),
             CompileCommand(projectArg),
             ExportCommand(projectArg, configOption),
+            DeployCommand(projectArg, configOption),
+            DevicesCommand(projectArg),
             PlayCommand(projectArg),
             PlayModeCommand(projectArg),
             SceneCommand(projectArg),
@@ -172,40 +174,150 @@ public static partial class Program
             Description = "Build profile to export, into Output/<profile>/<game>; repeat it to build several in one run. "
                           + "Without it, export the active profile into Output/<game>"
         };
+        var installOption = new Option<bool>("--install")
+        {
+            Description = "Install the export on a connected device and start it, for platforms that run on devices "
+                          + "such as Android"
+        };
+        var deviceOption = new Option<string?>("--device")
+        {
+            Description = "The device to install on, as the platform lists it (for Android, the serial adb devices "
+                          + "shows); implies --install. Without it, the device from the user settings, else the only "
+                          + "one connected"
+        };
         var cmd = new Command("export", "Build and export as a standalone packaged game")
         {
-            projectArg, configOption, profileOption
+            projectArg, configOption, profileOption, installOption, deviceOption
         };
 
         cmd.SetAction(async (result, _) =>
         {
-            var settings = CreateSettings(result.GetValue(projectArg)!);
-            var config = result.GetValue(configOption);
-            var profiles = (result.GetValue(profileOption) ?? [])
-                .Select(name => BuildProfiles.Find(settings, name)).ToList();
-            Log.Logger.LogInformation("Exporting {Title} [{Config}]…", settings.Title, config);
+            var device = result.GetValue(deviceOption);
+            var deployment = result.GetValue(installOption) || device is not null ? new BuildDeployment(device) : null;
+            await ExportAsync(result.GetValue(projectArg)!, result.GetValue(configOption),
+                result.GetValue(profileOption) ?? [], deployment).ConfigureAwait(false);
+        });
 
-            using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+        return cmd;
+    }
+
+    /// <summary>Exports a project with each named profile, or its active one, installing each build when asked.</summary>
+    static async Task<List<ExportUserCode>> ExportAsync(FileSystemInfo project, BuildConfiguration config,
+        IReadOnlyList<string> profileNames, BuildDeployment? deployment)
+    {
+        var settings = CreateSettings(project);
+        var profiles = profileNames.Select(name => BuildProfiles.Find(settings, name)).ToList();
+        Log.Logger.LogInformation("Exporting {Title} [{Config}]…", settings.Title, config);
+
+        using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+            .ConfigureAwait(false);
+        // After the project's bricks are loaded, since platforms such as Android come from them.
+        LoadUserSettings();
+
+        // Compile library first
+        var slotDir = Path.Combine(settings.CacheAbsoluteDir, "bin", "CLI");
+        Directory.CreateDirectory(slotDir);
+        var compiler = new CompileUserCode(settings, Log.Logger, slotDir);
+        await compiler.ExecuteAsync();
+
+        if (profiles.Count == 0)
+        {
+            var export = new ExportUserCode(settings, Log.Logger, config, BuildProfiles.Active(settings),
+                deployment: deployment);
+            await export.ExecuteAsync();
+            return [export];
+        }
+
+        List<ExportUserCode> exports = [];
+        foreach (var profile in profiles)
+        {
+            Log.Logger.LogInformation("Build profile {Profile}: {Target}", profile.Name, profile.Profile.Target);
+            var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
+                settings.TitleToPathFriendly ?? "Game");
+            var export = new ExportUserCode(settings, Log.Logger, config, profile, output, deployment);
+            await export.ExecuteAsync();
+            exports.Add(export);
+        }
+
+        return exports;
+    }
+
+    /// <summary>The same per-user choices Studio saved, such as where the Android SDK is.</summary>
+    static void LoadUserSettings()
+    {
+        foreach (var page in BuildPlatforms.All().Select(static platform => platform.UserSettings).OfType<object>())
+        {
+            UserSettingsFile.Load(page);
+        }
+    }
+
+    static Command DeployCommand(
+        Argument<FileSystemInfo> projectArg,
+        Option<BuildConfiguration> configOption)
+    {
+        var profileOption = new Option<string?>("--profile")
+        {
+            Description = "Build profile to deploy; without it, the active profile"
+        };
+        var deviceOption = new Option<string?>("--device")
+        {
+            Description = "The device to install on, as turian devices lists it. Without it, the device from the user "
+                          + "settings, else the only one connected"
+        };
+        var cmd = new Command("deploy",
+            "Export, install on a device, start the game and show its log until it exits; Ctrl+C stops it")
+        {
+            projectArg, configOption, profileOption, deviceOption
+        };
+
+        cmd.SetAction(async (result, cancellationToken) =>
+        {
+            var profile = result.GetValue(profileOption);
+            var exports = await ExportAsync(result.GetValue(projectArg)!, result.GetValue(configOption),
+                profile is null ? [] : [profile], new BuildDeployment(result.GetValue(deviceOption)))
                 .ConfigureAwait(false);
-
-            // Compile library first
-            var slotDir = Path.Combine(settings.CacheAbsoluteDir, "bin", "CLI");
-            Directory.CreateDirectory(slotDir);
-            var compiler = new CompileUserCode(settings, Log.Logger, slotDir);
-            await compiler.ExecuteAsync();
-
-            if (profiles.Count == 0)
+            if (exports.Single().Deployed is { } deployed)
             {
-                await new ExportUserCode(settings, Log.Logger, config, BuildProfiles.Active(settings)).ExecuteAsync();
-                return;
+                await deployed.Platform.FollowAsync(deployed.Context, deployed.Device, Console.WriteLine,
+                    cancellationToken).ConfigureAwait(false);
             }
+        });
 
-            foreach (var profile in profiles)
+        return cmd;
+    }
+
+    static Command DevicesCommand(Argument<FileSystemInfo> projectArg)
+    {
+        var cmd = new Command("devices",
+            "List the devices each export platform of a project can install on; platforms come from its bricks")
+        {
+            projectArg
+        };
+        cmd.SetAction(result =>
+        {
+            var settings = CreateSettings(result.GetValue(projectArg)!);
+            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), Log.Logger,
+                settings.ProjectAbsoluteDir);
+            LoadUserSettings();
+            foreach (var platform in BuildPlatforms.All().Where(static platform => platform.Deploys))
             {
-                Log.Logger.LogInformation("Build profile {Profile}: {Target}", profile.Name, profile.Profile.Target);
-                var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
-                    settings.TitleToPathFriendly ?? "Game");
-                await new ExportUserCode(settings, Log.Logger, config, profile, output).ExecuteAsync();
+                var status = platform.CheckToolchain();
+                var devices = platform.Devices ?? [];
+                Console.WriteLine($"{platform.Id}:");
+                if (!status.IsReady)
+                {
+                    Console.WriteLine($"  {status.Message}");
+                }
+
+                if (devices.Count == 0)
+                {
+                    Console.WriteLine("  no device ready");
+                }
+
+                foreach (var device in devices)
+                {
+                    Console.WriteLine($"  {device.Id}\t{device.DisplayName}");
+                }
             }
         });
 

@@ -340,15 +340,31 @@ public sealed class BuildManager : IDisposable
     /// <param name="configuration">
     /// Override the build configuration without an active profile. Defaults to <see cref="BuildConfiguration.Release"/>.
     /// </param>
-    public Task<BuildTaskStatus> ExportAsync(BuildConfiguration configuration = BuildConfiguration.Release) =>
+    /// <param name="install">
+    /// Install the build on a device and start it even when the user's settings do not ask for it.
+    /// </param>
+    public Task<BuildTaskStatus> ExportAsync(BuildConfiguration configuration = BuildConfiguration.Release,
+        bool install = false) =>
         TaskRunner.EnqueueAsync(new DelegateTask(
             name: "Export",
             locksUi: true,
             run: async _ =>
             {
-                var exporter = new ExportUserCode(settings, logger, configuration, BuildProfiles.Active(settings));
+                var profile = BuildProfiles.Active(settings);
+                var exporter = new ExportUserCode(settings, logger, configuration, profile,
+                    deployment: Deployment(profile, install));
                 return $"Exported to: {await exporter.ExecuteAsync().ConfigureAwait(false)}";
             }));
+
+    /// <summary>Whether the active profile's builds run on a device, so running one means installing it there.</summary>
+    public bool ActiveProfileDeploys => BuildPlatforms.For(BuildProfiles.Active(settings)?.Profile).Deploys;
+
+    // The user's standing choice, or a one-off install for the platforms that have devices.
+    static BuildDeployment? Deployment(ProjectBuildProfile? profile, bool install)
+    {
+        var platform = BuildPlatforms.For(profile?.Profile);
+        return platform.ConfiguredDeployment ?? (install && platform.Deploys ? new BuildDeployment(null) : null);
+    }
 
     /// <summary>
     /// Exports the project with <paramref name="profile"/>, active or not, into <c>Output/&lt;profile&gt;/&lt;game&gt;</c>: what
@@ -365,7 +381,8 @@ public sealed class BuildManager : IDisposable
             {
                 var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
                     settings.TitleToPathFriendly ?? "Game");
-                var exporter = new ExportUserCode(settings, logger, profile.Profile.Configuration, profile, output);
+                var exporter = new ExportUserCode(settings, logger, profile.Profile.Configuration, profile, output,
+                    Deployment(profile, install: false));
                 return $"Exported to: {await exporter.ExecuteAsync().ConfigureAwait(false)}";
             }));
     }

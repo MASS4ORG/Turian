@@ -147,7 +147,7 @@ public sealed class AssetCreationCatalog : IDisposable
         if (payload is EnumValueAsset named) { named.Name = Path.GetFileNameWithoutExtension(assetPath); }
         var meta = new DataAssetAsset
         {
-            RelativePath = Path.GetRelativePath(appSettings.ProjectAbsoluteDir, assetPath)
+            RelativePath = Path.GetRelativePath(appSettings.ProjectAbsoluteDir, assetPath).Replace('\\', '/')
         };
         payload.Id = meta.Id;
 

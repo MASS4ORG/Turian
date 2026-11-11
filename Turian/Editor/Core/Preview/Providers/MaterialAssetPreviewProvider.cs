@@ -20,7 +20,7 @@ public sealed class MaterialAssetPreviewProvider : IScenePreviewProvider
         var root = new Node { Name = "__AssetPreview" };
 
         var quadNode = new Node { Name = "Swatch" };
-        // Ownership transfers to quadNode; Dispose only clears cached asset lookups, nothing owned.
+
 #pragma warning disable CA2000
         quadNode.AddComponent(new ModelComponent
         {

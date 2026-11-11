@@ -31,7 +31,7 @@ public sealed class BrickNuGetRestoreTests : IDisposable
             var stub = File.ReadAllText(Path.Combine(directory, BrickNuGetRestore.StubProjectFileName));
             Assert.Contains("<PackageReference Include=\"X\" Version=\"1.4.0\" />", stub);
             Assert.Contains("<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>", stub);
-            Assert.Contains("<TargetFramework>net10.0</TargetFramework>", stub);
+            Assert.Contains($"<TargetFramework>{BrickNuGetRestore.StubTargetFramework}</TargetFramework>", stub);
         }
         finally
         {
@@ -136,7 +136,7 @@ public sealed class BrickNuGetRestoreTests : IDisposable
     public void AMatchingLockFileSurvives()
     {
         var directory = WriteLock(
-            """{ "version": 1, "dependencies": { "net10.0": { "X": { "type": "Direct", "resolved": "1.4.0" } } } }""");
+            Lock("""{ "version": 1, "dependencies": { "net10.0": { "X": { "type": "Direct", "resolved": "1.4.0" } } } }"""));
 
         Assert.False(BrickNuGetRestore.DropStaleLockFile(directory, new Dictionary<string, string> { ["X"] = "1.4.0" }));
 
@@ -148,11 +148,11 @@ public sealed class BrickNuGetRestoreTests : IDisposable
     public void TransitiveEntriesDoNotMakeALockFileStale()
     {
         var directory = WriteLock(
-            """
+            Lock("""
             { "version": 1, "dependencies": { "net10.0": {
               "X": { "type": "Direct", "resolved": "1.4.0" },
               "X.Dep": { "type": "Transitive", "resolved": "4.0.0" } } } }
-            """);
+            """));
 
         Assert.False(BrickNuGetRestore.DropStaleLockFile(directory, new Dictionary<string, string> { ["X"] = "1.4.0" }));
     }
@@ -162,7 +162,7 @@ public sealed class BrickNuGetRestoreTests : IDisposable
     public void AStaleLockFileIsDeleted()
     {
         var directory = WriteLock(
-            """{ "version": 1, "dependencies": { "net10.0": { "X": { "type": "Direct", "resolved": "1.2.0" } } } }""");
+            Lock("""{ "version": 1, "dependencies": { "net10.0": { "X": { "type": "Direct", "resolved": "1.2.0" } } } }"""));
 
         Assert.True(BrickNuGetRestore.DropStaleLockFile(directory, new Dictionary<string, string> { ["X"] = "1.4.0" }));
 
@@ -174,12 +174,25 @@ public sealed class BrickNuGetRestoreTests : IDisposable
     public void ALockFileWithAnotherPackageSetIsDeleted()
     {
         var directory = WriteLock(
-            """{ "version": 1, "dependencies": { "net10.0": { "Y": { "type": "Direct", "resolved": "1.4.0" } } } }""");
+            Lock("""{ "version": 1, "dependencies": { "net10.0": { "Y": { "type": "Direct", "resolved": "1.4.0" } } } }"""));
 
         Assert.True(BrickNuGetRestore.DropStaleLockFile(directory,
             new Dictionary<string, string> { ["X"] = "1.4.0", ["Y"] = "1.4.0" }));
 
         Assert.False(File.Exists(Path.Combine(directory, BrickNuGetRestore.LockFileName)));
+    }
+
+    // A lock file written by this editor: its packages under the framework it restores for.
+    static string Lock(string json) => json.Replace("net10.0", BrickNuGetRestore.StubTargetFramework, StringComparison.Ordinal);
+
+    /// <summary>A lock written for another framework, by an editor on another .NET, is replaced rather than refused.</summary>
+    [Fact]
+    public void ALockFileForAnotherFrameworkIsDeleted()
+    {
+        var directory = WriteLock(
+            """{ "version": 1, "dependencies": { "net8.0": { "X": { "type": "Direct", "resolved": "1.4.0" } } } }""");
+
+        Assert.True(BrickNuGetRestore.DropStaleLockFile(directory, new Dictionary<string, string> { ["X"] = "1.4.0" }));
     }
 
     static string WriteLock(string json)

@@ -96,7 +96,7 @@ public static class ProjectSettingsFiles
         var meta = new DataAssetAsset
         {
             Id = Guid.NewGuid(),
-            RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path),
+            RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path).Replace('\\', '/'),
         };
         profile.Id = meta.Id;
         Serializer.Save<DataAsset>(path, profile);
@@ -240,7 +240,7 @@ public static class ProjectSettingsFiles
             Serializer.Save($"{path}.meta", new DataAssetAsset
             {
                 Id = asset.Id,
-                RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path),
+                RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path).Replace('\\', '/'),
             });
         }
 
@@ -268,7 +268,7 @@ public static class ProjectSettingsFiles
         var meta = new DataAssetAsset
         {
             Id = Guid.NewGuid(),
-            RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path),
+            RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path).Replace('\\', '/'),
         };
         settings.Id = meta.Id;
 

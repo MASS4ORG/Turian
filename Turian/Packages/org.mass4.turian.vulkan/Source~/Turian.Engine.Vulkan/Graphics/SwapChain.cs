@@ -91,6 +91,7 @@ public partial class SwapChain : IDisposable
     Image[] swapChainImages = null!;
     Format swapChainDepthFormat;
     Extent2D swapChainExtent;
+    bool compositorRotates;
     ImageView[] swapChainImageViews = null!;
     Framebuffer[] swapChainFramebuffers = null!;
     RenderPass renderPass;
@@ -157,7 +158,7 @@ public partial class SwapChain : IDisposable
             ref imageIndex
         );
 
-        return result;
+        return PresentResult(result, compositorRotates);
     }
 
     /// <summary>
@@ -198,7 +199,8 @@ public partial class SwapChain : IDisposable
             PCommandBuffers = &commandBuffer
         };
 
-        var signalSemaphores = stackalloc[] { renderFinishedSemaphores[currentFrame] };
+        // Present keeps this semaphore until its image is reacquired, so it belongs to the image, not the frame slot.
+        var signalSemaphores = stackalloc[] { renderFinishedSemaphores[imageIndex] };
         submitInfo = submitInfo with
         {
             SignalSemaphoreCount = 1,
@@ -229,7 +231,7 @@ public partial class SwapChain : IDisposable
 
         currentFrame = (currentFrame + 1) % MaxFramesInFlight;
 
-        return result;
+        return PresentResult(result, compositorRotates);
     }
 
     /// <summary>
@@ -266,9 +268,13 @@ public partial class SwapChain : IDisposable
         vk.DestroyRenderPass(device.VkDevice, renderPass, null);
 
         // cleanup synchronization objects
+        foreach (var semaphore in renderFinishedSemaphores)
+        {
+            vk.DestroySemaphore(device.VkDevice, semaphore, null);
+        }
+
         for (var i = 0; i < MaxFramesInFlight; i++)
         {
-            vk.DestroySemaphore(device.VkDevice, renderFinishedSemaphores[i], null);
             vk.DestroySemaphore(device.VkDevice, imageAvailableSemaphores[i], null);
             vk.DestroyFence(device.VkDevice, inFlightFences[i], null);
         }

@@ -118,6 +118,7 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
 
         var startInfo = new ProcessStartInfo(DotnetLocator.Find())
         {
+            WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(csprojFilePath)),
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,

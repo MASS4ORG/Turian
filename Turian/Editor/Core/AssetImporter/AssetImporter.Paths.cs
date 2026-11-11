@@ -309,6 +309,37 @@ public sealed partial class AssetImporter
         return IgnoredExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// What a meta records for its source: the path below the brick or project that holds it, with forward slashes,
+    /// so a meta reads the same on every system and never names a machine's folders.
+    /// </summary>
+    /// <param name="absolutePath">The source file.</param>
+    /// <returns>The path to store.</returns>
+    internal string StoredPathOf(string absolutePath)
+    {
+        var fullPath = Path.GetFullPath(absolutePath);
+        var root = PackageRootOf(fullPath)?.Root ?? projectRootPath;
+        var relative = string.IsNullOrWhiteSpace(root) ? Path.GetFileName(fullPath) : Path.GetRelativePath(root, fullPath);
+        return Path.IsPathRooted(relative) ? Path.GetFileName(fullPath) : relative.Replace('\\', '/');
+    }
+
+    /// <summary>Whether a meta's stored path names a machine's folders or a system's separators.</summary>
+    static bool IsMachineSpecificPath(string stored) =>
+        stored.Contains('\\', StringComparison.Ordinal) || stored.StartsWith('/') || (stored.Length > 1 && stored[1] == ':');
+
+    /// <summary>Serializes an asset's meta with the path stored for its source, leaving the loaded asset as it is.</summary>
+    /// <param name="asset">The metadata.</param>
+    /// <param name="sourcePath">The asset's source file.</param>
+    /// <returns>The text of the meta file.</returns>
+    internal string SerializeMetaFile(Asset asset, string sourcePath)
+    {
+        var meta = JsonNode.Parse(SerializeAssetMetadata(asset))!.AsObject();
+        meta[nameof(Asset.RelativePath)] = StoredPathOf(sourcePath);
+        return meta.ToJsonString(MetaFileOptions);
+    }
+
+    static readonly JsonSerializerOptions MetaFileOptions = new() { WriteIndented = true };
+
     string ToProjectRelativePath(string absolutePath)
     {
         if (string.IsNullOrWhiteSpace(projectRootPath))

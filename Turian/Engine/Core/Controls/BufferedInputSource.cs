@@ -13,7 +13,7 @@ namespace Turian.Engine.Core;
 /// Pushes may originate from the UI thread while the game loop reads on the same thread; state is
 /// guarded so an out-of-band push cannot corrupt a set mid-enumeration.
 /// </remarks>
-public sealed class BufferedInputSource : IInputSource
+public sealed partial class BufferedInputSource : IInputSource
 {
     readonly HashSet<Key> keysDown = [];
     readonly HashSet<Key> keysPressed = [];
@@ -161,6 +161,8 @@ public sealed class BufferedInputSource : IInputSource
                 pad.Pressed.Clear();
                 pad.Released.Clear();
             }
+
+            RollTouches();
         }
     }
 
@@ -345,6 +347,9 @@ public sealed class BufferedInputSource : IInputSource
             mouseDelta = Vector2.Zero;
             scrollDelta = 0f;
             gamepads.Clear();
+            touches.Clear();
+            primaryTouch = null;
+            pressPending = false;
         }
     }
 }

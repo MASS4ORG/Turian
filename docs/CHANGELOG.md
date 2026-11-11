@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: dotnet 11
+- Added: android `org.mass4.turian.android brick` #254 #255 #257 #258 #259 #260 #261 #269 #271 #272 #274 #275 #343
+- Fixed: Studio's file dialog no longer hangs on Linux mounts
+- Fixed: Vulkan semaphores are per swapchain image
+
 ## [3.11.0] - 2026-11-09
 
 - Added: audio playback #61 #95.

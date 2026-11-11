@@ -48,6 +48,9 @@ public interface IInputSource
     /// </summary>
     void NewFrame();
 
+    /// <summary>The fingers on the screen this frame, oldest contact first. Sources without touch report none.</summary>
+    IReadOnlyList<TouchPoint> Touches => [];
+
     /// <summary>
     /// Player slots with a gamepad attached. A source with no gamepad support reports none, which is
     /// what the Studio's play mode does today.

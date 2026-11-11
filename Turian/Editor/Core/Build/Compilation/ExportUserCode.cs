@@ -2,18 +2,23 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Publishes the user project as a standalone executable and packages assets. A build profile chooses the target,
-/// platform, configuration and script symbols. The exported folder is named after the game.
+/// platform, configuration and script symbols. The exported folder is named after the game. With a deployment, the
+/// finished build is then installed on a device and started.
 /// </summary>
 public sealed class ExportUserCode(
     IAppSettings settings,
     ILogger logger,
     BuildConfiguration configuration = BuildConfiguration.Release,
     ProjectBuildProfile? profile = null,
-    string? outputDirectory = null)
+    string? outputDirectory = null,
+    BuildDeployment? deployment = null)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
     /// <inheritdoc />
     protected override ProjectSettingsCollection? SettingsOverrides => profile?.Profile;
+
+    /// <summary>Where the build was installed, after an export with a deployment; otherwise null.</summary>
+    public DeployedBuild? Deployed { get; private set; }
 
     /// <summary>The destination folder containing the executable and its content.</summary>
     internal string OutputDirectory => outputDirectory ?? ExportOutputDir(Settings.ProjectAbsoluteDir,
@@ -52,9 +57,12 @@ public sealed class ExportUserCode(
         var context = new BuildPlatformContext(Settings, Logger, csprojFilePath, exportOutputPath, configName,
             profile?.Profile);
 
+        await platform.PrepareAsync(context, CancellationToken.None).ConfigureAwait(false);
+
         // SetupAsync already restored this project, so skip the implicit restore of `dotnet publish`.
         var startInfo = new ProcessStartInfo(DotnetLocator.Find())
         {
+            WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(context.ProjectFile)),
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -90,6 +98,13 @@ public sealed class ExportUserCode(
         var artifact = await platform.FinalizeAsync(context, CancellationToken.None).ConfigureAwait(false);
 
         Logger.LogInformation("Export succeeded");
+        if (deployment is not null)
+        {
+            var device = await platform.DeployAsync(context, artifact, deployment.Device, CancellationToken.None)
+                .ConfigureAwait(false);
+            Deployed = new DeployedBuild(platform, context, device);
+        }
+
         return artifact.OutputDirectory;
     }
 

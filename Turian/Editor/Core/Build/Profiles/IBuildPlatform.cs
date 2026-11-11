@@ -14,6 +14,17 @@ public sealed record BuildPlatformStatus(bool IsReady, string Message);
 /// <param name="OutputDirectory">The folder holding the exported game.</param>
 public sealed record BuildArtifact(string OutputDirectory);
 
+/// <summary>A request to install a finished build on a device and start it.</summary>
+/// <param name="Device">The device's id, or <c>null</c> for the one the platform's user settings or the connection
+/// make unambiguous.</param>
+public sealed record BuildDeployment(string? Device);
+
+/// <summary>A build installed on a device and started there.</summary>
+/// <param name="Platform">The platform that installed it.</param>
+/// <param name="Context">The export it came from.</param>
+/// <param name="Device">The device it runs on.</param>
+public sealed record DeployedBuild(IBuildPlatform Platform, BuildPlatformContext Context, string Device);
+
 /// <summary>What a platform needs to configure, publish or finalize a generated runtime project.</summary>
 /// <param name="Settings">The project settings.</param>
 /// <param name="Logger">The logger.</param>
@@ -54,6 +65,9 @@ public interface IBuildPlatform
     /// <summary>The target framework the platform's exported project builds for, such as <c>net10.0</c>.</summary>
     string TargetFramework { get; }
 
+    /// <summary>The SDK version pinned in generated launcher projects, or null to inherit the project's SDK.</summary>
+    string? SdkVersion => null;
+
     /// <summary>The <see cref="TextureBuildTarget"/> key whose artifacts the platform ships.</summary>
     string TextureTarget { get; }
 
@@ -67,6 +81,40 @@ public interface IBuildPlatform
     /// The devices the platform can deploy to, or <c>null</c> when it runs games on this machine and needs no picker.
     /// </summary>
     IReadOnlyList<BuildDevice>? Devices { get; }
+
+    /// <summary>Whether builds run on another device that <see cref="DeployAsync"/> installs them on.</summary>
+    bool Deploys => false;
+
+    /// <summary>
+    /// The platform's per-user settings, such as where its tools are installed: an object carrying
+    /// <c>[EditorSetting]</c> that Studio shows in its settings and the CLI reads from the same user file, or
+    /// <c>null</c>. It is one instance for the process, because both hosts fill it in place.
+    /// </summary>
+    object? UserSettings => null;
+
+    /// <summary>The installation the user asked for after every export of this platform, or <c>null</c>.</summary>
+    BuildDeployment? ConfiguredDeployment => null;
+
+    /// <summary>Installs a finished build on a device and starts it.</summary>
+    /// <param name="context">The export the build came from.</param>
+    /// <param name="artifact">The finished build.</param>
+    /// <param name="device">The device's id, or <c>null</c> for the one the platform can choose unambiguously.</param>
+    /// <param name="cancellationToken">Cancels the installation.</param>
+    /// <returns>The id of the device it was installed on.</returns>
+    Task<string> DeployAsync(BuildPlatformContext context, BuildArtifact artifact, string? device,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException($"{DisplayName} builds run on this computer; there is no device to install on.");
+
+    /// <summary>
+    /// Shows the log of a game <see cref="DeployAsync"/> started until it exits or the token is cancelled, then stops
+    /// it if it still runs.
+    /// </summary>
+    /// <param name="context">The export the game came from.</param>
+    /// <param name="device">The device it runs on.</param>
+    /// <param name="write">Receives each log line.</param>
+    /// <param name="cancellationToken">Ends following and stops the game, as Ctrl+C does.</param>
+    Task FollowAsync(BuildPlatformContext context, string device, Action<string> write,
+        CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Adds the platform-specific properties and items of the generated runtime project.</summary>
     /// <param name="project">The generated project, not yet saved.</param>
@@ -86,6 +134,11 @@ public interface IBuildPlatform
     /// <param name="settings">The project settings.</param>
     /// <returns>What the user must fix, or <c>null</c> when the settings are acceptable.</returns>
     string? ValidateSettings(IAppSettings settings) => null;
+
+    /// <summary>Stages content that a platform must include inside its published artifact.</summary>
+    /// <param name="context">The generated project and export settings.</param>
+    /// <param name="cancellationToken">Cancels preparation before publishing.</param>
+    Task PrepareAsync(BuildPlatformContext context, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Finishes a published build: strips artifacts, names the executable, and places content.</summary>
     /// <param name="context">The published project, output, configuration and profile.</param>
@@ -111,7 +164,10 @@ public static class BuildPlatforms
 
     /// <summary>The built-in desktop platform, then those of the loaded editor bricks.</summary>
     /// <returns>The platforms.</returns>
-    public static IReadOnlyList<IBuildPlatform> All() =>
+    public static IReadOnlyList<IBuildPlatform> All()
+    {
+        LoadBuiltinPlatforms();
+        return
     [
         new DesktopBuildPlatform(),
         .. AppDomain.CurrentDomain.GetAssemblies()
@@ -119,6 +175,31 @@ public static class BuildPlatforms
             .SelectMany(static assembly => assembly.GetCustomAttributes<BuildPlatformAttribute>())
             .Select(static attribute => (IBuildPlatform)Activator.CreateInstance(attribute.PlatformType)!),
     ];
+    }
+
+    static void LoadBuiltinPlatforms()
+    {
+        if (!Directory.Exists(ProjectPackages.BuiltinDirectory))
+        {
+            return;
+        }
+        foreach (var brick in Directory.EnumerateDirectories(ProjectPackages.BuiltinDirectory))
+        {
+            var editor = Path.Combine(brick, "Precast~", "editor");
+            if (!Directory.Exists(editor))
+            {
+                continue;
+            }
+            foreach (var assembly in Directory.EnumerateFiles(editor, "Turian.Editor.Build.Platform.*.dll"))
+            {
+                var name = Path.GetFileNameWithoutExtension(assembly);
+                if (!AppDomain.CurrentDomain.GetAssemblies().Any(loaded => loaded.GetName().Name == name))
+                {
+                    AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.GetFullPath(assembly));
+                }
+            }
+        }
+    }
 
     /// <summary>The platform with id <paramref name="id"/>, ignoring case; the desktop platform for none.</summary>
     /// <param name="id">A platform id, or <c>null</c>.</param>

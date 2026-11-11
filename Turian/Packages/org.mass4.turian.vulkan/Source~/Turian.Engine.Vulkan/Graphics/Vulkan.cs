@@ -27,7 +27,7 @@ public class Vulkan : IRenderDevice
         ArgumentNullException.ThrowIfNull(surfaceHost);
 
         Vk = Vk.GetApi();
-        Device = new Device(Vk, surfaceHost, RequestedMsaaSamples(settings));
+        Device = new Device(Vk, surfaceHost, RequestedMsaaSamples(settings), ValidationLayers(settings), logger);
 
         logger.Lap("startup", "got vk");
     }
@@ -41,13 +41,17 @@ public class Vulkan : IRenderDevice
     public Vulkan(ILogger logger, IAppSettings? settings = null)
     {
         Vk = Vk.GetApi();
-        Device = new Device(Vk, requestedMsaaSamples: RequestedMsaaSamples(settings));
+        Device = new Device(Vk, requestedMsaaSamples: RequestedMsaaSamples(settings),
+            validationLayers: ValidationLayers(settings), logger: logger);
 
         logger.Lap("startup", "Vulkan headless device ready");
     }
 
     static int RequestedMsaaSamples(IAppSettings? settings) =>
         settings?.Get<GraphicsSettings>().MsaaSamples ?? GraphicsSettings.DefaultMsaaSamples;
+
+    static bool ValidationLayers(IAppSettings? settings) =>
+        settings?.Get<GraphicsSettings>().ValidationLayers ?? false;
 
     /// <inheritdoc />
     public Model? GetModel(Guid modelAssetId, AssetDatabase assets) =>

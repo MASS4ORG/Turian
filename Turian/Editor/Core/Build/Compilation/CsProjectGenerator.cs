@@ -231,8 +231,12 @@ public static class CsProjectGenerator
             .AddNugetPackageReferences(platform.Dependencies.Packages)
             .AddAssetsDir(settings)
             .CopyLauncherFiles(platform);
+        // Desktop falls back to the host's runtime; other platforms always build for one of their own.
+        var nativeRuntime = string.IsNullOrWhiteSpace(profile?.RuntimeIdentifier) && platform.Id != BuildPlatforms.Desktop
+            ? platform.RuntimeIdentifiers[0]
+            : profile?.RuntimeIdentifier;
         BrickNativeAssets.AddToProject(projectRoot,
-            ReferencedBricks(settings, true, profile?.Target ?? BuildTarget.Client), profile?.RuntimeIdentifier);
+            ReferencedBricks(settings, true, profile?.Target ?? BuildTarget.Client), nativeRuntime);
         if (profile?.Target == BuildTarget.Server)
         {
             projectRoot.AddServerVerification(settings, platform.Dependencies.Packages);
@@ -461,7 +465,11 @@ public static class CsProjectGenerator
                 .Concat(editor ? bricks.SelectMany(BrickAssemblies.EditorAssemblies) : []);
             foreach (var path in paths)
             {
-                references.AddItem("Reference", Path.GetFileNameWithoutExtension(path)).AddMetadata("HintPath", path, true);
+                var name = Path.GetFileNameWithoutExtension(path);
+                if (!projectRoot.Items.Any(item => item.ItemType == "Reference" && item.Include == name))
+                {
+                    references.AddItem("Reference", name).AddMetadata("HintPath", path, true);
+                }
             }
 
             AddBrickPackages(references, packages ?? settings.PackageReferences, bricks, shipping, platform);
@@ -528,7 +536,10 @@ public static class CsProjectGenerator
     static void AddBrickPackages(ProjectItemGroupElement references, IReadOnlyList<(string, string)> declaredPackages,
         IReadOnlyList<MASS4.Bricks.ResolvedPackage> bricks, bool shipping, string platform)
     {
-        var declared = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var declared = declaredPackages.Select(static p => p.Item1)
+            .Concat(references.ContainingProject.Items.Where(static item => item.ItemType == "PackageReference")
+                .Select(static item => item.Include))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var (id, version) in BrickNuGet.UnifyVersions(bricks, platform))
         {
             if (!declared.Add(id))
@@ -570,6 +581,13 @@ public static class CsProjectGenerator
             var fileName = Path.GetFileName(file);
             var destFile = Path.Combine(destDir, fileName);
             File.Copy(file, destFile, true);
+        }
+        if (platform.SdkVersion is { } sdkVersion)
+        {
+            File.WriteAllText(Path.Combine(destDir, "global.json"), JsonSerializer.Serialize(new
+            {
+                sdk = new { version = sdkVersion, rollForward = "latestPatch", allowPrerelease = true },
+            }));
         }
     }
 }

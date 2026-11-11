@@ -172,8 +172,30 @@ public abstract class ProjectDirectoryWatcher : IDisposable
 
     // ── Private routing ────────────────────────────────────────────────────────
 
-    void OnCreatedCore(object _, FileSystemEventArgs e) => OnFileCreated(e);
-    void OnChangedCore(object _, FileSystemEventArgs e) => OnFileChanged(e);
-    void OnDeletedCore(object _, FileSystemEventArgs e) => OnFileDeleted(e);
-    void OnRenamedCore(object _, RenamedEventArgs e) => OnFileRenamed(e);
+    void OnCreatedCore(object _, FileSystemEventArgs e) => Handle(e, OnFileCreated);
+    void OnChangedCore(object _, FileSystemEventArgs e) => Handle(e, OnFileChanged);
+    void OnDeletedCore(object _, FileSystemEventArgs e) => Handle(e, OnFileDeleted);
+    void OnRenamedCore(object _, RenamedEventArgs e) => Handle(e, OnFileRenamed);
+
+    // Events arrive on thread-pool threads, where an escaping exception ends the process. A file another program is
+    // still writing, which Windows refuses to share, raises a change event again once it is closed, so the event is
+    // only reported.
+    void Handle<TArgs>(TArgs e, Action<TArgs> handler) where TArgs : FileSystemEventArgs
+    {
+        try
+        {
+            handler(e);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogDebug(exception, "Skipped a {Change} event for {Path} the file system refused", e.ChangeType,
+                e.FullPath);
+        }
+#pragma warning disable CA1031
+        catch (Exception exception)
+#pragma warning restore CA1031
+        {
+            Logger.LogError(exception, "Could not handle the {Change} event for {Path}", e.ChangeType, e.FullPath);
+        }
+    }
 }

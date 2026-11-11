@@ -204,7 +204,7 @@ public static class BrickNuGetRestore
             $$"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
+                <TargetFramework>{{StubTargetFramework}}</TargetFramework>
                 <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
               </PropertyGroup>
               <ItemGroup>
@@ -313,7 +313,14 @@ public static class BrickNuGetRestore
         return true;
     }
 
-    // Whether the lock file's direct packages are exactly the unified map; transitive entries come from those.
+    /// <summary>
+    /// The framework the bricks' packages restore for: the one the editor runs on, whose reference pack every SDK able
+    /// to run it already has, so a restore needs no download beyond the packages themselves.
+    /// </summary>
+    internal static string StubTargetFramework => $"net{Environment.Version.Major}.0";
+
+    // Whether the lock file's direct packages are exactly the unified map for this editor's framework; transitive
+    // entries come from those. A lock written for another framework, such as by an editor on an older .NET, is stale.
     static bool DescribesMap(string lockFile, IReadOnlyDictionary<string, string> unified)
     {
         JsonNode? locked;
@@ -326,8 +333,13 @@ public static class BrickNuGetRestore
             return false;
         }
 
+        if (locked is not JsonObject frameworks || !frameworks.ContainsKey(StubTargetFramework))
+        {
+            return false;
+        }
+
         var pinned = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var framework in locked?.AsObject() ?? [])
+        foreach (var framework in frameworks)
         {
             foreach (var package in framework.Value?.AsObject() ?? [])
             {

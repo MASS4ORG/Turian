@@ -23,6 +23,14 @@ public interface IEngineSessionParticipant
     void Stop();
 }
 
+/// <summary>A feature that stops device work while the application is in the background.</summary>
+public interface IEngineSessionPauseParticipant
+{
+    /// <summary>Called on the game thread when the application leaves or returns to the foreground.</summary>
+    /// <param name="paused">Whether the application is now in the background.</param>
+    void SetPaused(bool paused);
+}
+
 /// <summary>Composes and tears down installed feature lifetimes in registration order.</summary>
 public sealed class EngineSessionLifetime(IEnumerable<IEngineSessionParticipant> participants) : IDisposable
 {
@@ -45,6 +53,16 @@ public sealed class EngineSessionLifetime(IEnumerable<IEngineSessionParticipant>
         {
             Dispose();
             throw;
+        }
+    }
+
+    /// <summary>Tells every started feature that the application left or returned to the foreground.</summary>
+    /// <param name="paused">Whether the application is now in the background.</param>
+    public void SetPaused(bool paused)
+    {
+        foreach (var participant in participants.Take(started).OfType<IEngineSessionPauseParticipant>())
+        {
+            participant.SetPaused(paused);
         }
     }
 

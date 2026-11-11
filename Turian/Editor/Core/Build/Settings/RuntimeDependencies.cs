@@ -26,7 +26,10 @@ public sealed class RuntimeDependencies
         return Parse(reader);
     }
 
-    internal static RuntimeDependencies Parse(TextReader reader)
+    /// <summary>Reads a platform launcher's resolved MSBuild dependency manifest.</summary>
+    /// <param name="reader">The manifest reader, owned by the caller.</param>
+    /// <returns>The platform's runtime dependency graph.</returns>
+    public static RuntimeDependencies Parse(TextReader reader)
     {
         var result = new RuntimeDependencies();
         var packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

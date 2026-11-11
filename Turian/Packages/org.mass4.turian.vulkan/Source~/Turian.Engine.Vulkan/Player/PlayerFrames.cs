@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Turian.Engine.Core;
 
 /// <summary>
@@ -38,6 +40,7 @@ public sealed class PlayerFrames(
 
     bool paused;
     bool resumed;
+    SafeAreaService? safeArea;
 
     /// <summary>
     /// Gets or sets whether the game is paused because its surface is lost: frames neither tick nor render, and the
@@ -48,12 +51,14 @@ public sealed class PlayerFrames(
         get => paused;
         set
         {
-            if (paused && !value)
+            if (paused == value)
             {
-                resumed = true;
+                return;
             }
 
+            resumed = !value;
             paused = value;
+            runtime.Services.GetService<EngineSessionLifetime>()?.SetPaused(value);
         }
     }
 
@@ -131,13 +136,15 @@ public sealed class PlayerFrames(
     void RenderOverlay(double deltaTime)
     {
         var size = framebufferSize();
+        safeArea ??= runtime.Services.GetService<SafeAreaService>();
+        safeArea?.SetScreen(size);
         if (presenter is null || size.X <= 0 || size.Y <= 0)
         {
             return;
         }
 
         var scenes = runtime.Scenes;
-        var root = runtime.StartupRoot ?? scenes.ActiveScene?.RootNode ?? scenes.PersistentRoot;
+        var root = scenes.ActiveScene?.RootNode ?? scenes.PersistentRoot;
         setOverlay(presenter.TryRenderOverlay(root, size.X, size.Y, (float)deltaTime));
     }
 

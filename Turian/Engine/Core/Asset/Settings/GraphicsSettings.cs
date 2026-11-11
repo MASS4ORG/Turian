@@ -20,4 +20,10 @@ public class GraphicsSettings : ProjectSettingsAsset
     /// dropping leading mip levels, so it shrinks the cache as well as VRAM.
     /// </summary>
     public int TextureMaxResolution { get; set; }
+
+    /// <summary>
+    /// Runs Vulkan with its validation layer and logs what it reports. Slows rendering, so it is off by default;
+    /// where the layer is not installed the game logs a warning and runs without it.
+    /// </summary>
+    public bool ValidationLayers { get; set; }
 }

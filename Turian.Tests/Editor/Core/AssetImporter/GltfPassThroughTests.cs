@@ -90,7 +90,7 @@ public sealed class GltfPassThroughTests(VulkanFixture fixture) : IClassFixture<
         using var project = new Project(false);
         var source = Path.Combine(project.Root, "Assets", "authoring" + extension);
         File.WriteAllText(source, "native authoring source");
-        var asset = new ModelImportAsset { Id = Guid.NewGuid(), RelativePath = source };
+        var asset = new ModelImportAsset { Id = Guid.NewGuid(), RelativePath = "Assets/authoring" + extension };
         if (existingMetadata)
         {
             Serializer.Save(source + ".meta", asset);

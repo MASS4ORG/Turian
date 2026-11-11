@@ -63,6 +63,71 @@ public sealed class PlayerFramesTests : IDisposable
         Assert.Equal(0, closed);
     }
 
+    sealed class PauseRecorder : IEngineSessionParticipant, IEngineSessionPauseParticipant
+    {
+        public List<bool> Changes { get; } = [];
+        public void Start() { }
+        public void Stop() { }
+        public void SetPaused(bool paused) => Changes.Add(paused);
+    }
+
+    /// <summary>Session features hear once when the application leaves the foreground and once when it returns.</summary>
+    [Fact]
+    public void SessionFeaturesFollowTheForeground()
+    {
+        var recorder = new PauseRecorder();
+        var runtime = GameRuntime.StartClient(
+            new GamePlayerContext(project, NullLogger.Instance, static services => services.BuildServiceProvider()),
+            new BufferedInputSource(),
+            services => services.AddSingleton<IEngineSessionParticipant>(recorder));
+        var frames = Frames(runtime, null);
+
+        frames.Paused = false;
+        frames.Paused = true;
+        frames.Paused = true;
+        frames.Paused = false;
+
+        Assert.Equal([true, false], recorder.Changes);
+    }
+
+    /// <summary>A player that owns its window opens an interactive client session on the input it supplies.</summary>
+    [Fact]
+    public void PlayersOwningTheirWindowOpenInteractiveClientSessions()
+    {
+        var input = new BufferedInputSource();
+
+        var runtime = GameRuntime.StartClient(
+            new GamePlayerContext(project, NullLogger.Instance, static services => services.BuildServiceProvider()), input);
+
+        var session = runtime.Services.GetRequiredService<EngineSessionContext>();
+        Assert.Equal(EngineSessionKind.Client, session.Kind);
+        Assert.True(session.Interactive);
+        Assert.Same(input, runtime.Services.GetRequiredService<IInputSource>());
+    }
+
+    /// <summary>Once another scene replaces the startup scene, the overlay is built from the scene now active.</summary>
+    [Fact]
+    public void OverlayFollowsTheActiveSceneAfterTheStartupSceneIsReplaced()
+    {
+        var runtime = Runtime();
+        var path = Path.Combine(project, "Assets", "scene.prefab");
+        Serializer.Save(path, new Node { Name = "Startup" });
+        var prefab = new Prefab { RelativePath = path };
+        Assert.True(runtime.Assets.RegisterAsset(prefab));
+        runtime.Settings.Get<PlayerSettings>().StartupScene = new AssetReference<Prefab>(prefab.Id);
+        runtime.LoadStartupScene();
+        var presenter = Substitute.For<IUiPresenter>();
+        var frames = Frames(runtime, presenter);
+
+        frames.Frame(0.1);
+        presenter.Received(1).TryRenderOverlay(runtime.StartupRoot!, 320, 200, 0.1f);
+
+        var replacement = new Node { Name = "Next" };
+        runtime.Scenes.AdoptScene(Guid.NewGuid(), replacement);
+        frames.Frame(0.1);
+        presenter.Received(1).TryRenderOverlay(replacement, 320, 200, 0.1f);
+    }
+
     /// <summary>
     /// No overlay is drawn without a presenter or while the window is minimized; roots without a camera are skipped.
     /// </summary>

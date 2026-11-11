@@ -1,4 +1,4 @@
-#pragma warning disable xUnit1031 // Hosts and scene lifecycle are pumped on the same game thread throughout each test.
+#pragma warning disable xUnit1031
 
 namespace Turian.Tests;
 

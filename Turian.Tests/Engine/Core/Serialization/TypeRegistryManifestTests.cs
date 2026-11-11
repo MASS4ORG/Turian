@@ -1,6 +1,8 @@
 namespace Turian.Tests;
 
 /// <summary>Tests registering user types from the compiled type manifest.</summary>
+// The registry is process-wide and other serial tests reset it, so these must not run beside them.
+[Collection(SerialTests.Name)]
 public sealed class TypeRegistryManifestTests : IDisposable
 {
     sealed class ManifestTarget : IdObject;
@@ -58,7 +60,11 @@ public sealed class TypeRegistryManifestTests : IDisposable
         Assert.Equal(typeof(ManifestTarget), type);
     }
 
-    /// <summary>A missing, unreadable or type-less manifest registers nothing and does not throw.</summary>
+    /// <summary>A missing, unreadable or type-less manifest is ignored without throwing.</summary>
+    /// <remarks>
+    /// The registry's size is not compared: it is process-wide, and tests outside the serial collection register their
+    /// own types at any moment.
+    /// </remarks>
     [Theory]
     [InlineData(null)]
     [InlineData("{ not json")]
@@ -70,11 +76,7 @@ public sealed class TypeRegistryManifestTests : IDisposable
             File.WriteAllText(Manifest, content);
         }
 
-        var count = TypeRegistry.Count;
-
-        TypeRegistry.RegisterFromManifest(Manifest, NullLogger.Instance);
-
-        Assert.Equal(count, TypeRegistry.Count);
+        Assert.Null(Record.Exception(() => TypeRegistry.RegisterFromManifest(Manifest, NullLogger.Instance)));
     }
 
     /// <summary>Identical type names in old and current assemblies resolve through the declared assembly.</summary>

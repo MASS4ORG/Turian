@@ -71,6 +71,18 @@ public sealed class GameRuntime : IDisposable
     public static GameRuntime Start(GamePlayerContext context, EngineSessionKind kind)
         => StartCore(context, null, kind, null);
 
+    /// <summary>Opens the game as a client session for a player that owns its window and input, such as a mobile launcher.</summary>
+    /// <param name="context">The launcher's project folder, logger and service container.</param>
+    /// <param name="input">The player's input device.</param>
+    /// <param name="addServices">Registers the player's services, such as its render device.</param>
+    /// <returns>The opened game, with no scene loaded yet.</returns>
+    public static GameRuntime StartClient(GamePlayerContext context, IInputSource input,
+        Action<IServiceCollection>? addServices = null)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return StartCore(context, input, EngineSessionKind.Client, addServices);
+    }
+
     internal static GameRuntime StartClient(GamePlayerContext context, IClientRuntimeHost? host)
         => StartCore(context, null, EngineSessionKind.Client, null, host);
 
@@ -151,6 +163,7 @@ public sealed class GameRuntime : IDisposable
             .AddSingleton(context.Logger)
             .AddSingleton<IAppSettings>(Settings)
             .AddSingleton<LayerFilter>()
+            .AddSingleton<SafeAreaService>()
             .AddSingleton<IPhysicsQueries, PhysicsQueries>()
             .AddSingleton(Assets)
             .AddSingleton<ISceneManager>(Scenes)
