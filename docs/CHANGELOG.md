@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: application, session and scene lifetimes #358.
+
 ## [4.0.0] - 2026-11-11
 
 - Added: dotnet 11

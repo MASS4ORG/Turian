@@ -64,14 +64,14 @@ public sealed class GameRuntime : IDisposable
         Action<IServiceCollection>? addServices = null)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return StartCore(context, input, EngineSessionKind.Headless, addServices);
+        return StartCore(context, input, ApplicationKind.Headless, addServices);
     }
 
-    /// <summary>Composes a session whose input and host are supplied by installed feature modules.</summary>
-    public static GameRuntime Start(GamePlayerContext context, EngineSessionKind kind)
+    /// <summary>Composes an application whose input and host are supplied by installed feature modules.</summary>
+    public static GameRuntime Start(GamePlayerContext context, ApplicationKind kind)
         => StartCore(context, null, kind, null);
 
-    /// <summary>Opens the game as a client session for a player that owns its window and input, such as a mobile launcher.</summary>
+    /// <summary>Opens the game as a client application for a player that owns its window and input, such as a mobile launcher.</summary>
     /// <param name="context">The launcher's project folder, logger and service container.</param>
     /// <param name="input">The player's input device.</param>
     /// <param name="addServices">Registers the player's services, such as its render device.</param>
@@ -80,13 +80,13 @@ public sealed class GameRuntime : IDisposable
         Action<IServiceCollection>? addServices = null)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return StartCore(context, input, EngineSessionKind.Client, addServices);
+        return StartCore(context, input, ApplicationKind.Client, addServices);
     }
 
     internal static GameRuntime StartClient(GamePlayerContext context, IClientRuntimeHost? host)
-        => StartCore(context, null, EngineSessionKind.Client, null, host);
+        => StartCore(context, null, ApplicationKind.Client, null, host);
 
-    static GameRuntime StartCore(GamePlayerContext context, IInputSource? input, EngineSessionKind kind,
+    static GameRuntime StartCore(GamePlayerContext context, IInputSource? input, ApplicationKind kind,
         Action<IServiceCollection>? addServices, IClientRuntimeHost? host = null)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -154,12 +154,12 @@ public sealed class GameRuntime : IDisposable
     }
 
     void BindServices(GamePlayerContext context, IAssetLoader loader, IInputSource? input,
-        DataAssetSession dataAssets, EngineSessionKind kind, Action<IServiceCollection>? addServices,
+        DataAssetSession dataAssets, ApplicationKind kind, Action<IServiceCollection>? addServices,
         IClientRuntimeHost? host)
     {
         var clock = new SimulationClock(Settings.Get<TimeSettings>());
         var registrations = new ServiceCollection()
-            .AddSingleton(new EngineSessionContext(kind, Interactive: kind == EngineSessionKind.Client))
+            .AddSingleton(new ApplicationContext(kind, Interactive: kind == ApplicationKind.Client))
             .AddSingleton(context.Logger)
             .AddSingleton<IAppSettings>(Settings)
             .AddSingleton<LayerFilter>()
@@ -174,7 +174,7 @@ public sealed class GameRuntime : IDisposable
             .AddSingleton(input ?? host?.Input ?? new BufferedInputSource())
             .AddSingleton(static sp => new InputActionService(sp.GetRequiredService<IInputSource>()))
             .AddSingleton<IInputActions>(static sp => sp.GetRequiredService<InputActionService>())
-            .AddSingleton<EngineSessionLifetime>();
+            .AddSingleton<ApplicationLifetime>();
         if (host is not null)
         {
             registrations.AddSingleton(host);
@@ -210,15 +210,15 @@ public sealed class GameRuntime : IDisposable
         Scenes.BindServices(Services);
 
         LoadActionMaps(loader);
-        Services.GetRequiredService<EngineSessionLifetime>().Start();
+        Services.GetRequiredService<ApplicationLifetime>().Start();
     }
 
-    /// <summary>Stops installed session features independently of the rendering host.</summary>
+    /// <summary>Stops installed application features independently of the rendering host.</summary>
     public void Dispose()
     {
         if (disposed) { return; }
         disposed = true;
-        try { Services?.GetService<EngineSessionLifetime>()?.Dispose(); }
+        try { Services?.GetService<ApplicationLifetime>()?.Dispose(); }
         finally
         {
             try { Ticker?.Async.Dispose(); }

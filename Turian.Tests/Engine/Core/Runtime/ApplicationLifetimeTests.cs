@@ -1,10 +1,10 @@
 namespace Turian.Tests;
 
 /// <summary>Qualifies feature composition and lifetime independently of rendering and optional features.</summary>
-public sealed class EngineSessionTests
+public sealed class ApplicationLifetimeTests
 {
     sealed class Participant(string name, List<string> calls, bool failStart = false, bool failStop = false)
-        : IEngineSessionParticipant
+        : IApplicationParticipant
     {
         public void Start()
         {
@@ -23,7 +23,7 @@ public sealed class EngineSessionTests
     public void FeatureLifetimesAreOrderedAndIdempotent()
     {
         var calls = new List<string>();
-        var lifetime = new EngineSessionLifetime([new Participant("a", calls), new Participant("b", calls)]);
+        var lifetime = new ApplicationLifetime([new Participant("a", calls), new Participant("b", calls)]);
         lifetime.Start();
         lifetime.Start();
         lifetime.Dispose();
@@ -33,10 +33,10 @@ public sealed class EngineSessionTests
 
     /// <summary>A failed startup unwinds both the failed feature and those already started.</summary>
     [Fact]
-    public void FailedFeatureStartupUnwindsTheSession()
+    public void FailedFeatureStartupUnwindsTheApplication()
     {
         var calls = new List<string>();
-        using var lifetime = new EngineSessionLifetime(
+        using var lifetime = new ApplicationLifetime(
             [new Participant("a", calls), new Participant("b", calls, failStart: true)]);
         Assert.Throws<InvalidOperationException>(() => lifetime.Start());
         Assert.Equal(["a:start", "b:start", "b:stop", "a:stop"], calls);
@@ -47,7 +47,7 @@ public sealed class EngineSessionTests
     public void FailedFeatureStopStillStopsOtherFeatures()
     {
         var calls = new List<string>();
-        var lifetime = new EngineSessionLifetime(
+        var lifetime = new ApplicationLifetime(
             [new Participant("a", calls), new Participant("b", calls, failStop: true)]);
         lifetime.Start();
         Assert.Single(Assert.Throws<AggregateException>(() => lifetime.Dispose()).InnerExceptions);
@@ -55,15 +55,15 @@ public sealed class EngineSessionTests
         lifetime.Dispose();
     }
 
-    /// <summary>Module registration can inspect session capabilities without constructing a provider.</summary>
+    /// <summary>Module registration can inspect application capabilities without constructing a provider.</summary>
     [Fact]
-    public void ModulesReadTheRegisteredSessionContext()
+    public void ModulesReadTheRegisteredApplicationContext()
     {
         var services = new ServiceCollection();
-        Assert.Equal(EngineSessionKind.Headless, services.GetEngineSession().Kind);
-        var context = new EngineSessionContext(EngineSessionKind.Editor, Interactive: true);
+        Assert.Equal(ApplicationKind.Headless, services.GetApplicationContext().Kind);
+        var context = new ApplicationContext(ApplicationKind.Editor, Interactive: true);
         services.AddSingleton(context);
-        Assert.Same(context, services.GetEngineSession());
+        Assert.Same(context, services.GetApplicationContext());
     }
 
     /// <summary>A renderer supplies host infrastructure without depending on optional audio or physics assemblies.</summary>

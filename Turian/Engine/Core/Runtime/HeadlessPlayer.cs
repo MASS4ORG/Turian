@@ -13,7 +13,7 @@ public sealed class HeadlessPlayer : IGamePlayer
         Application.BeginSession(headless: true);
 
         using var interrupt = Application.QuitOnInterrupt();
-        using var runtime = GameRuntime.Start(context, EngineSessionKind.Headless);
+        using var runtime = GameRuntime.Start(context, ApplicationKind.Headless);
         runtime.LoadStartupScene();
         context.Logger.LogInformation("{Product} running headless at {Rate:F0} ticks per second",
             runtime.ProductName, 1 / runtime.Ticker.Clock.FixedDeltaTime);

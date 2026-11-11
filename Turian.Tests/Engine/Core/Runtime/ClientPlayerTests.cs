@@ -4,7 +4,7 @@ namespace Turian.Tests;
 [Collection(SerialTests.Name)]
 public sealed class ClientPlayerTests
 {
-    sealed class Feature(List<string> calls, bool failStart) : IEngineSessionParticipant
+    sealed class Feature(List<string> calls, bool failStart) : IApplicationParticipant
     {
         public void Start()
         {
@@ -26,7 +26,7 @@ public sealed class ClientPlayerTests
         public void Initialize(GameRuntime runtime, GamePlayerContext context)
         {
             calls.Add("host:initialize");
-            Assert.True(runtime.Services.GetRequiredService<EngineSessionContext>().Interactive);
+            Assert.True(runtime.Services.GetRequiredService<ApplicationContext>().Interactive);
             if (fail) { throw new InvalidOperationException("Host initialization failed."); }
         }
         public int Run(GameRuntime runtime)
@@ -51,7 +51,7 @@ public sealed class ClientPlayerTests
         var calls = new List<string>();
         var context = new GamePlayerContext(directory.FullName, NullLogger.Instance, services =>
         {
-            services.AddSingleton<IEngineSessionParticipant>(new Feature(calls, failStart));
+            services.AddSingleton<IApplicationParticipant>(new Feature(calls, failStart));
             return provider = services.BuildServiceProvider();
         });
         try
