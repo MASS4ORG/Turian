@@ -1,6 +1,6 @@
-#pragma warning disable CA2012 // Exercises explicit registration, diagnostics and invalid consumption contracts.
-#pragma warning disable xUnit1031 // The scheduler's loop thread must remain fixed while worker work is joined.
-#pragma warning disable xUnit1051 // Exercises default and owner lifetimes independently of the test-run lifetime.
+#pragma warning disable CA2012
+#pragma warning disable xUnit1031
+#pragma warning disable xUnit1051
 
 namespace Turian.Tests;
 

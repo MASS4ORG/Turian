@@ -1,5 +1,5 @@
-#pragma warning disable xUnit1031 // The clock and scheduler stay on one thread while worker cancellation is joined.
-#pragma warning disable xUnit1051 // Clock and owner tests deliberately exercise their own cancellation lifetimes.
+#pragma warning disable xUnit1031
+#pragma warning disable xUnit1051
 
 namespace Turian.Tests;
 

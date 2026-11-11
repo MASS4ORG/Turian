@@ -19,7 +19,7 @@ public sealed class ModelAssetPreviewProvider : IScenePreviewProvider
         var root = new Node { Name = "__AssetPreview" };
 
         var modelNode = new Node { Name = "Model" };
-        // Ownership transfers to modelNode; Dispose only clears cached asset lookups, nothing owned.
+
 #pragma warning disable CA2000
         modelNode.AddComponent(new ModelComponent { Model = new AssetReference<ModelAsset>(modelAsset.Id) });
 #pragma warning restore CA2000

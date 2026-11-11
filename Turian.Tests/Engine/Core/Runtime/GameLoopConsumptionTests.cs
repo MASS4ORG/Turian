@@ -1,6 +1,6 @@
-#pragma warning disable CA2012 // These tests exercise invalid consumption of manually pumped values.
-#pragma warning disable xUnit1031 // Results are inspected after explicitly pumping the same loop thread.
-#pragma warning disable xUnit1051 // Exercises default tokens and source consumption independently of cancellation.
+#pragma warning disable CA2012
+#pragma warning disable xUnit1031
+#pragma warning disable xUnit1051
 
 namespace Turian.Tests;
 

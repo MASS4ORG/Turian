@@ -38,6 +38,10 @@
     <ItemGroup>
     </ItemGroup>
 
+    <ItemGroup>
+        <RuntimeHostConfigurationOption Include="System.GC.HeapHardLimit" Value="6442450944" />
+    </ItemGroup>
+
     <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />

@@ -1,4 +1,4 @@
-#pragma warning disable RS2008 // RS2008: test-only DiagnosticDescriptors, not real analyzer rules
+#pragma warning disable RS2008
 
 namespace Turian.Tests.Turian.Editor.Build;
 

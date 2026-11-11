@@ -55,14 +55,14 @@ RUN apt-get update -yqq \
        openssh-client curl unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# The editor runs on .NET 10 and hosts that SDK's MSBuild, while Android exports use the .NET 11 SDK of this image.
+# The editor runs on .NET 11; .NET 10 stays for bricks, games and their tests that target the LTS release.
 RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
     && bash /tmp/dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet \
     && rm /tmp/dotnet-install.sh
 
 WORKDIR /app
 COPY --from=build /app/publish .
-COPY ci/android-toolchain.env ci/android-toolchain.sh ci/android-verify.sh ci/android-smoke.sh /app/ci/
+COPY ci/android-toolchain.env ci/android-toolchain.sh ci/android-verify.sh /app/ci/
 ENV PATH="/app:${PATH}" \
     BRICK_RELEASE_ROOT=/app/tools/brick-release
 
