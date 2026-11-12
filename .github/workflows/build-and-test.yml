@@ -116,8 +116,8 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-  # Validate the Linux and NuGet release formats without tagging or pushing. The container image and the macOS
-  # archive build in their own jobs, which run beside this one: none of the three needs another's output.
+  # Validate the Linux and NuGet release formats without tagging or pushing. The NuGet packages, the container image
+  # and the macOS archive build in their own jobs, which run beside this one: none needs another's output.
   package:
     runs-on: ubuntu-latest
     permissions:
@@ -137,13 +137,37 @@ jobs:
           sudo apt-get update -yqq
           sudo apt-get install -yqq glslc
 
-      - name: Build Linux packages and NuGet packages
+      - name: Build Linux packages
         run: |
           chmod +x ./build.sh
-          ./build.sh Pack DebianPackage PackNuGet \
+          ./build.sh Pack DebianPackage \
             --configuration "Release" \
             --runtime-identifier "linux-x64" \
             --no-local-packages \
+            --verbosity minimal
+
+  # The NuGet packages need the whole solution built, which the Linux packages above do not.
+  package-nuget:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+
+      - name: Build NuGet packages
+        run: |
+          chmod +x ./build.sh
+          ./build.sh PackNuGet \
+            --configuration "Release" \
+            --no-local-packages \
+            --skip-shaders \
             --verbosity minimal
 
   # The container image is a podman build from the Containerfile; it does not use the archives built above.
