@@ -53,6 +53,7 @@ public sealed class MultiSelectionPanelTests
         var project = Path.Combine(Path.GetTempPath(), $"turian-inspector-selection-{Guid.NewGuid():N}");
         var folder = Path.Combine(project, "Assets");
         Directory.CreateDirectory(folder);
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         try
         {
             var settings = new SettingsService();
@@ -135,6 +136,7 @@ public sealed class MultiSelectionPanelTests
         var project = Path.Combine(Path.GetTempPath(), $"turian-browser-selection-{Guid.NewGuid():N}");
         var folder = Path.Combine(project, "Assets");
         Directory.CreateDirectory(folder);
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         try
         {
             var paths = new[] { "a.bin", "b.bin", "c.bin" }.Select(name => Path.Combine(folder, name)).ToArray();

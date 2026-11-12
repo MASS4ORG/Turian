@@ -27,6 +27,7 @@ artifacts/
 bld/
 coverage*.*
 coverage/
+test-results/
 project.fragment.lock.json
 project.lock.json
 Thumbs.db

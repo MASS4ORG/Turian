@@ -80,6 +80,7 @@ public sealed class HeadlessBrickTests : IDisposable
         using var meta = JsonDocument.Parse(File.ReadAllText(Path.Combine(brick, "Runtime", "HeadlessComponent.cs.meta")));
         var typeId = meta.RootElement.GetProperty("Id").GetGuid();
         var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "project")))!;
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         BrickService.Add(project, "user.mateo.headless", $"file:{brick}");
         var scene = Path.Combine(project, "Assets", "headless.prefab");
         File.WriteAllText(scene, $$"""

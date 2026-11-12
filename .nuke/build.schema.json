@@ -46,7 +46,6 @@
         "Restore",
         "ShowCurrentVersion",
         "Test",
-        "TestFast",
         "TestReport",
         "UpdateChangelog",
         "UpdateProjectVersions",
@@ -204,6 +203,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "SkipE2E": {
+          "type": "boolean",
+          "description": "skip-e2e (default: false): leave out the slow end-to-end tests, for quick local iteration"
         },
         "SkipShaders": {
           "type": "boolean",

@@ -63,6 +63,15 @@ jobs:
           chmod +x ./build.sh
           ./build.sh Restore Compile TestReport --configuration "Debug" --no-local-packages --verbosity minimal
 
+      # The HTML report is hundreds of small files, which take longer to upload than the tests' own results.
+      - name: Pack coverage report
+        if: always()
+        run: |
+          if [ -d coverage/report ]; then
+            tar -czf coverage/report.tar.gz -C coverage report
+            rm -rf coverage/report
+          fi
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
@@ -72,7 +81,8 @@ jobs:
           retention-days: 7
 
   # The full suite on Windows and macOS, where paths, file locking and atomic replaces differ from Linux.
-  # Compiled shaders are tracked, so glslc is not needed; GPU tests skip on runners without Vulkan.
+  # Compiled shaders are tracked, so glslc is not needed; GPU tests skip on runners without Vulkan. Coverage is
+  # measured on Linux only: here it would only slow the run down.
   test-desktop:
     strategy:
       fail-fast: false
@@ -94,14 +104,14 @@ jobs:
 
       - name: Restore, compile, test
         shell: pwsh
-        run: ./build.ps1 Restore Compile TestReport --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
+        run: ./build.ps1 Restore Compile Test --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
 
-      - name: Upload coverage report
+      - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report-${{ matrix.os }}
-          path: coverage/
+          name: test-results-${{ matrix.os }}
+          path: test-results/
           retention-days: 7
 
   # Validate the Linux and NuGet release formats without tagging or pushing. The container image and the macOS

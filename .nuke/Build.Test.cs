@@ -6,6 +6,9 @@ namespace Build;
 /// </summary>
 sealed partial class Build
 {
+    // Where Test writes its TRX reports.
+    static AbsolutePath TestResultsDirectory => RootDirectory / "test-results";
+
     static AbsolutePath CoverageDirectory => RootDirectory / "coverage";
     static AbsolutePath CoverageResultFile => CoverageDirectory / "coverage.xml";
 
@@ -15,8 +18,11 @@ sealed partial class Build
     static AbsolutePath CoverageReportSummaryDirectory => CoverageReportDirectory / "Summary.txt";
     static AbsolutePath CoverageSettingsFile => RootDirectory / "CodeCoverage.runsettings";
 
-    /// <summary>Runs tests without coverage, with optional project-specific filters for local iteration.</summary>
-    public Target TestFast => td =>
+    /// <summary>
+    /// Runs the tests without coverage and writes their TRX reports; a project may narrow what runs through
+    /// <see cref="ConfigureTests"/>.
+    /// </summary>
+    public Target Test => td =>
         td
             .DependsOn(Compile)
             .Executes(() =>
@@ -26,15 +32,19 @@ sealed partial class Build
                     .SetProcessWorkingDirectory(Solution.Directory)
                     .EnableNoBuild()
                     .EnableNoRestore()
-                    .AddProcessAdditionalArguments("--minimum-expected-tests", "1"));
-                ConfigureFastTests(ref settings);
-                DotNetTest(settings);
+                    .AddProcessAdditionalArguments(
+                        TestReportArgument,
+                        "--minimum-expected-tests", "1",
+                        "--results-directory", TestResultsDirectory));
+                ConfigureTests(ref settings);
+                _ = DotNetTest(settings);
             });
 
-    /// <summary>Configures project-specific fast-test filters using the project's test framework.</summary>
-    partial void ConfigureFastTests(ref DotNetTestSettings settings);
+    /// <summary>Configures project-specific test filters using the project's test framework.</summary>
+    partial void ConfigureTests(ref DotNetTestSettings settings);
 
-    Target Test => td =>
+    /// <summary>Runs every test with coverage, then generates the coverage reports and publishes their summary to CI.</summary>
+    public Target TestReport => td =>
         td
             .DependsOn(Compile)
             .Produces(CoverageResultFile)
@@ -72,15 +82,7 @@ sealed partial class Build
                     (CoverageMergedDirectory / "Cobertura.xml").Move(CoverageResultFile, ExistsPolicy.FileOverwrite);
                 }
                 CoverageMergedDirectory.DeleteDirectory();
-            });
 
-    /// <summary>Generates coverage reports and publishes their summary to CI.</summary>
-    public Target TestReport => td =>
-        td
-            .DependsOn(Test)
-            .Consumes(Test, CoverageResultFile)
-            .Executes(() =>
-            {
                 _ = CoverageReportDirectory.CreateDirectory();
                 _ = ReportGenerator(
                     s => s
