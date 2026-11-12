@@ -9,6 +9,9 @@ public sealed class MissingTypeMetaTests : IDisposable
     public MissingTypeMetaTests()
     {
         Directory.CreateDirectory(Path.Combine(project, "Assets"));
+
+        // Scanning metas does not depend on the renderer brick, whose packages every scan would otherwise restore.
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
     }
 
     /// <inheritdoc/>

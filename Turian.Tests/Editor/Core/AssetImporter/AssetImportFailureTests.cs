@@ -6,6 +6,9 @@ public sealed class AssetImportFailureTests : IDisposable
 {
     readonly string root = Directory.CreateTempSubdirectory("turian-import-failure-").FullName;
 
+    /// <summary>Opts the project out of the renderer brick, whose packages every scan would otherwise restore.</summary>
+    public AssetImportFailureTests() => ProjectPackages.OptOutOfDefault(root, ProjectPackages.RenderBrick);
+
     /// <inheritdoc/>
     public void Dispose() => Directory.Delete(root, recursive: true);
 

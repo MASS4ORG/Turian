@@ -9,7 +9,13 @@ public sealed class DataAssetVariantTests : IDisposable
     const string baseJson = """{ "__TypeId": "ca028d68-85a9-5f3d-ad2f-c54db757d6fa", "Name": "Base", "Stats": { "Health": 10, "Mana": 5 }, "Tags": ["a", "b"] }""";
 
     /// <summary>Creates the scratch folder.</summary>
-    public DataAssetVariantTests() => Directory.CreateDirectory(root);
+    public DataAssetVariantTests()
+    {
+        Directory.CreateDirectory(root);
+
+        // Variants do not depend on the renderer brick, whose packages every scan would otherwise restore.
+        ProjectPackages.OptOutOfDefault(root, ProjectPackages.RenderBrick);
+    }
 
     /// <inheritdoc/>
     public void Dispose() => Directory.Delete(root, recursive: true);

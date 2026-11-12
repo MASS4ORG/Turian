@@ -104,8 +104,38 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # Validate the Linux, macOS, NuGet and container release formats without tagging or pushing.
+  # Validate the Linux and NuGet release formats without tagging or pushing. The container image and the macOS
+  # archive build in their own jobs, which run beside this one: none of the three needs another's output.
   package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update -yqq
+          sudo apt-get install -yqq glslc
+
+      - name: Build Linux packages and NuGet packages
+        run: |
+          chmod +x ./build.sh
+          ./build.sh Pack DebianPackage PackNuGet \
+            --configuration "Release" \
+            --runtime-identifier "linux-x64" \
+            --no-local-packages \
+            --verbosity minimal
+
+  # The container image is a podman build from the Containerfile; it does not use the archives built above.
+  package-container:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,10 +154,10 @@ jobs:
           sudo apt-get update -yqq
           sudo apt-get install -yqq glslc podman
 
-      - name: Build Linux packages, NuGet packages and container image
+      - name: Build container image
         run: |
           chmod +x ./build.sh
-          ./build.sh Pack DebianPackage PackNuGet ContainerBuild \
+          ./build.sh ContainerBuild \
             --configuration "Release" \
             --runtime-identifier "linux-x64" \
             --no-local-packages \
@@ -147,8 +177,23 @@ jobs:
           test -n "$(ls -A "$work/sample/Output")"
           test -s "$work/screenshot.png"
 
+  package-macos:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+
       - name: Build macOS archive
         run: |
+          chmod +x ./build.sh
           ./build.sh Pack \
             --configuration "Release" \
             --runtime-identifier "osx-x64" \

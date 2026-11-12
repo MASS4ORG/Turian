@@ -118,6 +118,8 @@ public sealed class GltfPassThroughTests(VulkanFixture fixture) : IClassFixture<
 
         internal Project(bool external)
         {
+            // Pass-through does not depend on the renderer brick, whose packages every scan would otherwise restore.
+            ProjectPackages.OptOutOfDefault(Root, ProjectPackages.RenderBrick);
             var folder = Directory.CreateDirectory(Path.Combine(Root, "Assets")).FullName;
             var glb = Path.Combine(folder, "triangle.glb");
             GltfGeometryFixture.Save(glb,

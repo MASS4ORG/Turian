@@ -11,6 +11,9 @@ public sealed class MetaFilePathTests : IDisposable
     public MetaFilePathTests()
     {
         Directory.CreateDirectory(Path.Combine(project, "Assets", "Scenes"));
+
+        // Meta files do not depend on the renderer brick, whose packages every new project would otherwise restore.
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
         importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), settings);
         importer.GenerateMetaFiles(Path.Combine(project, "Assets"));

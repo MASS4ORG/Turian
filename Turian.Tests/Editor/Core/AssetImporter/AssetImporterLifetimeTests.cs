@@ -23,7 +23,7 @@ public sealed class AssetImporterLifetimeTests : IDisposable
     [InlineData(WatcherChangeTypes.Renamed, true)]
     public void WatcherEventsRespectImporterLifetime(WatcherChangeTypes change, bool dispose)
     {
-        var assets = Directory.CreateDirectory(Path.Combine(project, "Assets")).FullName;
+        var assets = NewAssetsFolder();
         var source = Path.Combine(assets, "Base.dataasset");
         var content = new AssemblyDefinition { Name = "Original" };
         Serializer.Save<DataAsset>(source, content);
@@ -82,6 +82,13 @@ public sealed class AssetImporterLifetimeTests : IDisposable
         }
     }
 
+    // Watcher lifetimes do not depend on the renderer brick, whose packages every new project would otherwise restore.
+    string NewAssetsFolder()
+    {
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
+        return Directory.CreateDirectory(Path.Combine(project, "Assets")).FullName;
+    }
+
     (string Path, string Content)[] SnapshotCache() =>
         [.. Directory.EnumerateFiles(Path.Combine(project, ".Cache"), "*", SearchOption.AllDirectories)
             .Order(StringComparer.Ordinal)
@@ -94,7 +101,7 @@ public sealed class AssetImporterLifetimeTests : IDisposable
     [InlineData("Script.cs", false)]
     public void LiveDeletionEventsRespectAssetKinds(string name, bool removesAsset)
     {
-        var assets = Directory.CreateDirectory(Path.Combine(project, "Assets")).FullName;
+        var assets = NewAssetsFolder();
         Serializer.Save<DataAsset>(Path.Combine(assets, "Base.dataasset"), new AssemblyDefinition { Name = "Base" });
         using var build = new BuildManager(new AppSettings(), NullLogger.Instance);
         using var importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), new SettingsService());

@@ -157,8 +157,40 @@ public sealed class BrickNuGetLoadTests(BrickNuGetFeedFixture fixture) : IClassF
                 $"{BrickNuGetFeedFixture.PackageId}.dll")]);
         Directory.Delete(feed, recursive: true);
 
-        Assert.True(BrickAssemblies.Load([brick], NullLogger.Instance, Project));
+        // Without its assets file the restore counts as unfinished, so this one really runs, from the warm folder.
+        Directory.Delete(Path.Combine(RestoreDirectory, "obj"), recursive: true);
+        var log = new MessageLogger();
+
+        Assert.True(BrickAssemblies.Load([brick], log, Project));
+        Assert.Contains(log.Messages, static message => message.StartsWith("Restoring brick NuGet packages", StringComparison.Ordinal));
         Assert.Equal(42, Compute(assembly));
+    }
+
+    /// <summary>A restore that is already done for the same maps, lock file and feeds starts no <c>dotnet</c> process.</summary>
+    [Fact]
+    public void ACurrentRestoreStartsNoProcess()
+    {
+        var brick = Brick();
+        ConfigureFeed(fixture.NewFeed());
+        var first = new MessageLogger();
+        _ = BrickAssemblies.Load([brick], first, Project);
+        Assert.Contains(first.Messages, static message => message.StartsWith("Restoring brick NuGet packages", StringComparison.Ordinal));
+        Assert.True(File.Exists(PackageAssembly));
+
+        var again = new MessageLogger();
+        _ = BrickAssemblies.Load([brick], again, Project);
+
+        Assert.DoesNotContain(again.Messages, static message => message.StartsWith("Restoring brick NuGet packages", StringComparison.Ordinal));
+        Assert.True(File.Exists(PackageAssembly));
+
+        // A restored package missing from the folder is not current: the next load restores it again.
+        Directory.Delete(Path.Combine(Project, ".Cache", "NuGet", "packages", BrickNuGetFeedFixture.PackageId.ToLowerInvariant()),
+            recursive: true);
+        var repaired = new MessageLogger();
+        _ = BrickAssemblies.Load([brick], repaired, Project);
+
+        Assert.Contains(repaired.Messages, static message => message.StartsWith("Restoring brick NuGet packages", StringComparison.Ordinal));
+        Assert.True(File.Exists(PackageAssembly));
     }
 
     /// <summary>Changing a brick's map recovers: the lock file it leaves behind is dropped and rewritten.</summary>
@@ -246,6 +278,20 @@ public sealed class BrickNuGetLoadTests(BrickNuGetFeedFixture fixture) : IClassF
         manifest.Save(folder);
         return new ResolvedPackage(manifest.Name, manifest, folder, PackageOrigin.File, $"file:{folder}", null, null, 1,
             false);
+    }
+
+    // Keeps what is logged, so a test can tell whether a restore ran.
+    sealed class MessageLogger : ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
     }
 
     // Compiles an assembly whose only dependency is <paramref name="packageAssembly"/>, into the brick's own payload.
