@@ -59,6 +59,48 @@ public sealed class ProjectBootstrapperTests : IDisposable
         Assert.Empty(ProjectValidator.Validate(project));
     }
 
+    /// <summary>
+    /// A scaffold, even inside a repository folder that already exists, writes no workstation folder and no platform
+    /// separator into any file, so it moves between directories and systems unchanged.
+    /// </summary>
+    [Fact]
+    public async Task WritesPortablePaths()
+    {
+        var repository = Path.Combine(root, "Fresh Repository");
+        Directory.CreateDirectory(Path.Combine(repository, ".git"));
+        await File.WriteAllTextAsync(Path.Combine(repository, "README.md"), "# Game", TestContext.Current.CancellationToken);
+
+        var project = await new ProjectBootstrapper().CreateAsync(repository);
+
+        var files = Directory.EnumerateFiles(project!, "*", SearchOption.AllDirectories)
+            .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}"))
+            .Where(static path => Path.GetExtension(path) is ".meta" or ".dataasset" or ".prefab" or ".json")
+            .ToArray();
+        Assert.NotEmpty(files);
+        foreach (var file in files)
+        {
+            var text = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
+            Assert.DoesNotContain(project!, text, StringComparison.Ordinal);
+            Assert.DoesNotContain(repository.Replace("\\", "\\\\", StringComparison.Ordinal), text, StringComparison.Ordinal);
+            Assert.DoesNotMatch("\"RelativePath\":\\s*\"([A-Za-z]:|/|[^\"]*\\\\)", text);
+        }
+    }
+
+    /// <summary>A new project loads from a different directory with every asset reference still resolving.</summary>
+    [Fact]
+    public async Task ScaffoldMovesBetweenDirectories()
+    {
+        var project = await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "Original"));
+        var moved = Path.Combine(root, "Moved Elsewhere");
+
+        Directory.Move(project!, moved);
+
+        var settings = new BuildAppSettings { ProjectAbsoluteDir = moved };
+        Assert.Empty(ProjectValidator.Validate(moved));
+        Assert.Equal(4, ProjectSettingsLoader.FindSources(settings.AssetsAbsoluteDir).Count());
+        Assert.Equal("Client", BuildProfiles.Active(settings)!.Name);
+    }
+
     /// <summary>A new project installs the default built-in packages, which ship beside the engine.</summary>
     [Fact]
     public async Task InstallsDefaultBuiltins()
