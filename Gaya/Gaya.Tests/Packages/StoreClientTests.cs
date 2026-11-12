@@ -249,6 +249,47 @@ public sealed class StoreClientTests : IDisposable
         Assert.Empty(await store.BuildAdvisoriesAsync(TestContext.Current.CancellationToken));
     }
 
+    /// <summary>
+    /// A refusal whose body is not a problem object with a text title is reported by its status, as a
+    /// <see cref="PackageException"/> every handler sees, never as an exception from reading the body.
+    /// </summary>
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("\"text\"")]
+    [InlineData("42")]
+    [InlineData("null")]
+    [InlineData("""{ "title": 5 }""")]
+    [InlineData("""{ "title": "" }""")]
+    [InlineData("<html>bad gateway</html>")]
+    [InlineData("")]
+    public async Task RefusalsWithoutAProblemTitleReportTheStatus(string body)
+    {
+        var handler = new StoreHandler { Status = HttpStatusCode.InternalServerError };
+        handler.Routes["/api/v1/build-advisories"] = body;
+        var store = new StoreClient("store.example", "secret", new HttpClient(handler));
+
+        var refused = await Assert.ThrowsAsync<PackageException>(() =>
+            store.BuildAdvisoriesAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("store.example refused to read build advisories: 500 InternalServerError.", refused.Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>A malformed success stops the operation, naming the host, method and endpoint, and is no empty answer.</summary>
+    [Fact]
+    public async Task MalformedSuccessesNameTheEndpoint()
+    {
+        var handler = new StoreHandler();
+        handler.Routes["/api/v1/manage/releases"] = "[{";
+        var store = new StoreClient("store.example", "secret", new HttpClient(handler));
+
+        var defect = await Assert.ThrowsAsync<System.Text.Json.JsonException>(() =>
+            store.ReleasesAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("store.example answered GET /api/v1/manage/releases with malformed JSON, a store defect",
+            defect.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>A store that cannot be reached is reported as such rather than taken for an absent release.</summary>
     [Fact]
     public async Task UnreachableStoresAreReported()
