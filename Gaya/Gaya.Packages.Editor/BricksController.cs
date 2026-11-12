@@ -46,6 +46,12 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
 {
     readonly IBrickTaskRunner tasks = runner ?? new ThreadPoolBrickTaskRunner();
     readonly ILogger log = logger ?? NullLogger.Instance;
+
+    // Actions change the same manifest, lock file and brick folders and each ends by publishing what it resolved, so
+    // they take turns: one that overlapped another could resolve a half-written workspace and publish it last.
+    readonly SemaphoreSlim turn = new(1, 1);
+    int pending;
+    int refreshes;
     IReadOnlyList<ResolvedPackage> installed = [];
     IReadOnlyList<(string Registry, string Id, string Latest)> registryBricks = [];
     string? registryRoot;
@@ -107,8 +113,11 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
     /// <summary>What went wrong with the last resolve or action; null when it went well.</summary>
     public string? Error { get; private set; }
 
-    /// <summary>Whether an action is running.</summary>
-    public bool IsBusy { get; private set; }
+    /// <summary>Whether an action is running or waiting for its turn.</summary>
+    public bool IsBusy => Volatile.Read(ref pending) > 0;
+
+    /// <summary>How many actions wait for the running one to end; actions run one at a time, in request order.</summary>
+    public int QueuedOperations => Math.Max(0, Volatile.Read(ref pending) - 1);
 
     /// <summary>Whether a workspace is open.</summary>
     public bool HasProject => project?.Workspace is not null;
@@ -324,28 +333,48 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
             return;
         }
 
-        var root = workspace.Root;
+        // The search takes as long as the network does, so it runs outside the turn; only the restore and the
+        // publication it ends with are serialized with the other actions.
+        var generation = Interlocked.Increment(ref refreshes);
         var found = await workspace.SearchAsync(string.Empty).ConfigureAwait(false);
-        if (WorkspaceRoot != root)
+        Enqueue();
+        await turn.WaitAsync().ConfigureAwait(false);
+        try
         {
-            return;
-        }
+            if (!IsCurrent(workspace, generation))
+            {
+                return;
+            }
 
-        registryBricks = [.. found.Where(static f => f.Latest.Length > 0)];
-        registryRoot = root;
-        SaveRegistryCache(root);
-        var unavailable = found.FirstOrDefault(static f => f.Latest.Length == 0);
-        if (unavailable.Id is not null)
-        {
-            log.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
-        }
+            registryBricks = [.. found.Where(static f => f.Latest.Length > 0)];
+            registryRoot = workspace.Root;
+            SaveRegistryCache(workspace.Root);
+            var unavailable = found.FirstOrDefault(static f => f.Latest.Length == 0);
+            if (unavailable.Id is not null)
+            {
+                log.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
+            }
 
-        await RunAsync("Restore refreshed bricks", static current => current.Restore()).ConfigureAwait(false);
-        if (WorkspaceRoot == root)
+            _ = await RunInTurnAsync("Restore refreshed bricks", workspace, static current => current.Restore(), applyToProject: true)
+                .ConfigureAwait(false);
+            if (IsCurrent(workspace, generation))
+            {
+                Publish(installed, Error ?? unavailable.Id);
+            }
+        }
+        finally
         {
-            Publish(installed, Error ?? unavailable.Id);
+            _ = turn.Release();
+            Dequeue();
         }
     }
+
+    /// <summary>
+    /// Whether a refresh that began on <paramref name="workspace"/> still owns the panel: no newer refresh was
+    /// requested, and the workspace was not closed or replaced, such as by a scope switch.
+    /// </summary>
+    bool IsCurrent(IBrickWorkspace workspace, int generation) =>
+        generation == Volatile.Read(ref refreshes) && ReferenceEquals(Workspace, workspace);
 
     /// <summary>Removes a brick, preserving embedded sources in the project's trash.</summary>
     /// <param name="id">The brick id.</param>
@@ -412,44 +441,58 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
             return false;
         }
 
-        SetBusy(true);
-        string? failure = null;
+        Enqueue();
+        await turn.WaitAsync().ConfigureAwait(false);
         try
         {
-            var succeeded = await tasks.RunAsync(label, () =>
-            {
-                try
-                {
-                    ApplyWork(workspace, work, applyToProject);
-                }
-                catch (PackageException ex)
-                {
-                    failure = ex.Message;
-                    // The message says what is wrong and what to do; a stack trace would only bury it.
-                    log.LogError("{Label} failed: {Message}", label, ex.Message);
-                    throw;
-                }
-
-                workspace.Changed(applyToProject);
-            }).ConfigureAwait(false);
-
-            if (!succeeded)
-            {
-                log.LogWarning("{Label} did not complete", label);
-            }
-
-            Refresh();
-            if (!succeeded)
-            {
-                Publish(installed, failure ?? $"{label} failed");
-            }
-
-            return succeeded;
+            return await RunInTurnAsync(label, workspace, work, applyToProject).ConfigureAwait(false);
         }
         finally
         {
-            SetBusy(false);
+            _ = turn.Release();
+            Dequeue();
         }
+    }
+
+    // Runs one action while holding the turn.
+    async Task<bool> RunInTurnAsync(string label, IBrickWorkspace workspace, Action<IBrickWorkspace> work, bool applyToProject)
+    {
+        string? failure = null;
+        var succeeded = await tasks.RunAsync(label, () =>
+        {
+            try
+            {
+                ApplyWork(workspace, work, applyToProject);
+            }
+            catch (PackageException ex)
+            {
+                failure = ex.Message;
+                // The message says what is wrong and what to do; a stack trace would only bury it.
+                log.LogError("{Label} failed: {Message}", label, ex.Message);
+                throw;
+            }
+
+            workspace.Changed(applyToProject);
+        }).ConfigureAwait(false);
+
+        if (!succeeded)
+        {
+            log.LogWarning("{Label} did not complete", label);
+        }
+
+        // The panel moved on to another workspace while this ran: what it resolved is not the panel's to show.
+        if (!ReferenceEquals(Workspace, workspace))
+        {
+            return succeeded;
+        }
+
+        Refresh();
+        if (!succeeded)
+        {
+            Publish(installed, failure ?? $"{label} failed");
+        }
+
+        return succeeded;
     }
 
     void Publish(IReadOnlyList<ResolvedPackage> bricks, string? error)
@@ -573,9 +616,15 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
 
     sealed record RegistryCacheEntry(string Registry, string Id, string Latest);
 
-    void SetBusy(bool busy)
+    void Enqueue()
     {
-        IsBusy = busy;
+        _ = Interlocked.Increment(ref pending);
+        Changed?.Invoke();
+    }
+
+    void Dequeue()
+    {
+        _ = Interlocked.Decrement(ref pending);
         Changed?.Invoke();
     }
 }
