@@ -67,9 +67,9 @@ jobs:
       - name: Pack coverage report
         if: always()
         run: |
-          if [ -d coverage/report ]; then
-            tar -czf coverage/report.tar.gz -C coverage report
-            rm -rf coverage/report
+          if [ -d .artifacts/tests/report ]; then
+            tar -czf .artifacts/tests/report.tar.gz -C .artifacts/tests report
+            rm -rf .artifacts/tests/report
           fi
 
       - name: Upload coverage report
@@ -77,7 +77,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: coverage/
+          path: .artifacts/tests/
+          include-hidden-files: true
           retention-days: 7
 
   # The full suite on Windows and macOS, where paths, file locking and atomic replaces differ from Linux.
@@ -104,14 +105,15 @@ jobs:
 
       - name: Restore, compile, test
         shell: pwsh
-        run: ./build.ps1 Restore Compile Test --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
+        run: ./build.ps1 Restore Compile Test --skip-coverage --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}
-          path: test-results/
+          path: .artifacts/tests/
+          include-hidden-files: true
           retention-days: 7
 
   # Validate the Linux and NuGet release formats without tagging or pushing. The container image and the macOS
@@ -236,5 +238,6 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: windows-packages
-          path: artifacts/*
+          path: .artifacts/dist/*
+          include-hidden-files: true
           retention-days: 7

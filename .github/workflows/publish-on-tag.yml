@@ -52,7 +52,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
-          path: artifacts/packages/
+          path: .artifacts/dist/packages/
+          include-hidden-files: true
           retention-days: 30
 
   build:
@@ -115,7 +116,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ matrix.rid }}
-          path: artifacts/*
+          path: .artifacts/dist/*
+          include-hidden-files: true
           retention-days: 30
 
   release:
@@ -137,13 +139,13 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
-          path: artifacts
+          path: .artifacts/dist
           merge-multiple: true
 
       - name: Verify release assets
         shell: bash
         run: |
-          if ! find artifacts -maxdepth 1 -type f \( -name '*.zip' -o -name '*.deb' -o -name '*.exe' \) -print -quit | grep -q .; then
+          if ! find .artifacts/dist -maxdepth 1 -type f \( -name '*.zip' -o -name '*.deb' -o -name '*.exe' \) -print -quit | grep -q .; then
             echo 'No release assets were produced.' >&2
             exit 1
           fi

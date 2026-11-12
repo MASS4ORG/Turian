@@ -6,27 +6,33 @@ namespace Build;
 /// </summary>
 sealed partial class Build
 {
-    // Where Test writes its TRX reports.
-    static AbsolutePath TestResultsDirectory => RootDirectory / "test-results";
+    [Parameter("skip-coverage (default: false): run the tests without instrumenting them; TestReport needs coverage")]
+    readonly bool SkipCoverage;
 
-    static AbsolutePath CoverageDirectory => RootDirectory / "coverage";
-    static AbsolutePath CoverageResultFile => CoverageDirectory / "coverage.xml";
+    // Where Test writes the TRX reports and, unless skipped, the coverage.
+    static AbsolutePath TestDirectory => TransientDirectory / "tests";
+    static AbsolutePath CoverageResultFile => TestDirectory / "coverage.xml";
 
     // Where dotnet test writes the cobertura report it merges from all test projects.
-    static AbsolutePath CoverageMergedDirectory => CoverageDirectory / "merged";
-    static AbsolutePath CoverageReportDirectory => CoverageDirectory / "report";
+    static AbsolutePath CoverageMergedDirectory => TestDirectory / "merged";
+    static AbsolutePath CoverageReportDirectory => TestDirectory / "report";
     static AbsolutePath CoverageReportSummaryDirectory => CoverageReportDirectory / "Summary.txt";
     static AbsolutePath CoverageSettingsFile => RootDirectory / "CodeCoverage.runsettings";
 
     /// <summary>
-    /// Runs the tests without coverage and writes their TRX reports; a project may narrow what runs through
-    /// <see cref="ConfigureTests"/>.
+    /// Runs the tests and writes their TRX reports, with coverage unless <see cref="SkipCoverage"/> is set. A project
+    /// may narrow what runs through <see cref="ConfigureTests"/>.
     /// </summary>
     public Target Test => td =>
         td
             .DependsOn(Compile)
+            .Produces(CoverageResultFile)
             .Executes(() =>
             {
+                // Every test project writes its own uniquely named report; a shared --coverage-output would let the
+                // parallel test hosts overwrite each other.
+                TestDirectory.GlobFiles("*.cobertura.xml").ForEach(static report => report.DeleteFile());
+                CoverageMergedDirectory.DeleteDirectory();
                 var settings = WithMsBuildProperties(new DotNetTestSettings()
                     .SetConfiguration(Config)
                     .SetProcessWorkingDirectory(Solution.Directory)
@@ -35,54 +41,35 @@ sealed partial class Build
                     .AddProcessAdditionalArguments(
                         TestReportArgument,
                         "--minimum-expected-tests", "1",
-                        "--results-directory", TestResultsDirectory));
+                        "--results-directory", TestDirectory));
+                if (!SkipCoverage)
+                {
+                    settings = settings.AddProcessAdditionalArguments(
+                        "--coverage",
+                        "--coverage-settings", CoverageSettingsFile, // Excludes source generated files
+                        "--coverage-output-format", "cobertura");
+                }
+
                 ConfigureTests(ref settings);
                 _ = DotNetTest(settings);
+
+                if (!SkipCoverage)
+                {
+                    MergeCoverage();
+                }
             });
 
     /// <summary>Configures project-specific test filters using the project's test framework.</summary>
     partial void ConfigureTests(ref DotNetTestSettings settings);
 
-    /// <summary>Runs every test with coverage, then generates the coverage reports and publishes their summary to CI.</summary>
+    /// <summary>Generates coverage reports from <see cref="Test"/> and publishes their summary to CI.</summary>
     public Target TestReport => td =>
         td
-            .DependsOn(Compile)
-            .Produces(CoverageResultFile)
+            .DependsOn(Test)
+            .Requires(() => !SkipCoverage)
+            .Consumes(Test, CoverageResultFile)
             .Executes(() =>
             {
-                // Every test project writes its own uniquely named report; a shared --coverage-output would let the
-                // parallel test hosts overwrite each other.
-                CoverageDirectory.GlobFiles("*.cobertura.xml").ForEach(static report => report.DeleteFile());
-                CoverageMergedDirectory.DeleteDirectory();
-                DotNetTest(settings => WithMsBuildProperties(settings
-                    .SetConfiguration(Config)
-                    .SetProcessWorkingDirectory(Solution.Directory)
-                    .EnableNoBuild()
-                    .EnableNoRestore()
-                    .AddProcessAdditionalArguments(
-                        "--coverage",
-                        "--coverage-settings", CoverageSettingsFile, // Excludes source generated files
-                        "--coverage-output-format", "cobertura",
-                        TestReportArgument,
-                        "--minimum-expected-tests", "1",
-                        "--results-directory", CoverageDirectory)));
-
-                var reportDirectory = CoverageMergedDirectory.DirectoryExists() ? CoverageMergedDirectory : CoverageDirectory;
-                var reports = reportDirectory.GlobFiles("*.cobertura.xml").ToArray();
-                if (reports.Length == 1)
-                {
-                    reports[0].Move(CoverageResultFile, ExistsPolicy.FileOverwrite);
-                }
-                else
-                {
-                    _ = ReportGenerator(settings => settings
-                        .SetReports(reports.Select(static report => report.ToString()))
-                        .SetTargetDirectory(CoverageMergedDirectory)
-                        .SetReportTypes([ReportTypes.Cobertura]));
-                    (CoverageMergedDirectory / "Cobertura.xml").Move(CoverageResultFile, ExistsPolicy.FileOverwrite);
-                }
-                CoverageMergedDirectory.DeleteDirectory();
-
                 _ = CoverageReportDirectory.CreateDirectory();
                 _ = ReportGenerator(
                     s => s
@@ -99,4 +86,25 @@ sealed partial class Build
                     File.AppendAllText(stepSummary, (CoverageReportDirectory / "SummaryGithub.md").ReadAllText());
                 }
             });
+
+    /// <summary>Merges the coverage every test project wrote into <see cref="CoverageResultFile"/>.</summary>
+    static void MergeCoverage()
+    {
+        var reportDirectory = CoverageMergedDirectory.DirectoryExists() ? CoverageMergedDirectory : TestDirectory;
+        var reports = reportDirectory.GlobFiles("*.cobertura.xml").ToArray();
+        if (reports.Length == 1)
+        {
+            reports[0].Move(CoverageResultFile, ExistsPolicy.FileOverwrite);
+        }
+        else
+        {
+            _ = ReportGenerator(settings => settings
+                .SetReports(reports.Select(static report => report.ToString()))
+                .SetTargetDirectory(CoverageMergedDirectory)
+                .SetReportTypes([ReportTypes.Cobertura]));
+            (CoverageMergedDirectory / "Cobertura.xml").Move(CoverageResultFile, ExistsPolicy.FileOverwrite);
+        }
+
+        CoverageMergedDirectory.DeleteDirectory();
+    }
 }

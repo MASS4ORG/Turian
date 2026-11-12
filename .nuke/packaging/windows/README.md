@@ -30,7 +30,7 @@ It warns, without blocking, when the .NET 10 SDK is missing. Uninstalling remove
      --winget-installer-url https://example.org/releases/Turian-<version>-win-x64-setup.exe
    ```
 
-6. Fork `microsoft/winget-pkgs`, place the three files from `artifacts/winget/<version>` under the matching
+6. Fork `microsoft/winget-pkgs`, place the three files from `.artifacts/dist/winget/<version>` under the matching
    `manifests/a/Turian/Turian/<version>/` directory, and open a pull request.
 
 `publish-on-tag.yml` and the GitLab `build-windows` job build and test the installer on every release (`Pack` depends on `WindowsInstaller`) but do not sign it, so Windows SmartScreen warns on first run until signing is added. The `windows` job of `build-and-test.yml` and the GitLab `package-check-windows` job run the same test on every commit, plus `WingetManifest WingetValidate` with `--packaging-dry-run`; on CI, `WingetValidate` installs winget through the `Microsoft.WinGet.Client` PowerShell module when the image lacks it. Run `WingetManifest` with the real URL once the permanent download URL and the final Winget package identifier are confirmed.
