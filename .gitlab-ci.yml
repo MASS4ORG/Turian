@@ -80,7 +80,7 @@ test:
         reports:
             coverage_report:
                 coverage_format: cobertura
-                path: coverage/coverage.xml
+                path: .artifacts/tests/coverage.xml
 
 # The full suite on Windows, where paths, file locking and atomic replaces differ from Linux.
 test-windows:
@@ -91,13 +91,7 @@ test-windows:
           when: never
         - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "web"'
     script:
-        - ./build.ps1 Restore Compile TestReport --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
-    artifacts:
-        expire_in: 1 week
-        reports:
-            coverage_report:
-                coverage_format: cobertura
-                path: coverage/coverage.xml
+        - ./build.ps1 Restore Compile Test --skip-coverage --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
 
 package-check:
     <<: *build_job_template
@@ -139,7 +133,7 @@ package-check-windows:
         - ./build.ps1 Pack WingetManifest WindowsInstallerTest WingetValidate --configuration Release --runtime-identifier win-x64 --skip-shaders --no-local-packages --packaging-dry-run --verbosity minimal
     artifacts:
         paths:
-            - artifacts/*
+            - .artifacts/dist/*
 
 qodana:
     stage: test
@@ -200,7 +194,7 @@ build:
               --verbosity minimal
     artifacts:
         paths:
-            - artifacts/*
+            - .artifacts/dist/*
 
 # Pack the Windows archive and installer on every tag, installing, using and uninstalling the installer first.
 build-windows:
@@ -213,7 +207,7 @@ build-windows:
         - ./build.ps1 Pack WindowsInstallerTest --configuration Release --runtime-identifier win-x64 --skip-shaders --publish-self-contained "$env:PUBLISH_SELF_CONTAINED" --publish-single-file "$env:PUBLISH_SINGLE_FILE" --publish-trimmed "$env:PUBLISH_TRIMMED" --verbosity minimal
     artifacts:
         paths:
-            - artifacts/*
+            - .artifacts/dist/*
 
 # GitLab.com doesn't provide a macOS shared runner by default. Wire a "macos" runner tag here once
 # one is provisioned; until then this stays manual so it never blocks the release.
@@ -240,7 +234,7 @@ build-macos:
               --verbosity minimal
     artifacts:
         paths:
-            - artifacts/*.zip
+            - .artifacts/dist/*.zip
 
 gitlab-release:
     <<: *build_job_template

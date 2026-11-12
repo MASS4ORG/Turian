@@ -2,19 +2,19 @@
 // Lists the slowest tests and test classes from a TRX report, to find what makes the suite slow.
 //
 // Usage: dotnet run tools/slow-tests.cs -- [<report.trx | directory>] [--top <n>]
-//   report     a .trx file, or a directory whose newest .trx is used (default: coverage/)
+//   report     a .trx file, or a directory whose newest .trx is used (default: .artifacts/tests/)
 //   --top      how many tests and classes to list (default: 15)
 //
-// The NUKE `test` target writes coverage/<host>.trx (the newest is picked up automatically), so run `./build.sh test`
+// The NUKE `Test` target writes .artifacts/tests/<host>.trx (the newest is picked up automatically), so run `./build.sh Test`
 // first. To produce one by hand:
-//   dotnet run --project Turian.Tests/Turian.Tests.csproj -- --report-xunit-trx --results-directory coverage
+//   dotnet run --project Turian.Tests/Turian.Tests.csproj -- --report-xunit-trx --results-directory .artifacts/tests
 
 using System.Globalization;
 using System.Xml.Linq;
 
 var top = int.Parse(Option("--top") ?? "15", CultureInfo.InvariantCulture);
 var target = args.FirstOrDefault(arg => !arg.StartsWith("--", StringComparison.Ordinal)
-    && Array.IndexOf(args, arg) is var i && (i == 0 || args[i - 1] != "--top")) ?? "coverage";
+    && Array.IndexOf(args, arg) is var i && (i == 0 || args[i - 1] != "--top")) ?? ".artifacts/tests";
 var report = Directory.Exists(target)
     ? new DirectoryInfo(target).GetFiles("*.trx", SearchOption.AllDirectories)
         .OrderByDescending(file => file.LastWriteTimeUtc).FirstOrDefault()?.FullName

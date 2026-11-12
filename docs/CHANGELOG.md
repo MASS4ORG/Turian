@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Added: Object pool #90.
 - Added: application, session and scene lifetimes #358.
+- Changed: CI package jobs run in parallel #370.
+- Fixed: brick refresh race #330.
 
 ## [4.0.0] - 2026-11-11
 

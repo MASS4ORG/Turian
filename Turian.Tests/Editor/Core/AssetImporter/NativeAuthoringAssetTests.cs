@@ -9,6 +9,8 @@ public sealed class NativeAuthoringAssetTests : IDisposable
     /// <summary>Creates a supported model beside the authoring document to verify continued asset imports.</summary>
     public NativeAuthoringAssetTests()
     {
+        // Opaque authoring files do not depend on the renderer brick, whose packages every scan would otherwise restore.
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         var assets = Directory.CreateDirectory(Path.Combine(project, "Assets")).FullName;
         GltfGeometryFixture.Save(Path.Combine(assets, "triangle.glb"),
             [new(Vector3.Zero, Vector3.One), new(Vector3.UnitX, Vector3.One), new(Vector3.One, Vector3.One)],

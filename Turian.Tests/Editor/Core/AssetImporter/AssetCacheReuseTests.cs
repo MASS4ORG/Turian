@@ -6,6 +6,9 @@ public sealed class AssetCacheReuseTests : IDisposable
 {
     readonly string root = Directory.CreateTempSubdirectory("turian-asset-reuse-").FullName;
 
+    /// <summary>Opts the project out of the renderer brick, whose packages every scan would otherwise restore.</summary>
+    public AssetCacheReuseTests() => ProjectPackages.OptOutOfDefault(root, ProjectPackages.RenderBrick);
+
     /// <summary>Removes the isolated project and its cache.</summary>
     public void Dispose() => Directory.Delete(root, true);
 

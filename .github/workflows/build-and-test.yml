@@ -63,16 +63,27 @@ jobs:
           chmod +x ./build.sh
           ./build.sh Restore Compile TestReport --configuration "Debug" --no-local-packages --verbosity minimal
 
+      # The HTML report is hundreds of small files, which take longer to upload than the tests' own results.
+      - name: Pack coverage report
+        if: always()
+        run: |
+          if [ -d .artifacts/tests/report ]; then
+            tar -czf .artifacts/tests/report.tar.gz -C .artifacts/tests report
+            rm -rf .artifacts/tests/report
+          fi
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: coverage/
+          path: .artifacts/tests/
+          include-hidden-files: true
           retention-days: 7
 
   # The full suite on Windows and macOS, where paths, file locking and atomic replaces differ from Linux.
-  # Compiled shaders are tracked, so glslc is not needed; GPU tests skip on runners without Vulkan.
+  # Compiled shaders are tracked, so glslc is not needed; GPU tests skip on runners without Vulkan. Coverage is
+  # measured on Linux only: here it would only slow the run down.
   test-desktop:
     strategy:
       fail-fast: false
@@ -94,18 +105,73 @@ jobs:
 
       - name: Restore, compile, test
         shell: pwsh
-        run: ./build.ps1 Restore Compile TestReport --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
+        run: ./build.ps1 Restore Compile Test --skip-coverage --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
 
-      - name: Upload coverage report
+      - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report-${{ matrix.os }}
-          path: coverage/
+          name: test-results-${{ matrix.os }}
+          path: .artifacts/tests/
+          include-hidden-files: true
           retention-days: 7
 
-  # Validate the Linux, macOS, NuGet and container release formats without tagging or pushing.
+  # Validate the Linux and NuGet release formats without tagging or pushing. The NuGet packages, the container image
+  # and the macOS archive build in their own jobs, which run beside this one: none needs another's output.
   package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update -yqq
+          sudo apt-get install -yqq glslc
+
+      - name: Build Linux packages
+        run: |
+          chmod +x ./build.sh
+          ./build.sh Pack DebianPackage \
+            --configuration "Release" \
+            --runtime-identifier "linux-x64" \
+            --no-local-packages \
+            --verbosity minimal
+
+  # The NuGet packages need the whole solution built, which the Linux packages above do not.
+  package-nuget:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+
+      - name: Build NuGet packages
+        run: |
+          chmod +x ./build.sh
+          ./build.sh PackNuGet \
+            --configuration "Release" \
+            --no-local-packages \
+            --skip-shaders \
+            --verbosity minimal
+
+  # The container image is a podman build from the Containerfile; it does not use the archives built above.
+  package-container:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,10 +190,10 @@ jobs:
           sudo apt-get update -yqq
           sudo apt-get install -yqq glslc podman
 
-      - name: Build Linux packages, NuGet packages and container image
+      - name: Build container image
         run: |
           chmod +x ./build.sh
-          ./build.sh Pack DebianPackage PackNuGet ContainerBuild \
+          ./build.sh ContainerBuild \
             --configuration "Release" \
             --runtime-identifier "linux-x64" \
             --no-local-packages \
@@ -147,8 +213,23 @@ jobs:
           test -n "$(ls -A "$work/sample/Output")"
           test -s "$work/screenshot.png"
 
+  package-macos:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+
       - name: Build macOS archive
         run: |
+          chmod +x ./build.sh
           ./build.sh Pack \
             --configuration "Release" \
             --runtime-identifier "osx-x64" \
@@ -181,5 +262,6 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: windows-packages
-          path: artifacts/*
+          path: .artifacts/dist/*
+          include-hidden-files: true
           retention-days: 7

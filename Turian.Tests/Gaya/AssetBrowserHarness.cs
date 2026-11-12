@@ -25,6 +25,9 @@ sealed class AssetBrowserHarness : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(Root, "Folder"));
         Directory.CreateDirectory(Path.Combine(Root, "Other"));
+
+        // Browsing files does not depend on the renderer brick, whose packages every new project would otherwise restore.
+        ProjectPackages.OptOutOfDefault(Project, ProjectPackages.RenderBrick);
         File.WriteAllText(Path.Combine(Root, "a.txt"), "a");
         File.WriteAllText(Path.Combine(Root, "b.txt"), "b");
         File.WriteAllText(Path.Combine(Root, "Folder", "deep.txt"), "deep");

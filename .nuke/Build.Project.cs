@@ -20,8 +20,16 @@ sealed partial class Build
     string DefaultConfiguration => IsLocalBuild ? ConfigurationOptions.Debug : ConfigurationOptions.Release;
     const string TestReportArgument = "--report-xunit-trx";
 
-    partial void ConfigureFastTests(ref DotNetTestSettings settings) =>
-        settings = settings.AddProcessAdditionalArguments("--filter-not-trait", "Category=E2E");
+    [Parameter("skip-e2e (default: false): leave out the slow end-to-end tests, for quick local iteration")]
+    readonly bool SkipE2E;
+
+    partial void ConfigureTests(ref DotNetTestSettings settings)
+    {
+        if (SkipE2E)
+        {
+            settings = settings.AddProcessAdditionalArguments("--filter-not-trait", "Category=E2E");
+        }
+    }
 
     const string PackageAuthors = "Bruno Massa";
     const string PackageCopyrightOwner = "Bruno Massa";

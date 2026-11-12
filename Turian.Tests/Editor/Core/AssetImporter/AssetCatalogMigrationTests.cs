@@ -8,6 +8,9 @@ public sealed class AssetCatalogMigrationTests : IDisposable
 {
     readonly string root = Directory.CreateTempSubdirectory("turian-catalog-migration-").FullName;
 
+    /// <summary>Opts the project out of the renderer brick, whose packages every scan would otherwise restore.</summary>
+    public AssetCatalogMigrationTests() => ProjectPackages.OptOutOfDefault(root, ProjectPackages.RenderBrick);
+
     /// <inheritdoc/>
     public void Dispose() => Directory.Delete(root, recursive: true);
 

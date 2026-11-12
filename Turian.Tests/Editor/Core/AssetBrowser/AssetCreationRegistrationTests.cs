@@ -18,6 +18,7 @@ public sealed class AssetCreationRegistrationTests : IDisposable
     public void CreatedSettingsAndProfilesRegister()
     {
         Directory.CreateDirectory(Assets);
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         var settings = new SettingsService();
         var app = new AppSettings { ProjectAbsoluteDir = project };
         settings.Set(app);
@@ -44,6 +45,7 @@ public sealed class AssetCreationRegistrationTests : IDisposable
     public void CreatedPayloadIdMatchesMetaId()
     {
         Directory.CreateDirectory(Assets);
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         var settings = new SettingsService();
         var app = new AppSettings { ProjectAbsoluteDir = project };
         settings.Set(app);

@@ -29,6 +29,7 @@ public sealed class ProjectStartupTests
         {
             var project = await new ProjectBootstrapper().CreateAsync(root);
             Assert.NotNull(project);
+            ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
             using var services = new ServiceCollection().AddEditorServices(NullLogger.Instance).BuildServiceProvider();
             var session = new ProjectSession(services, NullLogger.Instance);
             session.QueueOpen(project);
@@ -60,6 +61,8 @@ public sealed class ProjectStartupTests
             var second = await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "second"));
             Assert.NotNull(first);
             Assert.NotNull(second);
+            ProjectPackages.OptOutOfDefault(first, ProjectPackages.RenderBrick);
+            ProjectPackages.OptOutOfDefault(second, ProjectPackages.RenderBrick);
             using var services = new ServiceCollection().AddEditorServices(NullLogger.Instance).BuildServiceProvider();
             var session = new ProjectSession(services, NullLogger.Instance);
             Assert.True(session.Open(first));

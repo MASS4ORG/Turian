@@ -13,6 +13,7 @@ public sealed class ProjectSessionHotReloadTests
         {
             var project = await new ProjectBootstrapper().CreateAsync(root);
             Assert.NotNull(project);
+            ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
             using var services = new ServiceCollection().AddEditorServices(NullLogger.Instance).BuildServiceProvider();
             var session = new ProjectSession(services, NullLogger.Instance);
             Assert.True(session.Open(project));

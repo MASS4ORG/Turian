@@ -83,6 +83,12 @@ public static class BrickNuGetRestore
 
         var stub = Path.Combine(projectRoot, ProjectManifest.DirectoryName, RestoreDirectoryName);
         var packages = Path.Combine(projectRoot, ProjectCacheDirectoryName, CacheDirectoryName, PackagesDirectoryName);
+        if (IsRestoreCurrent(stub, packages, unified, sources))
+        {
+            logger.LogDebug("The bricks' NuGet packages are already restored for their current maps");
+            return PackageDirectories(packages, unified);
+        }
+
         Directory.CreateDirectory(stub);
         Directory.CreateDirectory(packages);
         WriteStub(stub, unified, sources);
@@ -197,11 +203,19 @@ public static class BrickNuGetRestore
     {
         ArgumentNullException.ThrowIfNull(unified);
 
+        File.WriteAllText(Path.Combine(directory, StubProjectFileName), StubProjectText(unified));
+        if (sources is { Count: > 0 })
+        {
+            File.WriteAllText(Path.Combine(directory, NuGetConfigFileName), NuGetConfigText(sources));
+        }
+    }
+
+    static string StubProjectText(IReadOnlyDictionary<string, string> unified)
+    {
         var references = string.Join(Environment.NewLine,
             unified.OrderBy(static p => p.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(static p => $"    <PackageReference Include=\"{p.Key}\" Version=\"{p.Value}\" />"));
-        File.WriteAllText(Path.Combine(directory, StubProjectFileName),
-            $$"""
+        return $$"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <TargetFramework>{{StubTargetFramework}}</TargetFramework>
@@ -211,27 +225,42 @@ public static class BrickNuGetRestore
             {{references}}
               </ItemGroup>
             </Project>
-            """.ReplaceLineEndings("\n") + "\n");
-
-        if (sources is { Count: > 0 })
-        {
-            WriteSources(directory, sources);
-        }
+            """.ReplaceLineEndings("\n") + "\n";
     }
 
-    static void WriteSources(string directory, IReadOnlyList<string> sources)
+    static string NuGetConfigText(IReadOnlyList<string> sources)
     {
         var entries = string.Join(Environment.NewLine,
             sources.Select(static (source, index) => $"    <add key=\"brick{index}\" value=\"{source}\" />"));
-        File.WriteAllText(Path.Combine(directory, NuGetConfigFileName),
-            $"""
+        return $"""
             <configuration>
               <packageSources>
                 <clear />
             {entries}
               </packageSources>
             </configuration>
-            """.ReplaceLineEndings("\n") + "\n");
+            """.ReplaceLineEndings("\n") + "\n";
+    }
+
+    /// <summary>
+    /// Whether an earlier restore already did what a restore would now: the stub and its sources are what would be
+    /// written, the lock file pins exactly these packages, the restore finished (it writes <c>project.assets.json</c>
+    /// last) and every package folder is there. Such a restore only costs a <c>dotnet</c> process to find nothing to do.
+    /// </summary>
+    static bool IsRestoreCurrent(string stub, string packages, IReadOnlyDictionary<string, string> unified,
+        IReadOnlyList<string>? sources)
+    {
+        var config = Path.Combine(stub, NuGetConfigFileName);
+        var configCurrent = sources is { Count: > 0 }
+            ? File.Exists(config) && File.ReadAllText(config) == NuGetConfigText(sources)
+            : !File.Exists(config);
+        var project = Path.Combine(stub, StubProjectFileName);
+        var lockFile = Path.Combine(stub, LockFileName);
+        return configCurrent
+            && File.Exists(project) && File.ReadAllText(project) == StubProjectText(unified)
+            && File.Exists(lockFile) && DescribesMap(lockFile, unified)
+            && File.Exists(Path.Combine(stub, "obj", "project.assets.json"))
+            && PackageDirectories(packages, unified).Count == unified.Count;
     }
 
     /// <summary>Runs <c>dotnet restore</c> on the stub, locked when its lock file exists.</summary>

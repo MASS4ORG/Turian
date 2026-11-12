@@ -127,6 +127,10 @@ public static class BrickBake
             var project = Path.Combine(scratch, "project");
             _ = await new ProjectBootstrapper().CreateAsync(project).ConfigureAwait(false)
                 ?? throw new PackageException("The scratch project for the bake could not be created.");
+
+            // Importing needs no renderer, and its packages are nearly a gigabyte to restore for every bake. A brick
+            // that depends on the renderer still gets it: opting out only drops the implicit default.
+            ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
             ProjectBricks.Add(project, manifest.Name, $"file:{copy}");
             ProjectPackages.Invalidate(project);
             var resolution = ProjectPackages.Resolve(project);

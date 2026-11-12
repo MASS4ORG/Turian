@@ -106,6 +106,7 @@ public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixtu
         Assert.Equal(ProjectPackages.EngineVersion, precast.BuiltWith[ProjectPackages.HostName]);
 
         var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "project")))!;
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         var resolution = BrickService.Add(project, "user.mateo.inventory", $"file:{fixture.Packed}");
         var brick = resolution.Packages.Single(p => p.Id == "user.mateo.inventory");
         File.WriteAllText(Path.Combine(project, "Assets", "Bag.cs"),
@@ -153,6 +154,7 @@ public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixtu
         Assert.Equal(["Mateo.Inventory"], twin.Manifest.Precast!.Assemblies);
 
         var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "project")))!;
+        ProjectPackages.OptOutOfDefault(project, ProjectPackages.RenderBrick);
         var brick = BrickService.Add(project, "user.mateo.inventory", $"file:{twin.Path}").Packages
             .Single(static p => p.Id == "user.mateo.inventory");
         Assert.Equal(variant, brick.Manifest.Variant);

@@ -46,7 +46,6 @@
         "Restore",
         "ShowCurrentVersion",
         "Test",
-        "TestFast",
         "TestReport",
         "UpdateChangelog",
         "UpdateProjectVersions",
@@ -172,7 +171,7 @@
         },
         "PublishDirectory": {
           "type": "string",
-          "description": "publish-directory (default: ./.publish/{runtimeIdentifier})"
+          "description": "publish-directory (default: ./.artifacts/publish/{runtimeIdentifier})"
         },
         "PublishReadyToRun": {
           "type": "boolean",
@@ -204,6 +203,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "SkipCoverage": {
+          "type": "boolean",
+          "description": "skip-coverage (default: false): run the tests without instrumenting them; TestReport needs coverage"
+        },
+        "SkipE2E": {
+          "type": "boolean",
+          "description": "skip-e2e (default: false): leave out the slow end-to-end tests, for quick local iteration"
         },
         "SkipShaders": {
           "type": "boolean",
