@@ -5,7 +5,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <PackageId>MASS4.Localization</PackageId>
-        <Version>4.1.1</Version>
+        <Version>4.1.2</Version>
         <Description>Shared string tables, localization and translation interchange.</Description>
     </PropertyGroup>
     <ItemGroup>

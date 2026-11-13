@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Version>4.1.1</Version>
+        <Version>4.1.2</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <TargetFramework>net11.0</TargetFramework>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
