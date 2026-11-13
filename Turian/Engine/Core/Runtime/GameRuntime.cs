@@ -8,16 +8,14 @@ namespace Turian.Engine.Core;
 public sealed class GameRuntime : IDisposable
 {
     bool disposed;
-    readonly DataAssetSession dataAssets;
     GameRuntime(string projectDirectory, IContentDirectory content, AssetDatabase assets, AppSettings settings,
-        SceneManager scenes, DataAssetSession dataAssets)
+        SceneManager scenes)
     {
         ProjectDirectory = projectDirectory;
         Content = content;
         Assets = assets;
         Settings = settings;
         Scenes = scenes;
-        this.dataAssets = dataAssets;
     }
 
     /// <summary>The folder the game runs from.</summary>
@@ -41,8 +39,11 @@ public sealed class GameRuntime : IDisposable
     /// <summary>The project's action maps, read from the input source the player supplied.</summary>
     public InputActionService Actions { get; private set; } = null!;
 
-    /// <summary>The services scene components are injected from.</summary>
+    /// <summary>The services scene components are injected from, live subsystems included.</summary>
     public IServiceProvider Services { get; private set; } = null!;
+
+    /// <summary>The application, session and scene lifetimes; a session begins before the startup scene loads.</summary>
+    public GameLifetimes Lifetimes { get; private set; } = null!;
 
     /// <summary>The startup scene's root, or <c>null</c> before <see cref="LoadStartupScene"/> or without one.</summary>
     public Node? StartupRoot { get; private set; }
@@ -94,19 +95,18 @@ public sealed class GameRuntime : IDisposable
         var content = context.ContentDirectory;
         var assets = new AssetDatabase();
         LoadCatalog(assets, content, context.ProjectDirectory);
-        var dataAssets = new DataAssetSession();
-        var loader = new RuntimeAssetLoader(assets, dataAssets);
         var settings = new AppSettings
         {
             ProjectAbsoluteDir = context.ProjectDirectory,
             Title = Path.GetFileName(context.ProjectDirectory),
         };
-        var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets), dataAssets);
+        var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets));
+        var loader = new RuntimeAssetLoader(assets, () => runtime.Lifetimes?.DataAssets);
         try
         {
             ProjectSettingsLoader.Load(settings, loader, content);
             host?.Prepare(new(settings, context.Logger, context.Development));
-            runtime.BindServices(context, loader, input, dataAssets, kind, addServices, host);
+            runtime.BindServices(context, loader, input, kind, addServices, host);
             LogBuild(context.Logger, settings.Get<TimeSettings>());
             return runtime;
         }
@@ -154,11 +154,36 @@ public sealed class GameRuntime : IDisposable
     }
 
     void BindServices(GamePlayerContext context, IAssetLoader loader, IInputSource? input,
-        DataAssetSession dataAssets, ApplicationKind kind, Action<IServiceCollection>? addServices,
-        IClientRuntimeHost? host)
+        ApplicationKind kind, Action<IServiceCollection>? addServices, IClientRuntimeHost? host)
     {
         var clock = new SimulationClock(Settings.Get<TimeSettings>());
-        var registrations = new ServiceCollection()
+        var registrations = Registrations(context, loader, input, kind, host, clock);
+        addServices?.Invoke(registrations);
+        AddGameModules(registrations);
+
+        ComposeLifetimes(context.BuildServices(registrations));
+        Actions = Services.GetRequiredService<InputActionService>();
+        Ticker = new SceneTicker(Scenes, clock)
+        {
+            Async = Services.GetRequiredService<GameLoopScheduler>(),
+            Lifetimes = Lifetimes,
+            Simulation = Services.GetService<SimulationSession>(),
+            Systems = [.. Services.GetServices<IFixedTickSystem>()],
+            InputSource = Services.GetRequiredService<IInputSource>(),
+            Actions = Actions,
+        };
+
+        LoadActionMaps(loader);
+        Services.GetRequiredService<ApplicationLifetime>().Start();
+        Lifetimes.Start();
+        Scenes.BindServices(Services);
+    }
+
+    ServiceCollection Registrations(GamePlayerContext context, IAssetLoader loader, IInputSource? input,
+        ApplicationKind kind, IClientRuntimeHost? host, SimulationClock clock)
+    {
+        var registrations = new ServiceCollection();
+        registrations
             .AddSingleton(new ApplicationContext(kind, Interactive: kind == ApplicationKind.Client))
             .AddSingleton(context.Logger)
             .AddSingleton<IAppSettings>(Settings)
@@ -168,7 +193,8 @@ public sealed class GameRuntime : IDisposable
             .AddSingleton(Assets)
             .AddSingleton<ISceneManager>(Scenes)
             .AddSingleton(loader)
-            .AddSingleton(dataAssets)
+            .AddSubsystem(LifetimeScope.Session, static _ => new DataAssetSession())
+            .AddSingleton<ISessionLifetime>(_ => Lifetimes)
             .AddSingleton(clock)
             .AddSingleton<GameLoopScheduler>()
             .AddSingleton(input ?? host?.Input ?? new BufferedInputSource())
@@ -180,7 +206,13 @@ public sealed class GameRuntime : IDisposable
             registrations.AddSingleton(host);
             registrations.AddSingleton(host.RenderDevice);
         }
-        addServices?.Invoke(registrations);
+
+        return registrations;
+    }
+
+    // An exported game composes its modules ahead of time; otherwise they are found among the loaded assemblies.
+    static void AddGameModules(ServiceCollection registrations)
+    {
         if (ExportRuntime.ConfigureServices is { } configure)
         {
             configure(registrations);
@@ -194,35 +226,32 @@ public sealed class GameRuntime : IDisposable
         {
             registrations.AddEngineModules([.. EngineServiceModules.LoadedGraph()]);
         }
-
-        Services = context.BuildServices(registrations);
-        Actions = Services.GetRequiredService<InputActionService>();
-        input = Services.GetRequiredService<IInputSource>();
-        Ticker = new SceneTicker(Scenes, clock)
-        {
-            Async = Services.GetRequiredService<GameLoopScheduler>(),
-            DataAssets = dataAssets,
-            Simulation = Services.GetService<SimulationSession>(),
-            Systems = [.. Services.GetServices<IFixedTickSystem>()],
-            InputSource = input,
-            Actions = Actions,
-        };
-        Scenes.BindServices(Services);
-
-        LoadActionMaps(loader);
-        Services.GetRequiredService<ApplicationLifetime>().Start();
     }
 
-    /// <summary>Stops installed application features independently of the rendering host.</summary>
+    void ComposeLifetimes(IServiceProvider services)
+    {
+        var host = new LifetimeHost(new SubsystemRegistry(services.GetServices<SubsystemDescriptor>()), services);
+        Lifetimes = new GameLifetimes(host, Scenes, LoadSceneOrStartup);
+        Services = new SubsystemServiceProvider(services, host);
+    }
+
+    // Opens a restarted session: the requested scene, else the startup scene.
+    Task LoadSceneOrStartup(Guid? sceneAssetId) =>
+        (sceneAssetId ?? StartupSceneId()) is { } id ? Scenes.LoadSceneAsync(id) : Task.CompletedTask;
+
+    Guid? StartupSceneId() =>
+        Settings.Get<PlayerSettings>().StartupScene is { IsEmpty: false } startup ? startup.AssetId : null;
+
+    /// <summary>Ends the session, then stops installed application features independently of the rendering host.</summary>
     public void Dispose()
     {
         if (disposed) { return; }
         disposed = true;
-        try { Services?.GetService<ApplicationLifetime>()?.Dispose(); }
+        try { Lifetimes?.Dispose(); }
         finally
         {
-            try { Ticker?.Async.Dispose(); }
-            finally { dataAssets.Dispose(); }
+            try { Services?.GetService<ApplicationLifetime>()?.Dispose(); }
+            finally { Ticker?.Async.Dispose(); }
         }
     }
 

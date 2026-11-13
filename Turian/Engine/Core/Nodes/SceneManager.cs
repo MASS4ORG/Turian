@@ -79,6 +79,12 @@ public partial class SceneManager : ISceneManager
     /// </summary>
     public Node PersistentRoot { get; } = new() { Name = "PersistentRoot" };
 
+    /// <summary>Raised once a scene is tracked as loaded, after its cross-scene references resolve.</summary>
+    public event Action<LoadedScene>? SceneLoaded;
+
+    /// <summary>Raised after an unloaded scene's nodes are torn down.</summary>
+    public event Action<LoadedScene>? SceneUnloaded;
+
     LoadedScene? activeScene;
 
     /// <summary>
@@ -303,6 +309,7 @@ public partial class SceneManager : ISceneManager
         scene.RootNode.Teardown();
         DetachNodeHierarchy(scene.RootNode);
         scene.ResetRuntimeState();
+        SceneUnloaded?.Invoke(scene);
     }
 
     /// <inheritdoc />

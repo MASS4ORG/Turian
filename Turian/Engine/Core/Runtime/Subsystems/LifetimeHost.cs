@@ -8,15 +8,18 @@ namespace Turian.Engine.Core;
 public sealed class LifetimeHost : IDisposable
 {
     readonly SubsystemRegistry registry;
+    readonly IServiceProvider? services;
     readonly List<SubsystemScope> scenes = [];
     readonly int ownerThread = Environment.CurrentManagedThreadId;
 
     /// <summary>Creates a host whose scopes build their subsystems from <paramref name="registry"/>.</summary>
     /// <param name="registry">The validated subsystems.</param>
-    public LifetimeHost(SubsystemRegistry registry)
+    /// <param name="services">The application's composed services, handed to subsystem factories.</param>
+    public LifetimeHost(SubsystemRegistry registry, IServiceProvider? services = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
         this.registry = registry;
+        this.services = services;
         Application = NewScope(LifetimeScope.Application, null);
     }
 
@@ -25,6 +28,9 @@ public sealed class LifetimeHost : IDisposable
 
     /// <summary>The running gameplay session's scope, or <c>null</c> between sessions.</summary>
     public SubsystemScope? Session { get; private set; }
+
+    /// <summary>The longest chain of live scopes outside any scene: the session when one runs, else the application.</summary>
+    public SubsystemScope Current => Session ?? Application;
 
     /// <summary>Starts the application's subsystems.</summary>
     public void Start() => Application.Start();
@@ -97,6 +103,31 @@ public sealed class LifetimeHost : IDisposable
         }
     }
 
+    /// <summary>Runs the <see cref="IFixedTickSystem"/> subsystems: application, then session, then scenes.</summary>
+    /// <param name="tick">The tick being executed.</param>
+    /// <param name="deltaTime">The fixed interval, in seconds.</param>
+    public void FixedTick(long tick, double deltaTime)
+    {
+        Application.FixedTick(tick, deltaTime);
+        Session?.FixedTick(tick, deltaTime);
+        for (var i = 0; i < scenes.Count; i++)
+        {
+            scenes[i].FixedTick(tick, deltaTime);
+        }
+    }
+
+    /// <summary>Lets the <see cref="IFixedTickSystem"/> subsystems present the frame, in the order they tick.</summary>
+    /// <param name="alpha">How far presentation time lies between the last tick and the next one, in [0, 1].</param>
+    public void AfterFixedTicks(double alpha)
+    {
+        Application.AfterFixedTicks(alpha);
+        Session?.AfterFixedTicks(alpha);
+        for (var i = 0; i < scenes.Count; i++)
+        {
+            scenes[i].AfterFixedTicks(alpha);
+        }
+    }
+
     /// <summary>Ends every scene, the session and the application, shortest-lived first.</summary>
     public void Dispose()
     {
@@ -118,7 +149,7 @@ public sealed class LifetimeHost : IDisposable
     }
 
     SubsystemScope NewScope(LifetimeScope kind, SubsystemScope? parent) =>
-        new(kind, parent, registry.For(kind), ownerThread);
+        new(kind, parent, registry.For(kind), ownerThread, services);
 
     void EndScenes()
     {

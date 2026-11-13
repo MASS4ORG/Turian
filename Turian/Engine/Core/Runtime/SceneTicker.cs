@@ -53,8 +53,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>The gameplay scheduler owned by this running session.</summary>
     public GameLoopScheduler Async { get; init; } = new();
 
-    /// <summary>Gameplay assets whose worker events drain after fixed-tick systems, before tick completion.</summary>
+    /// <summary>
+    /// Gameplay assets whose worker events drain after fixed-tick systems, before tick completion; when null, the
+    /// running session's <see cref="DataAssetSession"/> subsystem drains instead.
+    /// </summary>
     public DataAssetSession? DataAssets { get; init; }
+
+    /// <summary>
+    /// The game's lifetimes: their fixed-tick systems run after <see cref="Systems"/>, their ticking subsystems in
+    /// their phase, and a requested session restart applies once the frame ends.
+    /// </summary>
+    public GameLifetimes? Lifetimes { get; init; }
 
     /// <summary>The optional authoritative world sharing this driver's clock and fixed-tick boundary.</summary>
     public SimulationSession? Simulation { get; init; }
@@ -118,14 +127,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         Clock.AdvanceWithCompletion(unscaledDeltaTime, fixedTick ??= RunFixedTick,
             completedTick ??= PublishCompletedTick);
 
-        RunAfterFixedTicks();
-        RunUpdate((float)deltaTime);
-        Async.DrainUpdate();
-        RunLateUpdate((float)deltaTime);
-        Async.DrainLateUpdate();
-        FlushDestroyed();
-
-        InputSource?.NewFrame();
+        FinishFrame((float)deltaTime);
     }
 
     /// <summary>
@@ -153,12 +155,20 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
         Clock.Step(fixedTick ??= RunFixedTick);
         PublishCompletedTick();
+        FinishFrame((float)deltaTime);
+    }
+
+    // The presentation part of a frame, shared by Tick and StepFrame.
+    void FinishFrame(float deltaTime)
+    {
         RunAfterFixedTicks();
-        RunUpdate((float)deltaTime);
+        RunUpdate(deltaTime);
+        Lifetimes?.Host.Tick(SubsystemTickPhase.Frame, deltaTime);
         Async.DrainUpdate();
-        RunLateUpdate((float)deltaTime);
+        RunLateUpdate(deltaTime);
         Async.DrainLateUpdate();
         FlushDestroyed();
+        Lifetimes?.ApplyPendingRestart();
 
         InputSource?.NewFrame();
     }
@@ -190,9 +200,19 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             system.FixedTick(tick, interval);
         }
 
+        RunLifetimesFixedTick(tick, interval);
         simulation?.RunTick(tick, interval);
-        DataAssets?.Drain();
+        (DataAssets ?? Lifetimes?.DataAssets)?.Drain();
         FlushDestroyed();
+    }
+
+    void RunLifetimesFixedTick(long tick, double interval)
+    {
+        if (Lifetimes?.Host is { } host)
+        {
+            host.FixedTick(tick, interval);
+            host.Tick(SubsystemTickPhase.Fixed, (float)interval);
+        }
     }
 
     // Applies the destructions requested since the last boundary, root by root in scene order. Fixed-tick requests flush
@@ -207,7 +227,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
     void RunAfterFixedTicks()
     {
-        if (Systems.Count == 0)
+        if (Systems.Count == 0 && Lifetimes is null)
         {
             return;
         }
@@ -217,6 +237,8 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         {
             system.AfterFixedTicks(alpha);
         }
+
+        Lifetimes?.Host.AfterFixedTicks(alpha);
     }
 
     void PublishCompletedTick()
