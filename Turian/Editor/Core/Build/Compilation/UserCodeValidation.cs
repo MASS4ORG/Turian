@@ -23,12 +23,27 @@ public static class UserCodeValidation
 {
     /// <summary>Reports installed validators' warnings to Studio's shared Output log.</summary>
     public static void Report(string assetsDirectory, ILogger logger)
-    {
-        var validators = AppDomain.CurrentDomain.GetAssemblies()
+        => Report(assetsDirectory, logger, Validators(AppDomain.CurrentDomain.GetAssemblies(), logger));
+
+    /// <summary>Creates the validators the assemblies declare, skipping assemblies whose attributes cannot load yet.</summary>
+    internal static IEnumerable<IUserCodeValidator> Validators(IEnumerable<ReflectionAssembly> assemblies, ILogger logger)
+        => assemblies
             .Where(static assembly => !assembly.IsDynamic && !BrickAssemblies.IsRetired(assembly))
-            .SelectMany(static assembly => assembly.GetCustomAttributes<UserCodeValidatorAttribute>())
+            .SelectMany(assembly => ValidatorAttributes(assembly, logger))
             .Select(static attribute => (IUserCodeValidator)Activator.CreateInstance(attribute.ValidatorType)!);
-        Report(assetsDirectory, logger, validators);
+
+    // A precast brick assembly can reference a brick that is compiled from source only after this check.
+    static IEnumerable<UserCodeValidatorAttribute> ValidatorAttributes(ReflectionAssembly assembly, ILogger logger)
+    {
+        try
+        {
+            return assembly.GetCustomAttributes<UserCodeValidatorAttribute>();
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or FileLoadException or TypeLoadException)
+        {
+            logger.LogDebug("Skipped validators of {Assembly}: {Reason}", assembly.GetName().Name, exception.Message);
+            return [];
+        }
     }
 
     internal static void Report(string assetsDirectory, ILogger logger, IEnumerable<IUserCodeValidator> validators)
