@@ -24,10 +24,10 @@
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="System.CommandLine" Version="2.0.14" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.14" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.14" />
-        <PackageReference Include="SkiaSharp" Version="4.155.0" />
+        <PackageReference Include="System.CommandLine" Version="2.0.15" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.15" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.15" />
+        <PackageReference Include="SkiaSharp" Version="4.156.0" />
     </ItemGroup>
 
     <!-- The platform host template is copied, not compiled -->
