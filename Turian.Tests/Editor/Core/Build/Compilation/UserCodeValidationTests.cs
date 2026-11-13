@@ -9,6 +9,28 @@ public sealed class UserCodeValidationTests
             => [new(Path.Combine(assetsDirectory, "Source.cs"), 12, "validation warning")];
     }
 
+    sealed class FakeAssembly(string name, Func<UserCodeValidatorAttribute[]> attributes) : Assembly
+    {
+        public override bool IsCollectible => false;
+
+        public override AssemblyName GetName(bool copiedName) => new(name);
+
+        public override object[] GetCustomAttributes(Type attributeType, bool inherit) => attributes();
+    }
+
+    /// <summary>A precast assembly whose dependency is not compiled yet is skipped; other validators still run.</summary>
+    [Fact]
+    public void SkipsAssembliesWhoseAttributesCannotLoad()
+    {
+        Assembly[] assemblies =
+        [
+            new FakeAssembly("Precast.Bepu", static () => throw new FileNotFoundException("Turian.Engine.Physics")),
+            new FakeAssembly("Editor.Brick", static () => [new UserCodeValidatorAttribute(typeof(Validator))]),
+        ];
+        var validators = UserCodeValidation.Validators(assemblies, Substitute.For<ILogger>()).ToList();
+        Assert.IsType<Validator>(Assert.Single(validators));
+    }
+
     /// <summary>Optional brick warnings reach Studio's shared logger with a source location.</summary>
     [Fact]
     public void ReportsWarningsWithSourceLocation()
