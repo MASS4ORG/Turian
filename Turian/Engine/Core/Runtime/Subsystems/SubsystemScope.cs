@@ -12,13 +12,15 @@ public sealed class SubsystemScope : IDisposable
     readonly int ownerThread;
     ITickingSubsystem[] fixedTickers = [];
     ITickingSubsystem[] frameTickers = [];
+    IFixedTickSystem[] fixedSystems = [];
     bool begun;
 
     internal SubsystemScope(LifetimeScope kind, SubsystemScope? parent, IReadOnlyList<SubsystemDescriptor> descriptors,
-        int ownerThread)
+        int ownerThread, IServiceProvider? services)
     {
         Kind = kind;
         Parent = parent;
+        Services = services;
         this.descriptors = descriptors;
         this.ownerThread = ownerThread;
     }
@@ -28,6 +30,9 @@ public sealed class SubsystemScope : IDisposable
 
     /// <summary>The next longer-lived scope, or <c>null</c> for the application.</summary>
     public SubsystemScope? Parent { get; }
+
+    /// <summary>The application's composed services, for factories that need more than other subsystems.</summary>
+    public IServiceProvider? Services { get; }
 
     /// <summary>Resolves a subsystem from this scope or a longer-lived one.</summary>
     /// <typeparam name="T">The type the subsystem was registered as.</typeparam>
@@ -56,6 +61,45 @@ public sealed class SubsystemScope : IDisposable
         {
             tickers[i].Tick(deltaTime);
         }
+    }
+
+    /// <summary>Runs the fixed tick of every subsystem that is also an <see cref="IFixedTickSystem"/>, in start order.</summary>
+    /// <param name="tick">The tick being executed.</param>
+    /// <param name="deltaTime">The fixed interval, in seconds.</param>
+    public void FixedTick(long tick, double deltaTime)
+    {
+        EnsureOwnerThread();
+        for (var i = 0; i < fixedSystems.Length; i++)
+        {
+            fixedSystems[i].FixedTick(tick, deltaTime);
+        }
+    }
+
+    /// <summary>Lets every <see cref="IFixedTickSystem"/> subsystem present the frame after its fixed ticks.</summary>
+    /// <param name="alpha">How far presentation time lies between the last tick and the next one, in [0, 1].</param>
+    public void AfterFixedTicks(double alpha)
+    {
+        EnsureOwnerThread();
+        for (var i = 0; i < fixedSystems.Length; i++)
+        {
+            fixedSystems[i].AfterFixedTicks(alpha);
+        }
+    }
+
+    /// <summary>Resolves a subsystem by its registered type from this scope or a longer-lived one.</summary>
+    /// <param name="type">The type the subsystem was registered as.</param>
+    /// <returns>The live subsystem, or <c>null</c>.</returns>
+    public ISubsystem? Find(Type type)
+    {
+        for (var scope = this; scope is not null; scope = scope.Parent)
+        {
+            if (scope.instances.TryGetValue(type, out var subsystem))
+            {
+                return subsystem;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Creates and starts every subsystem of the lifetime, dependencies first; a failure stops those started.</summary>
@@ -91,6 +135,7 @@ public sealed class SubsystemScope : IDisposable
 
             fixedTickers = Tickers(SubsystemTickPhase.Fixed);
             frameTickers = Tickers(SubsystemTickPhase.Frame);
+            fixedSystems = [.. started.OfType<IFixedTickSystem>()];
         }
         catch
         {
@@ -131,23 +176,11 @@ public sealed class SubsystemScope : IDisposable
         instances.Clear();
         fixedTickers = [];
         frameTickers = [];
+        fixedSystems = [];
         if (errors is not null)
         {
             throw new AggregateException($"{Kind} subsystems failed to stop.", errors);
         }
-    }
-
-    ISubsystem? Find(Type type)
-    {
-        for (var scope = this; scope is not null; scope = scope.Parent)
-        {
-            if (scope.instances.TryGetValue(type, out var subsystem))
-            {
-                return subsystem;
-            }
-        }
-
-        return null;
     }
 
     ITickingSubsystem[] Tickers(SubsystemTickPhase phase) =>

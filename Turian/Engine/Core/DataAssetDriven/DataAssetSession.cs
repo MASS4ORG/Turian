@@ -1,7 +1,10 @@
 namespace Turian.Engine.Core;
 
-/// <summary>Owns gameplay asset state for one Play/export session; dispose on the game-loop thread to reset every asset.</summary>
-public sealed class DataAssetSession : IDisposable
+/// <summary>
+/// Owns gameplay asset state for one gameplay session, as a session-lifetime subsystem; dispose on the game-loop
+/// thread to reset every asset.
+/// </summary>
+public sealed class DataAssetSession : ISubsystem, IDisposable
 {
     readonly int threadId = Environment.CurrentManagedThreadId;
     readonly Dictionary<Guid, DataAsset> assets = [];
@@ -18,6 +21,10 @@ public sealed class DataAssetSession : IDisposable
     }
 
     internal IDataAssetEventBus Bus => bus;
+
+    void ISubsystem.Start() { }
+
+    void ISubsystem.Stop() { }
 
     /// <summary>Optional Studio tracing sink; installing it does not box payloads or allocate during raises.</summary>
     public IDataAssetEventObserver? Observer

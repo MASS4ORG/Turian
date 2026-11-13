@@ -10,7 +10,7 @@ namespace Turian.Engine.Core;
 public sealed class RuntimeAssetLoader : IAssetLoader
 {
     readonly AssetDatabase assetDatabase;
-    readonly DataAssetSession? dataAssets;
+    readonly Func<DataAssetSession?> dataAssets;
     readonly Dictionary<Guid, Asset> cache = new();
     readonly Dictionary<Guid, Task<Asset?>> inflight = new();
     readonly object gate = new();
@@ -20,9 +20,17 @@ public sealed class RuntimeAssetLoader : IAssetLoader
     /// Initializes a new instance of the <see cref="RuntimeAssetLoader"/> class.
     /// </summary>
     public RuntimeAssetLoader(AssetDatabase assetDatabase, DataAssetSession? dataAssets = null)
+        : this(assetDatabase, () => dataAssets)
+    {
+    }
+
+    /// <summary>Creates a loader that attaches hydrated DataAssets to whichever gameplay session is running.</summary>
+    /// <param name="assetDatabase">The catalog assets are read from.</param>
+    /// <param name="dataAssets">Returns the running session's DataAssets, or <c>null</c> between sessions.</param>
+    public RuntimeAssetLoader(AssetDatabase assetDatabase, Func<DataAssetSession?> dataAssets)
     {
         this.assetDatabase = assetDatabase ?? throw new ArgumentNullException(nameof(assetDatabase));
-        this.dataAssets = dataAssets;
+        this.dataAssets = dataAssets ?? throw new ArgumentNullException(nameof(dataAssets));
     }
 
     /// <inheritdoc />
@@ -68,7 +76,7 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         var content = metadata.GetContent(projectPath, ReadBaseFromSession, GetProvider(assetId));
         if (content is not null)
         {
-            dataAssets?.Attach(content);
+            dataAssets()?.Attach(content);
             await ObjectReferences.ResolveAsync(content, this).ConfigureAwait(false);
         }
 

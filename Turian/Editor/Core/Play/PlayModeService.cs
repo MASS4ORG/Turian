@@ -26,6 +26,8 @@ public sealed class PlayModeService(
 
     readonly Stopwatch clock = new();
     ServiceProvider? playServices;
+    GameLifetimes? lifetimes;
+    IServiceProvider? sceneServices;
     SceneTicker? ticker;
     ISceneManager? playSceneManager;
     double lastTickSeconds;
@@ -42,11 +44,14 @@ public sealed class PlayModeService(
     /// <summary>Gets the running game's locale service, if one was configured.</summary>
     public ILocaleContext? Locale => playServices?.GetService<ILocaleContext>();
 
-    /// <summary>The running game's services, or <c>null</c> outside play mode.</summary>
-    public IServiceProvider? Services => playServices;
+    /// <summary>The running game's services, live subsystems included, or <c>null</c> outside play mode.</summary>
+    public IServiceProvider? Services => sceneServices;
+
+    /// <summary>The running game's lifetimes, or <c>null</c> outside play mode.</summary>
+    public GameLifetimes? Lifetimes => lifetimes;
 
     /// <summary>The current session's hydrated gameplay assets and diagnostics, or null outside Play Mode.</summary>
-    public DataAssetSession? DataAssets => playServices?.GetService<DataAssetSession>();
+    public DataAssetSession? DataAssets => lifetimes?.DataAssets;
 
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event Action<PlayState>? StateChanged;
@@ -120,8 +125,7 @@ public sealed class PlayModeService(
         Node? clone;
         try
         {
-            clone = NodeCloner.DeepClone(editorRoot, awake: false,
-                loader: playServices.GetRequiredService<IAssetLoader>());
+            clone = CopyEditedScene(editorRoot);
         }
         catch (Exception ex)
         {
@@ -139,8 +143,7 @@ public sealed class PlayModeService(
 
         try
         {
-            sceneManager.AdoptScene(sceneTree.CurrentAsset?.Id ?? Guid.NewGuid(), clone);
-            clone.Awake(null, playServices);
+            AdoptCopy(sceneManager, clone);
         }
         catch (Exception ex)
         {
@@ -153,7 +156,7 @@ public sealed class PlayModeService(
         ticker = new SceneTicker(sceneManager, playServices.GetRequiredService<SimulationClock>())
         {
             Async = playServices.GetRequiredService<GameLoopScheduler>(),
-            DataAssets = playServices.GetRequiredService<DataAssetSession>(),
+            Lifetimes = lifetimes,
             Simulation = playServices.GetService<SimulationSession>(),
             Systems = [.. playServices.GetServices<IFixedTickSystem>()],
             InputSource = Input,
@@ -222,6 +225,7 @@ public sealed class PlayModeService(
             return;
         }
 
+        EndLifetimes();
         ticker?.Async.Dispose();
         PlayRoot = null;
         ticker = null;
@@ -341,11 +345,12 @@ public sealed class PlayModeService(
         playServices = BuildPlayServices();
         _ = playServices.GetRequiredService<SimulationClock>();
         playServices.GetRequiredService<ApplicationLifetime>().Start();
-        var sceneManager = playServices.GetRequiredService<ISceneManager>();
-        if (sceneManager is SceneManager concreteSceneManager)
-        {
-            concreteSceneManager.BindServices(playServices);
-        }
+        var sceneManager = (SceneManager)playServices.GetRequiredService<ISceneManager>();
+        var host = new LifetimeHost(new SubsystemRegistry(playServices.GetServices<SubsystemDescriptor>()), playServices);
+        lifetimes = new GameLifetimes(host, sceneManager, ReloadSession);
+        lifetimes.Start();
+        sceneServices = new SubsystemServiceProvider(playServices, host);
+        sceneManager.BindServices(sceneServices);
 
         if (localeOverride is not null)
         {
@@ -404,12 +409,12 @@ public sealed class PlayModeService(
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(new SceneManager(assetDatabase))
             .AddSingleton<GameLoopScheduler>()
-            .AddSingleton(_ => new DataAssetSession
+            .AddSubsystem(LifetimeScope.Session, _ => new DataAssetSession
             {
                 Observer = editorServices.GetService<IDataAssetEventObserver>()
             })
-            .AddSingleton<IAssetLoader>(provider =>
-                new RuntimeAssetLoader(assetDatabase, provider.GetRequiredService<DataAssetSession>()))
+            .AddSingleton<ISessionLifetime>(_ => lifetimes!)
+            .AddSingleton<IAssetLoader>(_ => new RuntimeAssetLoader(assetDatabase, () => DataAssets))
             .AddSingleton<IInputSource>(Input)
             .AddSingleton(_ => new InputActionService(Input))
             .AddSingleton<IInputActions>(sp => sp.GetRequiredService<InputActionService>());
@@ -502,8 +507,55 @@ public sealed class PlayModeService(
     /// </summary>
     void AbandonPlayServices()
     {
+        EndLifetimes();
         playServices?.Dispose();
         playServices = null;
+    }
+
+    // Ends the session, then the application's subsystems; a failing subsystem is logged so Stop always completes.
+    void EndLifetimes()
+    {
+        try
+        {
+            lifetimes?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Play mode subsystems failed to stop");
+        }
+
+        lifetimes = null;
+        sceneServices = null;
+    }
+
+    Node? CopyEditedScene(Node editorRoot) =>
+        NodeCloner.DeepClone(editorRoot, awake: false, loader: playServices!.GetRequiredService<IAssetLoader>());
+
+    void AdoptCopy(ISceneManager sceneManager, Node copy)
+    {
+        sceneManager.AdoptScene(sceneTree.CurrentAsset?.Id ?? Guid.NewGuid(), copy);
+        copy.Awake(null, sceneServices ?? throw new InvalidOperationException("Play services are not prepared."));
+    }
+
+    // Opens a restarted session on the requested scene, else on a fresh copy of the scene being edited.
+    Task ReloadSession(Guid? sceneAssetId)
+    {
+        if (playSceneManager is not { } sceneManager)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (sceneAssetId is { } requested)
+        {
+            return sceneManager.LoadSceneAsync(requested);
+        }
+
+        if (sceneTree.CurrentSceneRoot is { } editorRoot && CopyEditedScene(editorRoot) is { } copy)
+        {
+            AdoptCopy(sceneManager, copy);
+        }
+
+        return Task.CompletedTask;
     }
 
     void SetState(PlayState newState)

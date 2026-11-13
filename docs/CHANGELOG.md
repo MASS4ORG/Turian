@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: things can live per session #358.
+
 ## [4.1.0] - 2026-11-12
 
 - Added: Object pool #90.

@@ -27,7 +27,8 @@ public interface IInputActions
 
 /// <summary>
 /// Holds the action maps in force and advances them once per frame from an
-/// <see cref="IInputSource"/>. Components can receive this session's <see cref="IInputActions"/>.
+/// <see cref="IInputSource"/>. It has the application's lifetime: devices and the player's rebindings outlive
+/// gameplay sessions. Components can receive it as <see cref="IInputActions"/>.
 /// </summary>
 /// <param name="source">The devices the actions are read from.</param>
 public sealed class InputActionService(IInputSource source) : IInputActions

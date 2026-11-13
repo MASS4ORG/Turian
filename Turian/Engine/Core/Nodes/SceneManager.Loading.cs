@@ -156,6 +156,7 @@ public partial class SceneManager
                 pending);
         }
 
+        SceneLoaded?.Invoke(loadedScene);
         return loadedScene;
     }
 
