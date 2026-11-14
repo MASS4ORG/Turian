@@ -31,6 +31,7 @@ public static partial class Program
             ExportCommand(projectArg, configOption),
             DeployCommand(projectArg, configOption),
             DevicesCommand(projectArg),
+            DoctorCommand(),
             PlayCommand(projectArg),
             PlayModeCommand(projectArg),
             SceneCommand(projectArg),
