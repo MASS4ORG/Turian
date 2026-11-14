@@ -1,10 +1,10 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Owns gameplay asset state for one gameplay session, as a session-lifetime subsystem; dispose on the game-loop
-/// thread to reset every asset.
+/// Owns gameplay asset state for one gameplay session, as a session-lifetime subsystem that drains worker events in
+/// <see cref="GameLoopPhase.FixedCommit"/>; dispose on the game-loop thread to reset every asset.
 /// </summary>
-public sealed class DataAssetSession : ISubsystem, IDisposable
+public sealed class DataAssetSession : IGameLoopSubsystem, IDisposable
 {
     readonly int threadId = Environment.CurrentManagedThreadId;
     readonly Dictionary<Guid, DataAsset> assets = [];
@@ -25,6 +25,10 @@ public sealed class DataAssetSession : ISubsystem, IDisposable
     void ISubsystem.Start() { }
 
     void ISubsystem.Stop() { }
+
+    GameLoopPhases IGameLoopSubsystem.Phases => GameLoopPhases.FixedCommit;
+
+    void IGameLoopSubsystem.Run(GameLoopPhase phase, in LoopTime time) => Drain();
 
     /// <summary>Optional Studio tracing sink; installing it does not box payloads or allocate during raises.</summary>
     public IDataAssetEventObserver? Observer
@@ -70,7 +74,10 @@ public sealed class DataAssetSession : ISubsystem, IDisposable
     /// <summary>Lists active listeners in delivery order: larger priority first, ties by subscription order.</summary>
     public IReadOnlyList<DataAssetSubscription> Listeners(Guid topic) => bus.Listeners(topic);
 
-    /// <summary>Delivers worker raises after fixed-tick systems finish; never call from a worker callback.</summary>
+    /// <summary>
+    /// Delivers worker raises; the game loop calls it in <see cref="GameLoopPhase.FixedCommit"/>, after fixed-tick
+    /// systems finish. Never call from a worker callback.
+    /// </summary>
     public void Drain() => bus.Drain();
 
     internal TState State<TState>(DataAsset asset, Func<DataAsset, TState> create) where TState : class

@@ -36,11 +36,15 @@ public static partial class Program
         var widthOption = new Option<uint>("--width") { Description = "Output width in pixels", DefaultValueFactory = _ => 1280 };
         var heightOption = new Option<uint>("--height") { Description = "Output height in pixels", DefaultValueFactory = _ => 720 };
         var localeOption = LocaleOption();
+        var realtimeOption = new Option<bool>("--realtime")
+        {
+            Description = "Advance each frame by wall-clock time, as the Studio does, instead of exactly one fixed step",
+        };
 
         var cmd = new Command("playmode", "Run a play session headlessly, as the Studio's Play button does")
         {
             projectArg, sceneOption, reimportOption, loadUserCodeOption, framesOption, outputOption, widthOption, heightOption,
-            localeOption, statisticsOption
+            localeOption, statisticsOption, realtimeOption
         };
 
         cmd.SetAction(async (result, _) =>
@@ -76,7 +80,7 @@ public static partial class Program
                 options,
                 report.Bounds,
                 result.GetValue(localeOption),
-                Log.Logger, statistics);
+                Log.Logger, statistics, result.GetValue(realtimeOption));
 
             return ok ? 0 : 1;
         });

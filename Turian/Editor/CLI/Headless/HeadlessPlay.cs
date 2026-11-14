@@ -19,6 +19,9 @@ static class HeadlessPlay
     /// <param name="locale">Locale to force for the session, or <c>null</c> to use the project's default.</param>
     /// <param name="logger">The logger progress is reported through.</param>
     /// <param name="statisticsPath">Optional JSON report that enables offscreen rendering.</param>
+    /// <param name="realtime">
+    /// Advance each frame by the wall-clock time it took instead of exactly one fixed step; see <see cref="TickFrame"/>.
+    /// </param>
     /// <returns><c>true</c> when the session started, ticked and stopped without throwing.</returns>
     public static bool Run(
         HeadlessProject project,
@@ -29,7 +32,8 @@ static class HeadlessPlay
         Bounds bounds,
         string? locale,
         ILogger logger,
-        string? statisticsPath = null)
+        string? statisticsPath = null,
+        bool realtime = false)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(root);
@@ -51,7 +55,7 @@ static class HeadlessPlay
         try
         {
             renderer = CreateRenderer(project, play, options, outputPath is not null || statisticsPath is not null);
-            var stats = RunFrames(play, renderer, frames, logger);
+            var stats = RunFrames(play, renderer, frames, realtime, logger);
             stats.Report(logger);
             SaveOutputs(project, root, renderer, stats, outputPath, statisticsPath, logger);
             return true;
@@ -82,17 +86,43 @@ static class HeadlessPlay
             });
     }
 
-    static RenderStats RunFrames(PlayModeService play, ISceneCapture? renderer, int frames, ILogger logger)
+    /// <summary>The presentation delta a realtime frame is rendered with, as before fixed stepping became the default.</summary>
+    const double RealtimePresentationDelta = 1.0 / 60.0;
+
+    /// <summary>
+    /// Advances the session by one frame. By default the frame is exactly one fixed step, so <c>--frames N</c> runs
+    /// N ticks on any machine and the result is reproducible. With <paramref name="realtime"/>, the frame advances by
+    /// the wall-clock time since the previous one, as the Studio does, so a slow machine catches up with several ticks
+    /// per frame.
+    /// </summary>
+    /// <param name="play">The running session.</param>
+    /// <param name="realtime">Whether to advance by wall-clock time.</param>
+    /// <returns>The delta to render the frame with, in seconds.</returns>
+    internal static double TickFrame(PlayModeService play, bool realtime)
+    {
+        if (realtime)
+        {
+            play.Tick();
+            return RealtimePresentationDelta;
+        }
+
+        var deltaTime = play.FixedDeltaTime;
+        play.Tick(deltaTime);
+        return deltaTime;
+    }
+
+    static RenderStats RunFrames(PlayModeService play, ISceneCapture? renderer, int frames, bool realtime,
+        ILogger logger)
     {
         var stats = new RenderStats();
         for (var frame = 0; frame < frames; frame++)
         {
             var started = Stopwatch.GetTimestamp();
             var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-            play.Tick();
+            var deltaTime = TickFrame(play, realtime);
             if (renderer is not null && play.PlayRoot is { } playRoot)
             {
-                renderer.Render(playRoot, 1.0 / 60.0, play.ActiveCamera);
+                renderer.Render(playRoot, deltaTime, play.ActiveCamera);
                 RenderStatisticsTargets.Record(RenderStatisticsTargets.Find(playRoot), renderer.FrameStats);
             }
 

@@ -90,9 +90,26 @@ public sealed class LifetimeHost : IDisposable
         }
     }
 
+    /// <summary>
+    /// Runs every subsystem of a game-loop phase: the application's, then the session's, then each loaded scene's
+    /// in load order, each lifetime in its <see cref="SubsystemRegistry.RunOrder"/>.
+    /// </summary>
+    /// <param name="phase">The phase.</param>
+    /// <param name="time">The time the phase runs at.</param>
+    public void Run(GameLoopPhase phase, in LoopTime time)
+    {
+        Application.Run(phase, in time);
+        Session?.Run(phase, in time);
+        for (var i = 0; i < scenes.Count; i++)
+        {
+            scenes[i].Run(phase, in time);
+        }
+    }
+
     /// <summary>Runs the ticking subsystems of <paramref name="phase"/>: application, then session, then scenes.</summary>
     /// <param name="phase">The phase.</param>
     /// <param name="deltaTime">Seconds since the previous tick of the phase.</param>
+    [Obsolete("Use Run(GameLoopPhase, in LoopTime): FixedTick for SubsystemTickPhase.Fixed, Update for SubsystemTickPhase.Frame. Removed in the next major release.")]
     public void Tick(SubsystemTickPhase phase, float deltaTime)
     {
         Application.Tick(phase, deltaTime);
@@ -106,6 +123,7 @@ public sealed class LifetimeHost : IDisposable
     /// <summary>Runs the <see cref="IFixedTickSystem"/> subsystems: application, then session, then scenes.</summary>
     /// <param name="tick">The tick being executed.</param>
     /// <param name="deltaTime">The fixed interval, in seconds.</param>
+    [Obsolete("Use Run(GameLoopPhase.FixedTick, in LoopTime). Removed in the next major release.")]
     public void FixedTick(long tick, double deltaTime)
     {
         Application.FixedTick(tick, deltaTime);
@@ -118,6 +136,7 @@ public sealed class LifetimeHost : IDisposable
 
     /// <summary>Lets the <see cref="IFixedTickSystem"/> subsystems present the frame, in the order they tick.</summary>
     /// <param name="alpha">How far presentation time lies between the last tick and the next one, in [0, 1].</param>
+    [Obsolete("Use Run(GameLoopPhase.AfterFixedTicks, in LoopTime). Removed in the next major release.")]
     public void AfterFixedTicks(double alpha)
     {
         Application.AfterFixedTicks(alpha);
@@ -149,7 +168,7 @@ public sealed class LifetimeHost : IDisposable
     }
 
     SubsystemScope NewScope(LifetimeScope kind, SubsystemScope? parent) =>
-        new(kind, parent, registry.For(kind), ownerThread, services);
+        new(kind, parent, registry.For(kind), registry.RunOrder(kind), ownerThread, services);
 
     void EndScenes()
     {

@@ -6,7 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Changed!: Editor Core link no renderer or GUI.
+- Changed (breaking): Editor Core link no renderer or GUI.
+- Changed (breaking): the game loop runs named phases that subsystems join with `IGameLoopSubsystem`.
 - Changed: `BricksSettings` moved to the editor.
 - Changed: dependencies bumped
 - Removed: object pools moved to the `org.mass4.turian.pooling` #90.
@@ -28,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [4.0.0] - 2026-11-11
 
-- Added: dotnet 11
+- Added (breaking): dotnet 11
 - Added: android `org.mass4.turian.android brick` #254 #255 #257 #258 #259 #260 #261 #269 #271 #272 #274 #275 #343
 - Fixed: Studio's file dialog no longer hangs on Linux mounts
 - Fixed: Vulkan semaphores are per swapchain image

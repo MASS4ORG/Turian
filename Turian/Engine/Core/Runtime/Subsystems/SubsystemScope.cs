@@ -7,21 +7,24 @@ namespace Turian.Engine.Core;
 public sealed class SubsystemScope : IDisposable
 {
     readonly IReadOnlyList<SubsystemDescriptor> descriptors;
+    readonly IReadOnlyList<SubsystemDescriptor> runOrder;
     readonly Dictionary<Type, ISubsystem> instances = [];
     readonly List<ISubsystem> started = [];
     readonly int ownerThread;
+    readonly ISubsystem[][] phases = NoPhases();
     ITickingSubsystem[] fixedTickers = [];
     ITickingSubsystem[] frameTickers = [];
     IFixedTickSystem[] fixedSystems = [];
     bool begun;
 
     internal SubsystemScope(LifetimeScope kind, SubsystemScope? parent, IReadOnlyList<SubsystemDescriptor> descriptors,
-        int ownerThread, IServiceProvider? services)
+        IReadOnlyList<SubsystemDescriptor> runOrder, int ownerThread, IServiceProvider? services)
     {
         Kind = kind;
         Parent = parent;
         Services = services;
         this.descriptors = descriptors;
+        this.runOrder = runOrder;
         this.ownerThread = ownerThread;
     }
 
@@ -50,9 +53,26 @@ public sealed class SubsystemScope : IDisposable
         return subsystem is not null;
     }
 
+    /// <summary>
+    /// Runs this lifetime's part of a game-loop phase: every subsystem that runs in <paramref name="phase"/>, in
+    /// <see cref="SubsystemRegistry.RunOrder"/>. Allocates nothing.
+    /// </summary>
+    /// <param name="phase">The phase.</param>
+    /// <param name="time">The time the phase runs at.</param>
+    public void Run(GameLoopPhase phase, in LoopTime time)
+    {
+        EnsureOwnerThread();
+        var subsystems = phases[(int)phase];
+        for (var i = 0; i < subsystems.Length; i++)
+        {
+            GameLoopPhaseDispatch.Run(subsystems[i], phase, in time);
+        }
+    }
+
     /// <summary>Runs every subsystem of <paramref name="phase"/>, in start order.</summary>
     /// <param name="phase">The phase.</param>
     /// <param name="deltaTime">Seconds since the previous tick of the phase.</param>
+    [Obsolete("Use Run(GameLoopPhase, in LoopTime): FixedTick for SubsystemTickPhase.Fixed, Update for SubsystemTickPhase.Frame. Removed in the next major release.")]
     public void Tick(SubsystemTickPhase phase, float deltaTime)
     {
         EnsureOwnerThread();
@@ -66,6 +86,7 @@ public sealed class SubsystemScope : IDisposable
     /// <summary>Runs the fixed tick of every subsystem that is also an <see cref="IFixedTickSystem"/>, in start order.</summary>
     /// <param name="tick">The tick being executed.</param>
     /// <param name="deltaTime">The fixed interval, in seconds.</param>
+    [Obsolete("Use Run(GameLoopPhase.FixedTick, in LoopTime). Removed in the next major release.")]
     public void FixedTick(long tick, double deltaTime)
     {
         EnsureOwnerThread();
@@ -77,6 +98,7 @@ public sealed class SubsystemScope : IDisposable
 
     /// <summary>Lets every <see cref="IFixedTickSystem"/> subsystem present the frame after its fixed ticks.</summary>
     /// <param name="alpha">How far presentation time lies between the last tick and the next one, in [0, 1].</param>
+    [Obsolete("Use Run(GameLoopPhase.AfterFixedTicks, in LoopTime). Removed in the next major release.")]
     public void AfterFixedTicks(double alpha)
     {
         EnsureOwnerThread();
@@ -136,6 +158,7 @@ public sealed class SubsystemScope : IDisposable
             fixedTickers = Tickers(SubsystemTickPhase.Fixed);
             frameTickers = Tickers(SubsystemTickPhase.Frame);
             fixedSystems = [.. started.OfType<IFixedTickSystem>()];
+            BuildPhases();
         }
         catch
         {
@@ -177,9 +200,44 @@ public sealed class SubsystemScope : IDisposable
         fixedTickers = [];
         frameTickers = [];
         fixedSystems = [];
+        ClearPhases(phases);
         if (errors is not null)
         {
             throw new AggregateException($"{Kind} subsystems failed to stop.", errors);
+        }
+    }
+
+    static ISubsystem[][] NoPhases()
+    {
+        var empty = new ISubsystem[GameLoopPhaseDispatch.Count][];
+        ClearPhases(empty);
+        return empty;
+    }
+
+    static void ClearPhases(ISubsystem[][] tables)
+    {
+        for (var i = 0; i < tables.Length; i++)
+        {
+            tables[i] = [];
+        }
+    }
+
+    // Each phase's table lists the started subsystems that run in it, in the registry's run order.
+    void BuildPhases()
+    {
+        var running = new List<(ISubsystem Subsystem, GameLoopPhases Phases)>(runOrder.Count);
+        foreach (var descriptor in runOrder)
+        {
+            if (instances.TryGetValue(descriptor.Type, out var subsystem))
+            {
+                running.Add((subsystem, GameLoopPhaseDispatch.PhasesOf(subsystem)));
+            }
+        }
+
+        for (var phase = 0; phase < phases.Length; phase++)
+        {
+            var flag = (GameLoopPhases)(1 << phase);
+            phases[phase] = [.. running.Where(entry => (entry.Phases & flag) != 0).Select(static entry => entry.Subsystem)];
         }
     }
 
