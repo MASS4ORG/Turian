@@ -46,19 +46,19 @@
         <PackageReference Include="SkiaSharp" Version="4.155.0" />
         <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.155.0" />
         <!-- Microsoft.Build.Framework requires this exact version; bump all three together. -->
-        <PackageReference Include="Microsoft.NET.StringTools" Version="18.11.0" ExcludeAssets="runtime" PrivateAssets="all">
+        <PackageReference Include="Microsoft.NET.StringTools" Version="18.12.2" ExcludeAssets="runtime" PrivateAssets="all">
             <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0"/>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0"/>
         <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0"/>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
-        <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="10.0.14" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
-        <PackageReference Include="NuGet.Commands" Version="7.9.0"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="11.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0" />
+        <PackageReference Include="NuGet.Commands" Version="8.0.0" />
         <!-- NuGet.Packaging floors this at the vulnerable 8.0.1 (NU1902/NU1903); pinned to the patched release. -->
-        <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14"/>
-        <PackageReference Include="NuGet.Frameworks" Version="7.9.0" ExcludeAssets="runtime" PrivateAssets="all">
+        <PackageReference Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
+        <PackageReference Include="NuGet.Frameworks" Version="8.0.0" ExcludeAssets="runtime" PrivateAssets="all">
             <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <!-- Model import (FBX, and any other format Assimp handles) is editor-side only:

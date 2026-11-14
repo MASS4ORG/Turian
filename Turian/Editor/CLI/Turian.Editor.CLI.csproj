@@ -24,9 +24,9 @@
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="System.CommandLine" Version="2.0.14" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.14" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.14" />
+        <PackageReference Include="System.CommandLine" Version="3.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="11.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="11.0.0" />
         <PackageReference Include="SkiaSharp" Version="4.155.0" />
     </ItemGroup>
 
