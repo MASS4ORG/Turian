@@ -150,7 +150,10 @@ public sealed class SubsystemLifetimeTests
         Assert.Equal(["a:start", "b:start", "b:dispose", "a:stop", "a:dispose"], calls);
     }
 
-    /// <summary>Ticking subsystems run only in their own phase.</summary>
+    /// <summary>
+    /// Ticking subsystems run only in the game-loop phase their tick phase maps to: fixed in
+    /// <see cref="GameLoopPhase.FixedTick"/>, frame in <see cref="GameLoopPhase.Update"/>.
+    /// </summary>
     [Fact]
     public void TicksRunInTheirOwnPhase()
     {
@@ -160,10 +163,28 @@ public sealed class SubsystemLifetimeTests
             SubsystemDescriptor.Of(LifetimeScope.Application, _ => mover),
             SubsystemDescriptor.Of(LifetimeScope.Application, _ => painter)));
         host.Start();
-        host.Tick(SubsystemTickPhase.Fixed, 0.02f);
+        host.Run(GameLoopPhase.FixedTick, new LoopTime(1, 0.02, 0.02, 0));
+        host.Run(GameLoopPhase.FixedTick, new LoopTime(2, 0.02, 0.02, 0));
+        host.Run(GameLoopPhase.Update, new LoopTime(2, 0.016, 0.016, 0));
+        host.Run(GameLoopPhase.LateUpdate, new LoopTime(2, 0.016, 0.016, 0));
+        Assert.Equal((2, 1), (mover.Ticks, painter.Ticks));
+    }
+
+    /// <summary>The earlier per-kind tick methods still drive their subsystems until they are removed.</summary>
+    [Fact]
+    public void ObsoleteTickMethodsStillRunTheirPhase()
+    {
+        var mover = new Mover();
+        var painter = new Painter();
+        using var host = new LifetimeHost(Registry(
+            SubsystemDescriptor.Of(LifetimeScope.Application, _ => mover),
+            SubsystemDescriptor.Of(LifetimeScope.Application, _ => painter)));
+        host.Start();
+#pragma warning disable CS0618 // The per-kind methods are supported until the next major release.
         host.Tick(SubsystemTickPhase.Fixed, 0.02f);
         host.Tick(SubsystemTickPhase.Frame, 0.016f);
-        Assert.Equal((2, 1), (mover.Ticks, painter.Ticks));
+#pragma warning restore CS0618
+        Assert.Equal((1, 1), (mover.Ticks, painter.Ticks));
     }
 
     /// <summary>Starting from another thread is refused, because subsystems activate on the main thread.</summary>

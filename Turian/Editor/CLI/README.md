@@ -72,6 +72,8 @@ Capture Bistro measurements without opening a window:
 dotnet run --project Turian/Editor/CLI -- playmode path/to/example-02-bistro --frames 120 --stats /tmp/bistro-stats.json
 ```
 
+Each frame advances exactly one fixed simulation step, so `--frames 120` runs 120 ticks on any machine and two runs of the same scene are comparable. Add `--realtime` to advance each frame by its wall-clock time instead, as the Studio does; a slow machine then catches up with several ticks per frame. Play mode in the Studio, `playmode` and an exported game run the same game-loop phases.
+
 `--stats` enables offscreen rendering even when `--out` is omitted. Add `--out /tmp/bistro.png` to save the final image. Use an already imported project; asset import/compilation and device creation are outside the measured scene load. The JSON report includes scene read/deserialization/prefab expansion/awake time, cold model and texture decode/upload attempt counts and accumulated times, each frame's actual tick-and-render wall time, managed allocations and render preparation/submission scopes. The first frame can include material and texture loading; inspect the samples and median alongside the mean. Fixed simulation delta time is never used to calculate headless performance FPS.
 
 Render CPU and submission elapsed times include the offscreen GPU completion wait and image staging transfer. Pixel copying and PNG encoding are excluded. Draw calls and triangle counts cover the standard geometry pass; editor gizmos and UI are excluded. With GPU occlusion enabled these are submitted indirect commands and candidate triangles, not the number ultimately executed by the GPU. HUD FPS includes the editor's frame rate cap, other panels and preview cameras.

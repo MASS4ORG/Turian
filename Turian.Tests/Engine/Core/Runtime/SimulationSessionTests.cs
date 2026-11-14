@@ -123,10 +123,14 @@ public sealed class SimulationSessionTests
         Assert.Throws<InvalidOperationException>(() => session.Schedule(Producer, 2, "add", Payload()));
     }
 
-    /// <summary>Scene presentation and the authoritative world use one clock and execute one fixed batch.</summary>
+    /// <summary>
+    /// Scene presentation and the authoritative world use one clock and execute one fixed batch, through the ticker's
+    /// obsolete <see cref="SceneTicker.Simulation"/> property, supported until the next major release.
+    /// </summary>
     [Fact]
     public void SceneTicker_DrivesOneSharedSessionAndRejectsASecondClock()
     {
+#pragma warning disable CS0618 // The obsolete property keeps working until it is removed.
         var world = new SimulationTestWorld();
         var session = Create(world);
         var scenes = new SceneManager(new AssetDatabase());
@@ -140,6 +144,7 @@ public sealed class SimulationSessionTests
         ticker.StepFrame();
         Assert.Equal(3, session.CaptureState().Clock.TickIndex);
         var wrong = new SceneTicker(scenes) { Simulation = session };
+#pragma warning restore CS0618
         Assert.Throws<InvalidOperationException>(() => wrong.StepFrame());
         Assert.True(wrong.Clock.IsFaulted);
     }

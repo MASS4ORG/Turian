@@ -1,13 +1,22 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Drives the per-frame lifecycle of every loaded scene: the fixed-timestep pass
-/// (<see cref="Component.OnFixedUpdate"/>), the variable pass (<see cref="Component.OnUpdate"/>)
-/// and the late pass (<see cref="Component.OnLateUpdate"/>).
-///
+/// Drives the frames of every loaded scene through the game-loop phases, in order:
+/// <list type="number">
+/// <item><see cref="GameLoopPhase.BeginFrame"/>: scenes start and input actions are read.</item>
+/// <item>
+/// Between zero and <see cref="SimulationClock.MaxTicksPerFrame"/> fixed ticks, as the clock's accumulator allows,
+/// each running <see cref="Component.OnFixedUpdate"/>, <see cref="GameLoopPhase.FixedTick"/>,
+/// <see cref="GameLoopPhase.FixedCommit"/>, a destroy flush and <see cref="GameLoopPhase.TickCompleted"/>.
+/// </item>
+/// <item><see cref="GameLoopPhase.AfterFixedTicks"/>, once, with the presentation alpha.</item>
+/// <item><see cref="Component.OnUpdate"/> then <see cref="GameLoopPhase.Update"/>.</item>
+/// <item><see cref="Component.OnLateUpdate"/> then <see cref="GameLoopPhase.LateUpdate"/>.</item>
+/// <item>A destroy flush, <see cref="GameLoopPhase.EndFrame"/>, then a requested session restart.</item>
+/// </list>
 /// <para>
-/// The ticker is deliberately render-agnostic so that the standalone runtime and the Studio's
-/// in-editor play mode share the exact same update semantics.
+/// The ticker is deliberately render-agnostic so that the standalone runtime, the Studio's in-editor play mode and
+/// the CLI share the exact same update semantics; <see cref="Compose"/> builds it the same way for each of them.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -46,6 +55,34 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     List<Node>? nodeBuffer = [];
     Action<long, double>? fixedTick;
     Action? completedTick;
+    IReadOnlyList<IFixedTickSystem> systems = [];
+    InputActionService? actions;
+    SimulationSession? simulation;
+    DataAssetSession? dataAssets;
+    double frameDeltaTime;
+    double frameUnscaledDeltaTime;
+    double alpha;
+
+    /// <summary>
+    /// Builds the ticker a running game uses from its composed services: its scene manager, clock, scheduler, input
+    /// source and <see cref="IFixedTickSystem"/> services, driving <paramref name="lifetimes"/>. The standalone
+    /// runtime and play mode, and through play mode the CLI, all build their ticker here.
+    /// </summary>
+    /// <param name="services">The game's composed services.</param>
+    /// <param name="lifetimes">The game's lifetimes, whose subsystems run in each phase.</param>
+    public static SceneTicker Compose(IServiceProvider services, GameLifetimes lifetimes)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(lifetimes);
+        return new SceneTicker(services.GetRequiredService<ISceneManager>(),
+            services.GetRequiredService<SimulationClock>())
+        {
+            Async = services.GetRequiredService<GameLoopScheduler>(),
+            Lifetimes = lifetimes,
+            Systems = [.. services.GetServices<IFixedTickSystem>()],
+            InputSource = services.GetService<IInputSource>(),
+        };
+    }
 
     /// <summary>The authoritative fixed-tick clock shared with the running game's services.</summary>
     public SimulationClock Clock { get; } = clock ?? new SimulationClock();
@@ -54,22 +91,43 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     public GameLoopScheduler Async { get; init; } = new();
 
     /// <summary>
-    /// Gameplay assets whose worker events drain after fixed-tick systems, before tick completion; when null, the
-    /// running session's <see cref="DataAssetSession"/> subsystem drains instead.
+    /// Gameplay assets whose worker events drain in <see cref="GameLoopPhase.FixedCommit"/>, after the session's own
+    /// <see cref="DataAssetSession"/> subsystem when that is a different instance.
     /// </summary>
-    public DataAssetSession? DataAssets { get; init; }
+    [Obsolete("The session's DataAssetSession subsystem drains in GameLoopPhase.FixedCommit; register it with AddSubsystem instead. Removed in the next major release.")]
+    public DataAssetSession? DataAssets
+    {
+        get => dataAssets;
+        init => dataAssets = value;
+    }
 
     /// <summary>
-    /// The game's lifetimes: their fixed-tick systems run after <see cref="Systems"/>, their ticking subsystems in
-    /// their phase, and a requested session restart applies once the frame ends.
+    /// The game's lifetimes: their subsystems run in each <see cref="GameLoopPhase"/>, and a requested session restart
+    /// applies once the frame ends.
     /// </summary>
     public GameLifetimes? Lifetimes { get; init; }
 
-    /// <summary>The optional authoritative world sharing this driver's clock and fixed-tick boundary.</summary>
-    public SimulationSession? Simulation { get; init; }
+    /// <summary>
+    /// An authoritative world sharing this driver's clock, ticked at the start of
+    /// <see cref="GameLoopPhase.FixedCommit"/> and published at the start of <see cref="GameLoopPhase.TickCompleted"/>.
+    /// </summary>
+    [Obsolete("Register the session with AddSimulationLoop, which drives it in GameLoopPhase.FixedCommit and TickCompleted. Removed in the next major release.")]
+    public SimulationSession? Simulation
+    {
+        get => simulation;
+        init => simulation = value;
+    }
 
-    /// <summary>Session systems run after the components of every fixed tick, in list order.</summary>
-    public IReadOnlyList<IFixedTickSystem> Systems { get; init; } = [];
+    /// <summary>
+    /// Systems run in every fixed tick after the components and before the lifetimes' subsystems, in list order, and
+    /// presented in <see cref="GameLoopPhase.AfterFixedTicks"/> in the same order. <see cref="Compose"/> fills it
+    /// from the <see cref="IFixedTickSystem"/> services; a hand-built ticker lists its own.
+    /// </summary>
+    public IReadOnlyList<IFixedTickSystem> Systems
+    {
+        get => systems;
+        init => systems = value ?? throw new ArgumentNullException(nameof(value));
+    }
 
     /// <summary>
     /// Multiplier for simulation time. Zero freezes elapsed game time, but still polls input and runs updates with zero delta.
@@ -90,10 +148,15 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     public IInputSource? InputSource { get; init; }
 
     /// <summary>
-    /// Gets the action maps recomputed at the start of every tick, or <c>null</c> when no action asset
-    /// is in force. Updated before the passes so <see cref="Component.OnUpdate"/> reads this frame.
+    /// Action maps recomputed at the start of every frame, before the <see cref="GameLoopPhase.BeginFrame"/>
+    /// subsystems.
     /// </summary>
-    public InputActionService? Actions { get; init; }
+    [Obsolete("Register the actions with AddInputActions, which reads them in GameLoopPhase.BeginFrame. Removed in the next major release.")]
+    public InputActionService? Actions
+    {
+        get => actions;
+        init => actions = value;
+    }
 
     /// <summary>
     /// Advances every loaded scene by <paramref name="deltaTime"/> unscaled seconds.
@@ -117,17 +180,14 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         using var asyncContext = Async.EnterContext();
         Async.BeginFrame(scaledDeltaTime, unscaledDeltaTime);
         UnscaledElapsedSeconds += deltaTime;
-        deltaTime = scaledDeltaTime;
-        ElapsedSeconds += deltaTime;
-        sceneManager.EnsureScenesStarted();
-        Actions?.Update();
+        ElapsedSeconds += scaledDeltaTime;
+        BeginFrame(scaledDeltaTime, unscaledDeltaTime);
 
-        CollectRoots();
-
+        // The clock owns the accumulator, the catch-up cap and dropped backlog; the phases only see the ticks it runs.
         Clock.AdvanceWithCompletion(unscaledDeltaTime, fixedTick ??= RunFixedTick,
             completedTick ??= PublishCompletedTick);
 
-        FinishFrame((float)deltaTime);
+        FinishFrame();
     }
 
     /// <summary>
@@ -148,33 +208,58 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         using var asyncContext = Async.EnterContext();
         Async.BeginFrame(deltaTime, deltaTime);
         ElapsedSeconds += deltaTime;
-        sceneManager.EnsureScenesStarted();
-        Actions?.Update();
-
-        CollectRoots();
+        BeginFrame(deltaTime, deltaTime);
 
         Clock.Step(fixedTick ??= RunFixedTick);
         PublishCompletedTick();
-        FinishFrame((float)deltaTime);
+        FinishFrame();
+    }
+
+    /// <summary>Discards accumulated fixed-step time, e.g. after resuming from a pause.</summary>
+    public void ResetAccumulator() => Clock.ResetAccumulator();
+
+    void BeginFrame(double deltaTime, double unscaledDeltaTime)
+    {
+        frameDeltaTime = deltaTime;
+        frameUnscaledDeltaTime = unscaledDeltaTime;
+        sceneManager.EnsureScenesStarted();
+        actions?.Update();
+        RunPhase(GameLoopPhase.BeginFrame, FrameTime());
+        CollectRoots();
     }
 
     // The presentation part of a frame, shared by Tick and StepFrame.
-    void FinishFrame(float deltaTime)
+    void FinishFrame()
     {
-        RunAfterFixedTicks();
+        alpha = Math.Clamp(Clock.AccumulatorSeconds / Clock.FixedDeltaTime, 0d, 1d);
+        var time = FrameTime();
+        var deltaTime = (float)frameDeltaTime;
+        foreach (var system in systems)
+        {
+            system.AfterFixedTicks(alpha);
+        }
+
+        RunPhase(GameLoopPhase.AfterFixedTicks, time);
         RunUpdate(deltaTime);
-        Lifetimes?.Host.Tick(SubsystemTickPhase.Frame, deltaTime);
+        RunPhase(GameLoopPhase.Update, time);
         Async.DrainUpdate();
         RunLateUpdate(deltaTime);
+        RunPhase(GameLoopPhase.LateUpdate, time);
         Async.DrainLateUpdate();
+
+        // Destruction requested by the presentation phases (update, late update, their async continuations) leaves
+        // here, before the frame is rendered. It cannot wait for the next fixed tick's flush: a paused clock, a zero
+        // time scale or a fast frame runs no tick, and the node would be drawn and updated after it was destroyed.
         FlushDestroyed();
+        RunPhase(GameLoopPhase.EndFrame, time);
         Lifetimes?.ApplyPendingRestart();
 
         InputSource?.NewFrame();
     }
 
-    /// <summary>Discards accumulated fixed-step time, e.g. after resuming from a pause.</summary>
-    public void ResetAccumulator() => Clock.ResetAccumulator();
+    LoopTime FrameTime() => new(Clock.TickIndex, frameDeltaTime, frameUnscaledDeltaTime, alpha);
+
+    void RunPhase(GameLoopPhase phase, in LoopTime time) => Lifetimes?.Host.Run(phase, in time);
 
     void CollectRoots()
     {
@@ -188,31 +273,31 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
     void RunFixedTick(long tick, double interval)
     {
-        var simulation = Simulation;
-        if (simulation is not null && !ReferenceEquals(simulation.Clock, Clock))
+        var world = simulation;
+        if (world is not null && !ReferenceEquals(world.Clock, Clock))
         {
             throw new InvalidOperationException("The scene and simulation must share one clock.");
         }
 
+        var time = new LoopTime(tick, interval, interval, 0d);
         RunFixedUpdate((float)interval);
-        foreach (var system in Systems)
+        foreach (var system in systems)
         {
             system.FixedTick(tick, interval);
         }
 
-        RunLifetimesFixedTick(tick, interval);
-        simulation?.RunTick(tick, interval);
-        (DataAssets ?? Lifetimes?.DataAssets)?.Drain();
-        FlushDestroyed();
-    }
-
-    void RunLifetimesFixedTick(long tick, double interval)
-    {
-        if (Lifetimes?.Host is { } host)
+        RunPhase(GameLoopPhase.FixedTick, time);
+        world?.RunTick(tick, interval);
+        RunPhase(GameLoopPhase.FixedCommit, time);
+        if (dataAssets is { } assets && !ReferenceEquals(assets, Lifetimes?.DataAssets))
         {
-            host.FixedTick(tick, interval);
-            host.Tick(SubsystemTickPhase.Fixed, (float)interval);
+            assets.Drain();
         }
+
+        // Destruction requested during this tick leaves with it, before the next catch-up tick. Waiting for the
+        // frame-end flush would let a node destroyed in tick n run in tick n + 1 only on frames that catch up, so
+        // the simulation would depend on the frame rate.
+        FlushDestroyed();
     }
 
     // Applies the destructions requested since the last boundary, root by root in scene order. Fixed-tick requests flush
@@ -225,25 +310,11 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         }
     }
 
-    void RunAfterFixedTicks()
-    {
-        if (Systems.Count == 0 && Lifetimes is null)
-        {
-            return;
-        }
-
-        var alpha = Math.Clamp(Clock.AccumulatorSeconds / Clock.FixedDeltaTime, 0d, 1d);
-        foreach (var system in Systems)
-        {
-            system.AfterFixedTicks(alpha);
-        }
-
-        Lifetimes?.Host.AfterFixedTicks(alpha);
-    }
-
     void PublishCompletedTick()
     {
-        Simulation?.PublishCompletedTick();
+        simulation?.PublishCompletedTick();
+        RunPhase(GameLoopPhase.TickCompleted,
+            new LoopTime(Clock.TickIndex, Clock.FixedDeltaTime, Clock.FixedDeltaTime, 0d));
         Async.CompleteFixedStep(Clock.FixedDeltaTime);
     }
 

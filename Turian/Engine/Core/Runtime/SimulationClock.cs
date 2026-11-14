@@ -48,6 +48,10 @@ public sealed class SimulationClock
     public bool IsFaulted { get; private set; }
 
     /// <summary>Freezes automatic ticks while preserving speed and accumulated time.</summary>
+    /// <remarks>
+    /// The frame phases keep running with a zero delta, so input, UI and presentation stay live. The Studio's pause
+    /// button goes further and skips the frame entirely; see <c>PlayModeService.Pause</c>.
+    /// </remarks>
     public bool IsPaused { get; set; }
 
     /// <summary>Multiplier for incoming simulation time; zero freezes automatic ticks and backlog.</summary>

@@ -163,15 +163,7 @@ public sealed class GameRuntime : IDisposable
 
         ComposeLifetimes(context.BuildServices(registrations));
         Actions = Services.GetRequiredService<InputActionService>();
-        Ticker = new SceneTicker(Scenes, clock)
-        {
-            Async = Services.GetRequiredService<GameLoopScheduler>(),
-            Lifetimes = Lifetimes,
-            Simulation = Services.GetService<SimulationSession>(),
-            Systems = [.. Services.GetServices<IFixedTickSystem>()],
-            InputSource = Services.GetRequiredService<IInputSource>(),
-            Actions = Actions,
-        };
+        Ticker = SceneTicker.Compose(Services, Lifetimes);
 
         LoadActionMaps(loader);
         Services.GetRequiredService<ApplicationLifetime>().Start();
@@ -198,8 +190,8 @@ public sealed class GameRuntime : IDisposable
             .AddSingleton(clock)
             .AddSingleton<GameLoopScheduler>()
             .AddSingleton(input ?? host?.Input ?? new BufferedInputSource())
-            .AddSingleton(static sp => new InputActionService(sp.GetRequiredService<IInputSource>()))
-            .AddSingleton<IInputActions>(static sp => sp.GetRequiredService<InputActionService>())
+            .AddInputActions()
+            .AddSimulationLoop()
             .AddSingleton<ApplicationLifetime>();
         if (host is not null)
         {

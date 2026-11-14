@@ -53,6 +53,15 @@ public sealed class PlayModeService(
     /// <summary>The current session's hydrated gameplay assets and diagnostics, or null outside Play Mode.</summary>
     public DataAssetSession? DataAssets => lifetimes?.DataAssets;
 
+    /// <summary>
+    /// Registers extra services for each session after the project's own, as <see cref="GameRuntime.Start(GamePlayerContext, IInputSource, Action{IServiceCollection})"/>
+    /// does for a standalone game; game modules are added after them.
+    /// </summary>
+    public Action<IServiceCollection>? ConfigureServices { get; init; }
+
+    /// <summary>The running session's fixed tick interval, or the engine default outside play mode, in seconds.</summary>
+    public double FixedDeltaTime => ticker?.Clock.FixedDeltaTime ?? SceneTicker.FixedTimestep;
+
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event Action<PlayState>? StateChanged;
 
@@ -153,15 +162,7 @@ public sealed class PlayModeService(
         }
 
         PlayRoot = clone;
-        ticker = new SceneTicker(sceneManager, playServices.GetRequiredService<SimulationClock>())
-        {
-            Async = playServices.GetRequiredService<GameLoopScheduler>(),
-            Lifetimes = lifetimes,
-            Simulation = playServices.GetService<SimulationSession>(),
-            Systems = [.. playServices.GetServices<IFixedTickSystem>()],
-            InputSource = Input,
-            Actions = playServices.GetService<InputActionService>(),
-        };
+        ticker = SceneTicker.Compose(playServices, lifetimes!);
         playSceneManager = sceneManager;
         clock.Restart();
         lastTickSeconds = 0d;
@@ -176,6 +177,12 @@ public sealed class PlayModeService(
     }
 
     /// <summary>Freezes the running session. No-op unless currently playing.</summary>
+    /// <remarks>
+    /// The Studio's pause skips whole frames: while paused, <see cref="Tick()"/> runs no game-loop phase at all and
+    /// only pumps cancellations, so the session is inspected exactly as it stopped. That differs on purpose from
+    /// pausing the clock in a running game (<see cref="SimulationClock.IsPaused"/>), where every frame phase still
+    /// runs with a zero delta and only the fixed ticks stop.
+    /// </remarks>
     public void Pause()
     {
         if (State != PlayState.Playing)
@@ -416,8 +423,8 @@ public sealed class PlayModeService(
             .AddSingleton<ISessionLifetime>(_ => lifetimes!)
             .AddSingleton<IAssetLoader>(_ => new RuntimeAssetLoader(assetDatabase, () => DataAssets))
             .AddSingleton<IInputSource>(Input)
-            .AddSingleton(_ => new InputActionService(Input))
-            .AddSingleton<IInputActions>(sp => sp.GetRequiredService<InputActionService>());
+            .AddInputActions()
+            .AddSimulationLoop();
 
         // Scripts may ask for the backend's own device type as well as the neutral contract.
         if (editorServices.GetService(typeof(IRenderDevice)) is IRenderDevice device)
@@ -426,6 +433,7 @@ public sealed class PlayModeService(
         }
 
         AddProjectServices(services);
+        ConfigureServices?.Invoke(services);
 
         if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
         {
