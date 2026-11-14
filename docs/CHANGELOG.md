@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-14
+
 - Changed (breaking): Editor Core link no renderer or GUI.
 - Changed (breaking): the game loop runs named phases that subsystems join with `IGameLoopSubsystem`.
 - Changed: `BricksSettings` moved to the editor.
@@ -222,7 +224,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v4.1.2...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/MASS4ORG/Turian/compare/v4.1.2...v5.0.0
 [4.1.2]: https://github.com/MASS4ORG/Turian/compare/v4.1.1...v4.1.2
 [4.1.1]: https://github.com/MASS4ORG/Turian/compare/v4.1.0...v4.1.1
 [4.1.0]: https://github.com/MASS4ORG/Turian/compare/v4.0.0...v4.1.0
