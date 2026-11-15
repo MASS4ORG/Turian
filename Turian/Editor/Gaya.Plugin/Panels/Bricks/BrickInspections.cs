@@ -73,29 +73,45 @@ static class BrickInspections
         return brick is null ? null : Brick(controller, brick, controller.Installed.FirstOrDefault(p => p.Id == brick.Id));
     }
 
-    /// <summary>Builds a manifest form without inventing missing metadata for registry-only entries.</summary>
+    /// <summary>
+    /// Builds a brick's form: its status, version and actions first, then the details a user chooses by, such as its
+    /// description and dependencies. Packaging internals, such as excluded files and bake settings, stay in its manifest.
+    /// </summary>
     public static FormInspection Brick(BricksController controller, CatalogBrick brick, ResolvedPackage? resolved)
     {
         var manifest = Manifest(brick, resolved);
         var model = InspectorForms.Build(manifest, readOnly: true);
-        var fields = model.Sections[0].Fields;
-        if (resolved is null && brick.Manifest is null)
-        {
-            fields = [.. fields.Where(f => f.Name is "Name" or "DisplayName" or "Description" or "Author" or "Version")];
-        }
-
-        var metadata = new FormSection($"Brick '{brick.DisplayName ?? brick.Id}'", manifest, fields);
-        var installation = new FormSection("Installation", manifest,
+        var summary = new FormSection($"Brick '{brick.DisplayName ?? brick.Id}'", manifest,
         [
-            FormField.Display("Latest", manifest, () => brick.LatestVersion ?? ""),
             FormField.Display("Status", manifest, () => Status(brick, resolved)),
-            FormField.Display("Origin", manifest, () => brick.Origin ?? ""),
-            FormField.Display("Installed At", manifest, () => resolved?.RootPath ?? ""),
-            FormField.Display("Needed By", manifest, () => controller.RequiredBy(brick.Id)),
+            FormField.Display("Version", manifest, () => Version(brick, manifest)),
+            FormField.Display("Id", manifest, () => brick.Id),
         ])
         { Buttons = Actions(controller, brick, resolved) };
-        return new FormInspection(manifest, model with { Sections = [metadata, installation] },
+        var details = new FormSection("Details", manifest,
+        [
+            .. Text("Description", manifest, manifest.Description),
+            .. Text("Author", manifest, manifest.Author),
+            .. Text("License", manifest, manifest.License),
+            .. Text("Keywords", manifest, string.Join(", ", manifest.Keywords)),
+            .. Text("Dependencies", manifest, string.Join(", ", manifest.Dependencies.Keys)),
+            .. Text("Needed By", manifest, string.Join(", ", controller.RequiredBy(brick.Id))),
+            .. Text("Origin", manifest, brick.Origin),
+            .. Text("Installed At", manifest, resolved?.RootPath),
+        ]);
+        return new FormInspection(manifest, model with { Sections = [summary, details] },
             $"brick:{brick.Id}", controller.WorkspaceRoot);
+    }
+
+    // A detail row only when there is something to show.
+    static IEnumerable<FormField> Text(string label, PackageManifest manifest, string? value) =>
+        string.IsNullOrWhiteSpace(value) ? [] : [FormField.Display(label, manifest, () => value)];
+
+    // The version in use or on offer, and the newer one when there is an update.
+    static string Version(CatalogBrick brick, PackageManifest manifest)
+    {
+        var current = brick.InstalledVersion ?? manifest.Version?.ToString() ?? brick.LatestVersion ?? "";
+        return brick.HasUpdate ? $"{current} ({brick.LatestVersion} available)" : current;
     }
 
     static PackageManifest Manifest(CatalogBrick brick, ResolvedPackage? resolved) =>
@@ -111,7 +127,7 @@ static class BrickInspections
     {
         BrickState.Enabled when resolved?.Origin == PackageOrigin.Embedded => "In use, local to the project",
         BrickState.Enabled => "In use",
-        BrickState.Installed => "On this machine, not in use",
+        BrickState.Installed => "Downloaded, not in use",
         _ => "Available",
     };
 

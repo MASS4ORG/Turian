@@ -22,13 +22,13 @@ public enum BrickFilter
     /// <summary>Every brick.</summary>
     All,
 
-    /// <summary>Installed bricks, enabled or not.</summary>
+    /// <summary>Bricks the project or studio uses.</summary>
     Installed,
 
-    /// <summary>Bricks not yet installed.</summary>
+    /// <summary>Bricks not in use, whether downloaded to this machine or not.</summary>
     Available,
 
-    /// <summary>Installed bricks with a newer version available.</summary>
+    /// <summary>Bricks in use with a newer version available.</summary>
     Updates,
 
     /// <summary>Bricks that ship with the host.</summary>
@@ -74,11 +74,11 @@ public sealed record CatalogBrick(string Id, string? DisplayName, string? Descri
     /// <summary>The complete manifest when this client has it; null for registry-only catalog entries.</summary>
     public PackageManifest? Manifest { get; init; }
 
-    /// <summary>Whether the brick is on this machine or in use.</summary>
-    public bool IsInstalled => State != BrickState.Available;
+    /// <summary>Whether the project or studio uses the brick; a download in the shared store alone is not an installation.</summary>
+    public bool IsInstalled => State == BrickState.Enabled;
 
-    /// <summary>Whether the newest known version is newer than the one on this machine or in use.</summary>
-    public bool HasUpdate => InstalledVersion is { } installed && LatestVersion is { } latest
+    /// <summary>Whether the brick is in use and the newest known version is newer than the one used.</summary>
+    public bool HasUpdate => IsInstalled && InstalledVersion is { } installed && LatestVersion is { } latest
                              && SemanticVersion.TryParse(installed, out var have) && SemanticVersion.TryParse(latest, out var newest)
                              && newest > have;
 }
@@ -99,9 +99,11 @@ public static class BrickCatalog
     /// <param name="store">The shared store, or null.</param>
     /// <param name="reserved">Category prefixes only hosts may use, passed when reading manifests.</param>
     /// <param name="scope">The workspace's scope.</param>
+    /// <param name="outOfScope">Receives the ids of bricks found that do not accept the scope, for <see cref="WithRegistries"/>.</param>
     /// <returns>One entry per brick id, by id.</returns>
     public static IReadOnlyList<CatalogBrick> Local(IReadOnlyList<ResolvedPackage> installed, string? builtinDirectory,
-        PackageStore? store, IReadOnlyCollection<string> reserved, PackageScope scope = PackageScope.Project)
+        PackageStore? store, IReadOnlyCollection<string> reserved, PackageScope scope = PackageScope.Project,
+        ISet<string>? outOfScope = null)
     {
         ArgumentNullException.ThrowIfNull(installed);
         ArgumentNullException.ThrowIfNull(reserved);
@@ -117,17 +119,31 @@ public static class BrickCatalog
             { Manifest = package.Manifest };
         }
 
-        foreach (var manifest in BuiltinBricks(builtinDirectory, reserved).Where(m => m.EffectiveScopes.Contains(scope)))
+        foreach (var manifest in BuiltinBricks(builtinDirectory, reserved))
         {
-            Offer(bricks, manifest, $"builtin:{manifest.Name}", null, stored: false);
+            if (manifest.EffectiveScopes.Contains(scope))
+            {
+                Offer(bricks, manifest, $"builtin:{manifest.Name}", null, stored: false);
+            }
+            else
+            {
+                _ = outOfScope?.Add(manifest.Name);
+            }
         }
 
         if (store is not null)
         {
-            foreach (var (folder, manifest) in store.Packages(reserved).Where(p => p.Manifest.EffectiveScopes.Contains(scope)))
+            foreach (var (folder, manifest) in store.Packages(reserved))
             {
-                var origin = store.ReadOrigin(folder);
-                Offer(bricks, manifest, origin, InstallSourceOf(origin, manifest), stored: true);
+                if (manifest.EffectiveScopes.Contains(scope))
+                {
+                    var origin = store.ReadOrigin(folder);
+                    Offer(bricks, manifest, origin, InstallSourceOf(origin, manifest), stored: true);
+                }
+                else
+                {
+                    _ = outOfScope?.Add(manifest.Name);
+                }
             }
         }
 
@@ -137,9 +153,10 @@ public static class BrickCatalog
     /// <summary>Adds what registries offer: bricks not seen yet become available, and newer versions mark updates.</summary>
     /// <param name="bricks">The catalog so far.</param>
     /// <param name="found">The registry, id and newest version of each brick the registries list.</param>
+    /// <param name="outOfScope">Ids known not to accept the workspace's scope, which a registry cannot make available.</param>
     /// <returns>The merged catalog.</returns>
     public static IReadOnlyList<CatalogBrick> WithRegistries(IReadOnlyList<CatalogBrick> bricks,
-        IEnumerable<(string Registry, string Id, string Latest)> found)
+        IEnumerable<(string Registry, string Id, string Latest)> found, IReadOnlySet<string>? outOfScope = null)
     {
         ArgumentNullException.ThrowIfNull(bricks);
         ArgumentNullException.ThrowIfNull(found);
@@ -147,7 +164,8 @@ public static class BrickCatalog
         var merged = bricks.ToDictionary(static b => b.Id, StringComparer.Ordinal);
         foreach (var (registry, id, latest) in found)
         {
-            if (!PackageId.IsValid(id) || !SemanticVersion.TryParse(latest, out var version))
+            if (!PackageId.IsValid(id) || !SemanticVersion.TryParse(latest, out var version)
+                || (outOfScope?.Contains(id) == true && !merged.ContainsKey(id)))
             {
                 continue;
             }
@@ -173,7 +191,7 @@ public static class BrickCatalog
     /// <summary>Narrows a catalog to a filter, a content category and a search text.</summary>
     /// <param name="bricks">The catalog.</param>
     /// <param name="filter">Which group to keep.</param>
-    /// <param name="search">Text the id, name or author must contain; everything when empty.</param>
+    /// <param name="search">Text the id, name, author or description must contain; everything when empty.</param>
     /// <param name="category">Which kind of content to keep; registry-only entries match only <see cref="BrickCategoryFilter.All"/>.</param>
     /// <returns>The matching bricks, in order.</returns>
     public static IReadOnlyList<CatalogBrick> Filter(IEnumerable<CatalogBrick> bricks, BrickFilter filter, string? search,
@@ -194,7 +212,7 @@ public static class BrickCatalog
                 .Where(b => category == BrickCategoryFilter.All
                             || b.Manifest?.Categories.Contains(CategoryName(category), StringComparer.Ordinal) == true)
                 .Where(b => string.IsNullOrWhiteSpace(search)
-                            || new[] { b.Id, b.DisplayName, b.Author }.Any(text =>
+                            || new[] { b.Id, b.DisplayName, b.Author, b.Description }.Any(text =>
                                 text?.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase) == true)),
         ];
     }

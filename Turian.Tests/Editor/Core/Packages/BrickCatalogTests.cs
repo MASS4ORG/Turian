@@ -116,6 +116,58 @@ public sealed class BrickCatalogTests : IDisposable
         Assert.Empty(BrickCatalog.Filter(catalog, BrickFilter.Updates, null));
     }
 
+    /// <summary>Search finds a brick by what its description says, not only by its id, name or author.</summary>
+    [Fact]
+    public void SearchMatchesTheDescription()
+    {
+        var builtins = Path.Combine(root, "builtins");
+        var folder = BrickService.New(builtins, "user.mateo.mixer");
+        new PackageManifest { Name = "user.mateo.mixer", Version = SemanticVersion.Parse("1.0.0"), Description = "Plays Audio clips" }
+            .Save(folder);
+        _ = BrickService.New(builtins, "user.mateo.other");
+        var catalog = BrickCatalog.Local([], builtins, null, Reserved);
+
+        Assert.Equal(["user.mateo.mixer"], BrickCatalog.Filter(catalog, BrickFilter.All, "audio").Select(static b => b.Id));
+    }
+
+    /// <summary>A brick that is only downloaded is neither installed nor updatable, however new the registry's version is.</summary>
+    [Fact]
+    public void DownloadedBricksAreNeitherInstalledNorUpdatable()
+    {
+        var store = new PackageStore(Path.Combine(root, "store"));
+        Directory.CreateDirectory(store.Root);
+        Directory.Move(BrickService.New(root, "user.mateo.aside"), Path.Combine(store.Root, "user.mateo.aside@abc"));
+        var used = Resolved(BrickService.New(root, "user.mateo.used"));
+
+        var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([used], null, store, Reserved),
+            [("bricks.example", "user.mateo.aside", "9.0.0"), ("bricks.example", "user.mateo.used", "9.0.0")]);
+
+        Assert.Equal(["user.mateo.used"], BrickCatalog.Filter(catalog, BrickFilter.Installed, null).Select(static b => b.Id));
+        Assert.Equal(["user.mateo.aside"], BrickCatalog.Filter(catalog, BrickFilter.Available, null).Select(static b => b.Id));
+        Assert.Equal(["user.mateo.used"], BrickCatalog.Filter(catalog, BrickFilter.Updates, null).Select(static b => b.Id));
+    }
+
+    /// <summary>A registry cannot offer a brick the machine knows belongs to the other scope, since installing it would fail.</summary>
+    [Fact]
+    public void RegistriesDoNotOfferBricksOfAnotherScope()
+    {
+        var store = new PackageStore(Path.Combine(root, "store"));
+        Directory.CreateDirectory(store.Root);
+        var folder = BrickService.New(root, "user.mateo.studio");
+        new PackageManifest { Name = "user.mateo.studio", Version = SemanticVersion.Parse("1.0.0"), Scopes = [PackageScope.Studio] }
+            .Save(folder);
+        Directory.Move(folder, Path.Combine(store.Root, "user.mateo.studio@abc"));
+        var otherScope = new HashSet<string>();
+
+        var local = BrickCatalog.Local([], null, store, Reserved, PackageScope.Project, otherScope);
+        var project = BrickCatalog.WithRegistries(local,
+            [("bricks.example", "user.mateo.studio", "1.0.0"), ("bricks.example", "user.mateo.remote", "1.0.0")], otherScope);
+        var studio = BrickCatalog.Local([], null, store, Reserved, PackageScope.Studio);
+
+        Assert.Equal(["user.mateo.remote"], project.Select(static b => b.Id));
+        Assert.Equal(["user.mateo.studio"], studio.Select(static b => b.Id));
+    }
+
     static ResolvedPackage Resolved(string folder)
     {
         var manifest = PackageManifest.Load(folder, ["turian"]);

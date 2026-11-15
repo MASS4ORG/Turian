@@ -58,14 +58,14 @@ public sealed record ResolvedPackage(
 /// <summary>The packages a project installs, each after the packages it depends on, and the lock that pins them.</summary>
 /// <param name="Packages">The packages, dependencies first.</param>
 /// <param name="Lock">The lock file describing them.</param>
-public sealed record PackageResolution(IReadOnlyList<ResolvedPackage> Packages, LockFile Lock)
+public sealed partial record PackageResolution(IReadOnlyList<ResolvedPackage> Packages, LockFile Lock)
 {
     /// <summary>What the user should know about the resolution that did not stop it, such as a refused bake twin.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     /// <summary>
     /// Whether the per-user manifest override chose any package. Such a resolution is local to one machine, so its
-    /// lock must not replace the committed one.
+    /// overridden entries must not replace the committed ones; see <see cref="SharedLock"/>.
     /// </summary>
     public bool UsesUserOverride => Packages.Any(static p => p.IsOverridden);
 }

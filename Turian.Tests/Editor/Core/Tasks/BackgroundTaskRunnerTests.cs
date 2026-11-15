@@ -110,6 +110,25 @@ public sealed class BackgroundTaskRunnerTests
             && call.GetArguments()[3] is IOException));
     }
 
+    /// <summary>Work that never yields still leaves the caller's thread, so a click handler awaiting it cannot freeze the UI.</summary>
+    [Fact]
+    public async Task RunAsyncWorkLeavesTheCallersThread()
+    {
+        var runner = new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance);
+        using var gate = new ManualResetEventSlim();
+
+        var pending = runner.RunAsync(new BackgroundTaskSpec { Label = "Install brick" }, (_, _) =>
+        {
+            _ = gate.Wait(TimeSpan.FromSeconds(10));
+            return Task.CompletedTask;
+        });
+        var returnedWhileRunning = !pending.IsCompleted;
+        gate.Set();
+
+        Assert.Equal(BackgroundTaskStatus.Completed, await pending);
+        Assert.True(returnedWhileRunning);
+    }
+
     /// <summary>Background operations wait for required work and do not execute when that dependency failed.</summary>
     [Theory]
     [InlineData(true)]

@@ -98,7 +98,10 @@ public sealed class ProjectBrickWorkspace(string root, SettingsService? settings
     }
 }
 
-/// <summary>Supplies the open Turian project to the Bricks panel, and runs its operations as editor tasks.</summary>
+/// <summary>
+/// Supplies the open Turian project to the Bricks panel, and runs its operations as editor tasks that block the UI
+/// behind a progress overlay.
+/// </summary>
 /// <param name="settings">Tells which project is open.</param>
 /// <param name="runner">Runs operations as background tasks holding the project lock.</param>
 /// <param name="applier">Brings the open project in line after its bricks changed.</param>
@@ -132,7 +135,7 @@ public sealed class TurianProjectBricks(SettingsService settings, BackgroundTask
     {
         ArgumentNullException.ThrowIfNull(work);
         var status = await runner.RunAsync(
-            new BackgroundTaskSpec { Label = label, Kind = BackgroundTaskKind.Generic, Locks = EditorLocks.Project },
+            new BackgroundTaskSpec { Label = label, Kind = BackgroundTaskKind.Generic, Locks = EditorLocks.Project, BlocksUi = true },
             (progress, _) =>
             {
                 progress.Report(0, label);

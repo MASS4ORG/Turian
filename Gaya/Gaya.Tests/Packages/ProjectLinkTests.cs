@@ -129,6 +129,57 @@ public sealed class ProjectLinkTests : IDisposable
         Assert.Equal("../../checkout", manifest.Links["com.acme.rules"]);
     }
 
+    /// <summary>
+    /// Under a personal link, an update of another brick reaches the shared lock, while the linked brick and what only
+    /// its committed version needs keep their committed entries.
+    /// </summary>
+    [Fact]
+    public void PersonalLinksKeepTheirEntriesWhileOthersUpdate()
+    {
+        var committed = new LockFile
+        {
+            Dependencies =
+            {
+                ["com.acme.rules"] = Entry("1.0.0", "^1.0.0", "com.acme.helper"),
+                ["com.acme.helper"] = Entry("1.0.0", "^1.0.0"),
+                ["com.acme.shared"] = Entry("1.0.1", "^1.0.0"),
+            },
+        };
+        var resolved = new LockFile
+        {
+            Dependencies =
+            {
+                ["com.acme.rules"] = new LockEntry { Version = SemanticVersion.Parse("1.1.0"), Link = "../../personal" },
+                ["com.acme.shared"] = Entry("1.0.2", "^1.0.0"),
+            },
+        };
+        var resolution = new PackageResolution([Package("com.acme.rules", "1.1.0", overridden: true),
+            Package("com.acme.shared", "1.0.2", overridden: false)], resolved);
+
+        var shared = resolution.SharedLock(committed);
+
+        Assert.Same(committed.Dependencies["com.acme.rules"], shared.Dependencies["com.acme.rules"]);
+        Assert.Same(committed.Dependencies["com.acme.helper"], shared.Dependencies["com.acme.helper"]);
+        Assert.Equal(SemanticVersion.Parse("1.0.2"), shared.Dependencies["com.acme.shared"].Version);
+        Assert.Same(resolved, (resolution with { Packages = [Package("com.acme.shared", "1.0.2", overridden: false)] })
+            .SharedLock(committed));
+    }
+
+    static LockEntry Entry(string version, string source, params string[] dependencies)
+    {
+        var entry = new LockEntry { Version = SemanticVersion.Parse(version), Source = source };
+        foreach (var dependency in dependencies)
+        {
+            entry.Dependencies[dependency] = "^1.0.0";
+        }
+
+        return entry;
+    }
+
+    static ResolvedPackage Package(string id, string version, bool overridden) =>
+        new(id, new PackageManifest { Name = id, Version = SemanticVersion.Parse(version) }, "", PackageOrigin.Registry,
+            "^1.0.0", null, null, 1, overridden);
+
     /// <summary>A failed manifest save restores an embedded brick and leaves the shared declarations intact.</summary>
     [Theory]
     [InlineData(false)]

@@ -500,10 +500,7 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         var workspace = Workspace;
         installed = bricks;
         LoadRegistryCache(workspace?.Root);
-        Catalog = workspace is null
-            ? []
-            : WithUnresolved(BrickCatalog.WithRegistries(BrickCatalog.Local(bricks, workspace.BuiltinDirectory, Store,
-                workspace.ReservedCategoryPrefixes, workspace.Scope), registryBricks), workspace.Root, bricks);
+        Catalog = workspace is null ? [] : BuildCatalog(workspace, bricks);
         Rows =
         [
             .. bricks.Select(p => new BrickRow(p.Id, p.Version.ToString(), p.Manifest.DisplayName, p.Origin, p.Source,
@@ -518,6 +515,15 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
 
         Revision++;
         Changed?.Invoke();
+    }
+
+    // Registry entries carry no scope, so a brick known on this machine to belong to the other scope is not offered.
+    IReadOnlyList<CatalogBrick> BuildCatalog(IBrickWorkspace workspace, IReadOnlyList<ResolvedPackage> bricks)
+    {
+        var otherScope = new HashSet<string>(StringComparer.Ordinal);
+        var local = BrickCatalog.Local(bricks, workspace.BuiltinDirectory, Store, workspace.ReservedCategoryPrefixes,
+            workspace.Scope, otherScope);
+        return WithUnresolved(BrickCatalog.WithRegistries(local, registryBricks, otherScope), workspace.Root, bricks);
     }
 
     /// <summary>

@@ -214,8 +214,8 @@ public sealed class BricksControllerTests : IDisposable
         controller.Refresh();
         controller.Selected = "user.mateo.stored";
         var form = controller.InspectSelection()!;
-        Assert.Equal("On this machine, not in use", form.Model.Sections[1].Fields.Single(static f => f.Name == "Status").GetValue());
-        Assert.Equal(["Enable", "Uninstall"], form.Model.Sections[1].Buttons.Select(static b => b.Label));
+        Assert.Equal("Downloaded, not in use", form.Model.Sections[0].Fields.Single(static f => f.Name == "Status").GetValue());
+        Assert.Equal(["Enable", "Uninstall"], form.Model.Sections[0].Buttons.Select(static b => b.Label));
         Assert.True(await controller.UninstallAsync("user.mateo.stored"), controller.Error);
         Assert.False(Directory.Exists(stored));
     }
@@ -258,29 +258,32 @@ public sealed class BricksControllerTests : IDisposable
         controller.Refresh();
         controller.Selected = ProjectPackages.RenderBrick;
         Assert.Equal(["Disable", "Update", "Make Local"],
-            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(static b => b.Label));
+            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[0].Buttons.Select(static b => b.Label));
 
-        Assert.Equal("In use", controller.InspectSelection()!.Model.Sections[1].Fields
+        Assert.Equal("In use", controller.InspectSelection()!.Model.Sections[0].Fields
             .Single(static f => f.Name == "Status").GetValue());
 
         Assert.True(await controller.DisableAsync(ProjectPackages.RenderBrick));
         controller.Selected = ProjectPackages.RenderBrick;
         var available = Assert.IsType<FormInspection>(controller.InspectSelection());
         Assert.Equal(ProjectPackages.RenderBrick, Assert.IsType<PackageManifest>(available.Target).Name);
-        Assert.Equal("Available", available.Model.Sections[1].Fields.Single(static f => f.Name == "Status").GetValue());
-        Assert.Equal("Enable", Assert.Single(available.Model.Sections[1].Buttons).Label);
+        Assert.Equal("Available", available.Model.Sections[0].Fields.Single(static f => f.Name == "Status").GetValue());
+        Assert.Equal("Enable", Assert.Single(available.Model.Sections[0].Buttons).Label);
 
         var made = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.rules");
         controller.Refresh();
         controller.Selected = "user.mateo.rules";
         Assert.Equal(["Revert To Global", "Uninstall"],
-            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(static b => b.Label));
-        Assert.Equal("In use, local to the project", controller.InspectSelection()!.Model.Sections[1].Fields
+            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[0].Buttons.Select(static b => b.Label));
+        Assert.Equal("In use, local to the project", controller.InspectSelection()!.Model.Sections[0].Fields
             .Single(static f => f.Name == "Status").GetValue());
         Assert.True(Directory.Exists(made));
     }
 
-    /// <summary>The inspector form of a brick is read-only manifest fields and the buttons of its state.</summary>
+    /// <summary>
+    /// A brick's form leads with its status, version and actions, then read-only details; packaging internals such as
+    /// excluded files are left out.
+    /// </summary>
     [Fact]
     public void ManifestsBuildAnInspectorForm()
     {
@@ -290,12 +293,14 @@ public sealed class BricksControllerTests : IDisposable
         var inspection = Assert.IsType<FormInspection>(controller.InspectSelection());
         Assert.Same(controller.SelectedBrick!.Manifest, inspection.Target);
         var model = inspection.Model;
-        Assert.Equal(2, model.Sections.Count);
-        var section = model.Sections[0];
-        Assert.Equal("Brick 'Vulkan Renderer'", section.Title);
-        Assert.All(section.BodyFields, static f => Assert.True(f.IsReadOnly));
-        Assert.Contains(section.BodyFields, static f => f.Label == "Name");
-        Assert.Equal(["Disable", "Update", "Make Local"], model.Sections[1].Buttons.Select(static b => b.Label));
+        Assert.Equal(["Brick 'Vulkan Renderer'", "Details"], model.Sections.Select(static s => s.Title));
+        var summary = model.Sections[0];
+        Assert.Equal(["Status", "Version", "Id"], summary.BodyFields.Select(static f => f.Label));
+        Assert.Equal(controller.SelectedBrick.Version.ToString(), summary.BodyFields[1].GetValue());
+        Assert.Equal(["Disable", "Update", "Make Local"], summary.Buttons.Select(static b => b.Label));
+        var fields = model.Sections.SelectMany(static s => s.BodyFields).ToList();
+        Assert.All(fields, static f => Assert.True(f.IsReadOnly));
+        Assert.DoesNotContain(fields, static f => f.Label is "Exclude" or "Nuget" or "Roles" or "Bake");
     }
 
     /// <summary>A registry saved with only its address takes its name and keys from the registry without a scope filter.</summary>

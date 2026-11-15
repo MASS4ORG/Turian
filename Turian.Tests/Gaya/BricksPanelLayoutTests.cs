@@ -125,6 +125,33 @@ public sealed class BricksPanelLayoutTests : IDisposable
         Assert.Equal(BrickScope.Studio, controller.Scope);
     }
 
+    /// <summary>Narrowing the list scrolls it back to the top, so a shorter list is never drawn above the visible area.</summary>
+    [Fact]
+    public async Task NarrowingTheListScrollsToTheTop()
+    {
+        var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "game")))!;
+        var settings = new SettingsService();
+        settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
+        var controller = TestBricks.Controller(settings,
+            new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
+            Substitute.For<IBrickApplier>());
+        var panel = new BricksPanel(controller);
+        var gui = new Gui { Input = Substitute.For<IInputHandler>() };
+        using var surface = SKSurface.Create(new SKImageInfo(400, 300));
+        var font = Font.FromFamilyName("sans-serif", 14);
+        void Render() => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        Render();
+        var scroll = gui.GetScrollState("bricks/list")!;
+        scroll.ScrollOffset = new Vector2(0, 5000);
+
+        Render();
+        Assert.Equal(5000, scroll.ScrollOffset.Y);
+        panel.Category = BrickCategoryFilter.Themes;
+        Render();
+
+        Assert.Equal(0, scroll.ScrollOffset.Y);
+    }
+
     static IEnumerable<LayoutNode> Descendants(LayoutNode node)
     {
         yield return node;

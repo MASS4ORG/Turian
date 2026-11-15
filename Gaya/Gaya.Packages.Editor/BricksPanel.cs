@@ -2,7 +2,7 @@ namespace Gaya.Packages.Editor;
 
 /// <summary>
 /// The Bricks panel: one searchable list of every brick the studio or the open project could use, grouped by how far it
-/// is from being used (in use, on this machine, available), and a second tab for the registries bricks come from; a
+/// is from being used (in use, available), and a second tab for the registries bricks come from; a
 /// Studio and Project filter on the same row chooses whose. A checkbox turns a brick on or off; selecting a row shows
 /// the brick or registry in the inspector, which is where its details and actions are. It draws
 /// <see cref="BricksController"/> and holds no logic of its own.
@@ -49,6 +49,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     Vector2 pointer;
     Vector2 menuAt;
     int seenRevision = -1;
+    (BrickFilter, string, BrickCategoryFilter) listedView;
 
     static ThemeTokens Theme => ThemeTokens.Current;
 
@@ -433,12 +434,22 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     void List(Gui gui)
     {
         var shown = BrickCatalog.Filter(controller.Catalog, filter, search, Category);
-        using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
+        using (gui.Node(id: "bricks/list").Expand().Direction(Axis.Vertical).Gap(2f).Enter())
         {
+            // A shorter list keeps the old scroll offset, which would draw the matches above the visible area.
+            var view = (filter, search.Trim(), Category);
+            if (view != listedView)
+            {
+                listedView = view;
+                if (gui.GetScrollState(gui.CurrentNode.Id) is { } scroll)
+                {
+                    scroll.ScrollOffset = Vector2.Zero;
+                }
+            }
+
             gui.ScrollY();
             Group(gui, "In use", shown.Where(static b => b.State == BrickState.Enabled));
-            Group(gui, "On this machine", shown.Where(static b => b.State == BrickState.Installed));
-            Group(gui, "Available", shown.Where(static b => b.State == BrickState.Available));
+            Group(gui, "Available", shown.Where(static b => b.State != BrickState.Enabled));
             if (shown.Count == 0)
             {
                 Line(gui, "No bricks match.", Theme.InkDim);
