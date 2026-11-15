@@ -468,6 +468,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         RenderOverlays(gui);
 
+        // Panels queue notifications while drawing; they show above the panels and below a blocking task.
+        gui.Toasts();
+
         RenderBlocker(gui);
 
         if (gui.Pass != Pass.Pass2Render)

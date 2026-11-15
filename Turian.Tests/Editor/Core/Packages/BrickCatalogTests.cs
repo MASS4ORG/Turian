@@ -77,7 +77,7 @@ public sealed class BrickCatalogTests : IDisposable
         Directory.Move(BrickService.New(root, "user.mateo.old"), unrecorded);
 
         var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([], null, store, Reserved),
-            [("bricks.example", "user.mateo.old", "0.1.0")]).ToDictionary(static b => b.Id);
+            [Listing("user.mateo.old", "0.1.0")]).ToDictionary(static b => b.Id);
 
         Assert.Equal("^0.1.0", catalog["user.mateo.fetched"].InstallSource);
         Assert.Equal("^0.1.0", catalog["user.mateo.old"].InstallSource);
@@ -91,8 +91,7 @@ public sealed class BrickCatalogTests : IDisposable
         var used = Resolved(BrickService.New(root, "user.mateo.used"));
         var local = BrickCatalog.Local([used], null, null, Reserved);
 
-        var catalog = BrickCatalog.WithRegistries(local,
-            [("bricks.example", "user.mateo.used", "9.0.0"), ("bricks.example", "user.mateo.remote", "1.2.0")])
+        var catalog = BrickCatalog.WithRegistries(local, [Listing("user.mateo.used", "9.0.0"), Listing("user.mateo.remote", "1.2.0")])
             .ToDictionary(static b => b.Id);
 
         Assert.True(catalog["user.mateo.used"].HasUpdate);
@@ -140,33 +139,79 @@ public sealed class BrickCatalogTests : IDisposable
         var used = Resolved(BrickService.New(root, "user.mateo.used"));
 
         var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([used], null, store, Reserved),
-            [("bricks.example", "user.mateo.aside", "9.0.0"), ("bricks.example", "user.mateo.used", "9.0.0")]);
+            [Listing("user.mateo.aside", "9.0.0"), Listing("user.mateo.used", "9.0.0")]);
 
         Assert.Equal(["user.mateo.used"], BrickCatalog.Filter(catalog, BrickFilter.Installed, null).Select(static b => b.Id));
         Assert.Equal(["user.mateo.aside"], BrickCatalog.Filter(catalog, BrickFilter.Available, null).Select(static b => b.Id));
         Assert.Equal(["user.mateo.used"], BrickCatalog.Filter(catalog, BrickFilter.Updates, null).Select(static b => b.Id));
     }
 
-    /// <summary>A registry cannot offer a brick the machine knows belongs to the other scope, since installing it would fail.</summary>
+    /// <summary>
+    /// A brick that exists only in a registry is listed with the store's name and scopes, so searching its name finds
+    /// it, and a brick of the other scope is told apart rather than hidden.
+    /// </summary>
     [Fact]
-    public void RegistriesDoNotOfferBricksOfAnotherScope()
+    public void RegistryOnlyBricksAreFoundByTheirPresentation()
+    {
+        var studioOnly = new PackageManifest
+        {
+            Name = "user.mateo.inspector",
+            Version = SemanticVersion.Parse("1.0.2"),
+            DisplayName = "Wire Inspector",
+            Description = "Traces events",
+            Scopes = [PackageScope.Studio],
+        };
+
+        var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([], null, null, Reserved),
+            [Listing("user.mateo.inspector", "1.0.2", "1.0.1") with { ManifestJson = studioOnly.ToJson() }], Reserved);
+
+        var found = Assert.Single(BrickCatalog.Filter(catalog, BrickFilter.All, "wire insp"));
+        Assert.Equal("Wire Inspector", found.DisplayName);
+        Assert.Equal(BrickState.Available, found.State);
+        Assert.False(found.Accepts(PackageScope.Project));
+        Assert.True(found.Accepts(PackageScope.Studio));
+        Assert.Equal(["1.0.2", "1.0.1"], found.Versions.Select(static v => v.Version));
+    }
+
+    /// <summary>A newer registry presentation replaces the name a stored copy carried, so renaming it upstream shows on refresh.</summary>
+    [Fact]
+    public void RegistryPresentationRenamesStoredBricks()
     {
         var store = new PackageStore(Path.Combine(root, "store"));
         Directory.CreateDirectory(store.Root);
-        var folder = BrickService.New(root, "user.mateo.studio");
-        new PackageManifest { Name = "user.mateo.studio", Version = SemanticVersion.Parse("1.0.0"), Scopes = [PackageScope.Studio] }
-            .Save(folder);
-        Directory.Move(folder, Path.Combine(store.Root, "user.mateo.studio@abc"));
-        var otherScope = new HashSet<string>();
+        Directory.Move(BrickService.New(root, "user.mateo.look"), Path.Combine(store.Root, "user.mateo.look@abc"));
+        var renamed = new PackageManifest { Name = "user.mateo.look", Version = SemanticVersion.Parse("0.2.0"), DisplayName = "Retro Look" };
 
-        var local = BrickCatalog.Local([], null, store, Reserved, PackageScope.Project, otherScope);
-        var project = BrickCatalog.WithRegistries(local,
-            [("bricks.example", "user.mateo.studio", "1.0.0"), ("bricks.example", "user.mateo.remote", "1.0.0")], otherScope);
-        var studio = BrickCatalog.Local([], null, store, Reserved, PackageScope.Studio);
+        var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([], null, store, Reserved),
+            [Listing("user.mateo.look", "0.2.0") with { ManifestJson = renamed.ToJson() }], Reserved);
 
-        Assert.Equal(["user.mateo.remote"], project.Select(static b => b.Id));
-        Assert.Equal(["user.mateo.studio"], studio.Select(static b => b.Id));
+        Assert.Equal("Retro Look", Assert.Single(catalog).DisplayName);
     }
+
+    /// <summary>A bake twin published under an id of its own is a form of its source, listed in the source's row.</summary>
+    [Fact]
+    public void TwinsWithTheirOwnIdJoinTheirSource()
+    {
+        var store = new PackageStore(Path.Combine(root, "store"));
+        Directory.CreateDirectory(store.Root);
+        Directory.Move(BrickService.New(root, "user.mateo.save"), Path.Combine(store.Root, "user.mateo.save@a"));
+        var twin = BrickService.New(root, "user.mateo.save.bake");
+        new PackageManifest
+        {
+            Name = "user.mateo.save.bake",
+            Version = SemanticVersion.Parse("0.1.0"),
+            BakeOf = new PackageBakeOf { Brick = "user.mateo.save", Version = SemanticVersion.Parse("0.1.0"), Integrity = "sha256-x" },
+        }.Save(twin);
+        Directory.Move(twin, Path.Combine(store.Root, "user.mateo.save.bake@b"));
+
+        var brick = Assert.Single(BrickCatalog.Local([], null, store, Reserved));
+
+        Assert.Equal("user.mateo.save", brick.Id);
+        Assert.Equal(["bake", "source"], brick.Downloads.Select(static d => d.Variant).Order(StringComparer.Ordinal));
+    }
+
+    static RegistryListing Listing(string id, params string[] versions) =>
+        new("bricks.example", id, [.. versions.Select(static v => new ListedVersion(v, Yanked: false))]);
 
     static ResolvedPackage Resolved(string folder)
     {

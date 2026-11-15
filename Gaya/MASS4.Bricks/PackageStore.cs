@@ -101,6 +101,34 @@ public sealed class PackageStore(string root)
         return folders.Count;
     }
 
+    /// <summary>Deletes one stored version, with its recorded origin. Every project on the machine loses that version.</summary>
+    /// <param name="folder">A package folder directly inside the store.</param>
+    /// <returns>Whether the folder existed and was deleted.</returns>
+    /// <exception cref="PackageException">The folder is not a package folder of this store.</exception>
+    public bool Delete(string folder)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folder);
+        var full = Path.GetFullPath(folder);
+        if (!string.Equals(Path.GetDirectoryName(full), Path.TrimEndingDirectorySeparator(Root), StringComparison.Ordinal)
+            || Path.GetFileName(full).StartsWith('.'))
+        {
+            throw new PackageException($"{folder} is not a package folder of the store {Root}.");
+        }
+
+        if (!Directory.Exists(full))
+        {
+            return false;
+        }
+
+        DeleteReadOnly(full);
+        if (File.Exists(OriginPath(full)))
+        {
+            File.Delete(OriginPath(full));
+        }
+
+        return true;
+    }
+
     string OriginPath(string folder) => Path.Combine(Root, ".origins", $"{Path.GetFileName(folder)}.txt");
 
     /// <summary>The store folder of a package at a git commit.</summary>

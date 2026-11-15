@@ -290,7 +290,10 @@ public sealed class BricksControllerRaceTests : IDisposable
 
         public void ReleaseSearch() => searchGate.TrySetResult();
 
-        public async Task<IReadOnlyList<(string Registry, string Id, string Latest)>> SearchAsync(string query)
+        public Task<IReadOnlyList<(string Registry, string Id, string Latest)>> SearchAsync(string query) =>
+            Task.FromResult<IReadOnlyList<(string, string, string)>>([]);
+
+        public async Task<RegistryCatalog> ListAsync()
         {
             bool hold;
             lock (sync)
@@ -305,7 +308,7 @@ public sealed class BricksControllerRaceTests : IDisposable
                 await searchGate.Task.ConfigureAwait(false);
             }
 
-            return [];
+            return new RegistryCatalog([], []);
         }
 
         public void Restore()

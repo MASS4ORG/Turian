@@ -241,7 +241,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
 }
 
 /// <summary>Registry checks and searches shared by every brick workspace.</summary>
-public static class BrickRegistries
+public static partial class BrickRegistries
 {
     /// <summary>Checks a registry's name, address, optional scope filters and explicit signing trust.</summary>
     /// <param name="registry">The registry.</param>

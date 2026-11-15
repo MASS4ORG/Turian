@@ -146,6 +146,62 @@ public static class ProjectBricks
         return trash;
     }
 
+    /// <summary>
+    /// Stops linking a brick to a local folder, in this machine's override files and in the shared manifest, so the
+    /// brick comes from its declared source again. The linked folder is left as it is.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <returns>Whether any file linked it.</returns>
+    /// <exception cref="PackageException">A file is not a valid manifest.</exception>
+    public static bool Unlink(string projectRoot, string id)
+    {
+        var directory = Path.Combine(projectRoot, ProjectManifest.DirectoryName);
+        var personal = RemoveLink(Path.Combine(directory, ProjectManifest.UserFileName), id)
+                       | RemoveLink(Path.Combine(directory, ProjectManifest.LinksFileName), id);
+        var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
+        if (!manifest.Links.Remove(id))
+        {
+            return personal;
+        }
+
+        manifest.Save(projectRoot);
+        return true;
+    }
+
+    // Removes one entry of a file's "links" object, keeping the rest of the file as written.
+    static bool RemoveLink(string path, string id)
+    {
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        JsonObject node;
+        try
+        {
+            node = JsonNode.Parse(File.ReadAllText(path), documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip })?.AsObject()
+                ?? throw new PackageException($"{path} is not a valid project manifest.");
+        }
+        catch (JsonException ex)
+        {
+            throw new PackageException($"{path} is not a valid project manifest: {ex.Message}", ex);
+        }
+
+        if (node["links"] is not JsonObject links || !links.Remove(id))
+        {
+            return false;
+        }
+
+        if (links.Count == 0)
+        {
+            _ = node.Remove("links");
+        }
+
+        File.WriteAllText(path, node.ToJsonString(PackageJson.Options));
+        return true;
+    }
+
     static void CopyDirectory(string source, string target)
     {
         Directory.CreateDirectory(target);

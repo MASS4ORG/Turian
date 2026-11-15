@@ -225,15 +225,19 @@ public sealed class BricksControllerTests : IDisposable
     public void CatalogListsRegistryBricksFromTheCache()
     {
         var cache = Path.Combine(controller.Store.Root, ".registry-cache",
-            $"{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(project)))[..16]}.json");
+            $"{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(project)))[..16]}.listings.json");
         Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
-        File.WriteAllText(cache, """[{"Registry":"bricks.example","Id":"user.mateo.remote","Latest":"1.2.0"}]""");
+        File.WriteAllText(cache, JsonSerializer.Serialize(new List<RegistryListing>
+        {
+            new("bricks.example", "user.mateo.remote", [new ListedVersion("1.2.0", Yanked: false), new ListedVersion("1.1.0", Yanked: false)]),
+        }, PackageJson.Options));
 
         controller.Refresh();
 
         var remote = controller.Catalog.Single(static b => b.Id == "user.mateo.remote");
         Assert.Equal(BrickState.Available, remote.State);
         Assert.Equal("registry:bricks.example", remote.Origin);
+        Assert.Equal(["1.2.0", "1.1.0"], remote.Versions.Select(static v => v.Version));
     }
 
     /// <summary>A stored brick whose origin nobody recorded is refused rather than declared with no source.</summary>

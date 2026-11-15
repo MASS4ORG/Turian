@@ -6,7 +6,10 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 static class TurianForms
 {
-    /// <summary>The plugin's custom editors (<c>[CustomEditor]</c> in this assembly) over Guinevere's defaults.</summary>
+    /// <summary>
+    /// The plugin's custom editors (<c>[CustomEditor]</c> in this assembly) over Guinevere's defaults, with read-only
+    /// text wrapping instead of being cut off.
+    /// </summary>
     public static FormDrawers Drawers { get; } = CreateDrawers();
 
     /// <summary>
@@ -33,6 +36,8 @@ static class TurianForms
     {
         var drawers = new FormDrawers();
         drawers.AddCustomEditors(typeof(TurianForms).Assembly);
+        _ = drawers.Add(WrappedTextDrawer.Takes, WrappedTextDrawer.Instance);
+        _ = drawers.Add(BrickVersionDrawer.Takes, BrickVersionDrawer.Instance);
         return drawers;
     }
 }

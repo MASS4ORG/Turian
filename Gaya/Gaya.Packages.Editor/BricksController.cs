@@ -53,7 +53,7 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
     int pending;
     int refreshes;
     IReadOnlyList<ResolvedPackage> installed = [];
-    IReadOnlyList<(string Registry, string Id, string Latest)> registryBricks = [];
+    IReadOnlyList<RegistryListing> registryListings = [];
     string? registryRoot;
 
     /// <summary>What the last <see cref="Refresh"/> found, dependencies first.</summary>
@@ -102,7 +102,32 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
     public IReadOnlyList<ResolvedPackage> Installed => installed;
 
     /// <summary>The workspace of the current <see cref="Scope"/>, or null when there is none.</summary>
-    public IBrickWorkspace? Workspace => Scope == BrickScope.Studio ? studio : project?.Workspace;
+    public IBrickWorkspace? Workspace => WorkspaceOf(Scope);
+
+    /// <summary>The workspace of a scope, or null when the host has none.</summary>
+    /// <param name="scope">The scope.</param>
+    /// <returns>The studio's or the open project's workspace.</returns>
+    public IBrickWorkspace? WorkspaceOf(BrickScope scope) => scope == BrickScope.Studio ? studio : project?.Workspace;
+
+    /// <summary>
+    /// Where a brick installs: the current scope when the brick accepts it, else the other one it accepts, so a
+    /// studio-only brick found while managing a project goes to the studio.
+    /// </summary>
+    /// <param name="brick">The brick.</param>
+    /// <returns>The scope whose workspace should use it.</returns>
+    public BrickScope ScopeFor(CatalogBrick brick)
+    {
+        ArgumentNullException.ThrowIfNull(brick);
+        foreach (var scope in (BrickScope[])[Scope, BrickScope.Studio, BrickScope.Project])
+        {
+            if (WorkspaceOf(scope) is { } workspace && brick.Accepts(workspace.Scope))
+            {
+                return scope;
+            }
+        }
+
+        return Scope;
+    }
 
     /// <summary>The registries the workspace takes bricks from, the public one last.</summary>
     public IReadOnlyList<ScopedRegistry> Registries { get; private set; } = [];
@@ -127,6 +152,29 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
 
     /// <summary>Raised when <see cref="Rows"/>, <see cref="Error"/> or <see cref="IsBusy"/> changed, from any thread.</summary>
     public event Action? Changed;
+
+    /// <summary>
+    /// Raised, from any thread, with what went wrong when an action fails or the workspace stops resolving; the
+    /// message is logged as well, so a view only needs to show it briefly.
+    /// </summary>
+    public event Action<string>? Problem;
+
+    string? lastResolveError;
+
+    /// <summary>Logs a failure and tells the views about it.</summary>
+    void Report(string message, string? label = null)
+    {
+        if (label is null)
+        {
+            log.LogError("Bricks: {Message}", message);
+        }
+        else
+        {
+            log.LogError("{Label} failed: {Message}", label, message);
+        }
+
+        Problem?.Invoke(message);
+    }
 
     /// <summary>Validates, saves and resolves the workspace's edited brick manifest.</summary>
     /// <param name="manifest">The edited manifest; a copy is saved.</param>
@@ -253,10 +301,17 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         try
         {
             Publish(workspace.Resolve(), null);
+            lastResolveError = null;
         }
         catch (PackageException ex)
         {
             Publish([], ex.Message);
+            // Every redraw may refresh; the same broken workspace is reported once, not on each refresh.
+            if (ex.Message != lastResolveError)
+            {
+                lastResolveError = ex.Message;
+                Report(ex.Message);
+            }
         }
     }
 
@@ -268,20 +323,39 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         RunAsync($"Install brick {id}", workspace =>
             workspace.Add(id.Trim(), string.IsNullOrWhiteSpace(source) ? null : source.Trim()));
 
-    /// <summary>Makes the project use a catalog brick, fetching it from the origin this client knows for it.</summary>
+    /// <summary>
+    /// Makes the workspace the brick belongs in use a catalog brick, fetching it from the origin this client knows
+    /// for it. A brick of the other scope goes to that scope's workspace, and the panel moves there.
+    /// </summary>
     /// <param name="brick">The brick to use.</param>
     /// <returns>Whether the brick is in use.</returns>
-    public Task<bool> EnableAsync(CatalogBrick brick)
+    public async Task<bool> EnableAsync(CatalogBrick brick)
     {
         ArgumentNullException.ThrowIfNull(brick);
-        if (brick.InstallSource is null && !brick.IsBuiltin)
+        if (EnableProblem(brick) is { } problem)
         {
-            Publish(installed, $"{brick.Id} was downloaded before its origin was recorded; refresh the registries or add it from its source.");
-            return Task.FromResult(false);
+            Publish(installed, problem);
+            Report(problem);
+            return false;
         }
 
-        return InstallAsync(brick.Id, brick.InstallSource);
+        var scope = ScopeFor(brick);
+        var source = string.IsNullOrWhiteSpace(brick.InstallSource) ? null : brick.InstallSource.Trim();
+        var enabled = await RunAsync($"Install brick {brick.Id}", workspace => workspace.Add(brick.Id, source),
+            target: WorkspaceOf(scope)).ConfigureAwait(false);
+        if (enabled && scope != Scope)
+        {
+            Scope = scope;
+            Selected = brick.Id;
+        }
+
+        return enabled;
     }
+
+    /// <summary>Why a brick cannot be enabled as it is known, or null when it can.</summary>
+    static string? EnableProblem(CatalogBrick brick) => brick.InstallSource is null && !brick.IsBuiltin
+        ? $"{brick.Id} was downloaded before its origin was recorded; refresh the registries or add it from its source."
+        : null;
 
     /// <summary>Makes the project use a brick from a folder, a <c>.brick</c> file or a git repository.</summary>
     /// <param name="spec">The source: <c>file:&lt;path&gt;</c> or <c>git+&lt;url&gt;[#ref]</c>.</param>
@@ -336,7 +410,7 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         // The search takes as long as the network does, so it runs outside the turn; only the restore and the
         // publication it ends with are serialized with the other actions.
         var generation = Interlocked.Increment(ref refreshes);
-        var found = await workspace.SearchAsync(string.Empty).ConfigureAwait(false);
+        var found = await ListRegistriesAsync(workspace).ConfigureAwait(false);
         Enqueue();
         await turn.WaitAsync().ConfigureAwait(false);
         try
@@ -346,20 +420,19 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
                 return;
             }
 
-            registryBricks = [.. found.Where(static f => f.Latest.Length > 0)];
+            registryListings = found.Bricks;
             registryRoot = workspace.Root;
             SaveRegistryCache(workspace.Root);
-            var unavailable = found.FirstOrDefault(static f => f.Latest.Length == 0);
-            if (unavailable.Id is not null)
+            foreach (var problem in found.Problems)
             {
-                log.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
+                log.LogWarning("{Problem}", problem);
             }
 
             _ = await RunInTurnAsync("Restore refreshed bricks", workspace, static current => current.Restore(), applyToProject: true)
                 .ConfigureAwait(false);
             if (IsCurrent(workspace, generation))
             {
-                Publish(installed, Error ?? unavailable.Id);
+                Publish(installed, Error ?? (found.Problems.Count > 0 ? string.Join('\n', found.Problems) : null));
             }
         }
         finally
@@ -433,11 +506,15 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         RunAsync($"Copy assets of {id}", workspace => workspace.CopyAssets(id, assets, id.Split('.')[^1]),
             applyToProject: false);
 
-    async Task<bool> RunAsync(string label, Action<IBrickWorkspace> work, bool applyToProject = true)
+    // Runs one action on the current workspace, or on target when the action belongs to the other scope.
+    async Task<bool> RunAsync(string label, Action<IBrickWorkspace> work, bool applyToProject = true,
+        IBrickWorkspace? target = null)
     {
-        if (Workspace is not { } workspace)
+        if ((target ?? Workspace) is not { } workspace)
         {
-            Publish(installed, Scope == BrickScope.Studio ? "This host has no studio bricks." : "Open a project first.");
+            var missing = Scope == BrickScope.Studio ? "This host has no studio bricks." : "Open a project first.";
+            Publish(installed, missing);
+            Report(missing, label);
             return false;
         }
 
@@ -468,16 +545,18 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
             {
                 failure = ex.Message;
                 // The message says what is wrong and what to do; a stack trace would only bury it.
-                log.LogError("{Label} failed: {Message}", label, ex.Message);
+                Report(ex.Message, label);
                 throw;
             }
 
             workspace.Changed(applyToProject);
         }).ConfigureAwait(false);
 
-        if (!succeeded)
+        if (!succeeded && failure is null)
         {
+            // The task runner logged the exception itself; the views still need to hear that the action failed.
             log.LogWarning("{Label} did not complete", label);
+            Problem?.Invoke($"{label} failed; the log has the details.");
         }
 
         // The panel moved on to another workspace while this ran: what it resolved is not the panel's to show.
@@ -516,111 +595,6 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         Revision++;
         Changed?.Invoke();
     }
-
-    // Registry entries carry no scope, so a brick known on this machine to belong to the other scope is not offered.
-    IReadOnlyList<CatalogBrick> BuildCatalog(IBrickWorkspace workspace, IReadOnlyList<ResolvedPackage> bricks)
-    {
-        var otherScope = new HashSet<string>(StringComparer.Ordinal);
-        var local = BrickCatalog.Local(bricks, workspace.BuiltinDirectory, Store, workspace.ReservedCategoryPrefixes,
-            workspace.Scope, otherScope);
-        return WithUnresolved(BrickCatalog.WithRegistries(local, registryBricks, otherScope), workspace.Root, bricks);
-    }
-
-    /// <summary>
-    /// Lists the bricks the manifest declares but the resolution did not return, as in use, so a brick whose source
-    /// cannot be reached can still be seen and disabled.
-    /// </summary>
-    static IReadOnlyList<CatalogBrick> WithUnresolved(IReadOnlyList<CatalogBrick> catalog, string root,
-        IReadOnlyList<ResolvedPackage> resolved)
-    {
-        Dictionary<string, string?> declared;
-        try
-        {
-            declared = ProjectManifest.Load(root, includeUserOverride: false).Manifest.Dependencies;
-        }
-        catch (PackageException)
-        {
-            return catalog;
-        }
-
-        var missing = declared.Where(pair => pair.Value is not null && resolved.All(p => p.Id != pair.Key)).ToList();
-        if (missing.Count == 0)
-        {
-            return catalog;
-        }
-
-        var merged = catalog.ToDictionary(static b => b.Id, StringComparer.Ordinal);
-        foreach (var (id, source) in missing)
-        {
-            merged[id] = merged.TryGetValue(id, out var known)
-                ? known with { State = BrickState.Enabled, Origin = source }
-                : new CatalogBrick(id, null, "Declared by the project, but its source could not be resolved.", null,
-                    BrickState.Enabled, null, null, source, source, IsBuiltin: false);
-        }
-
-        return [.. merged.Values.OrderBy(static b => b.DisplayName ?? b.Id, StringComparer.OrdinalIgnoreCase)];
-    }
-
-    static IReadOnlyList<ScopedRegistry> ReadRegistries(IBrickWorkspace workspace)
-    {
-        try
-        {
-            return workspace.Registries();
-        }
-        catch (PackageException)
-        {
-            return workspace.PublicRegistry is { } shared ? [shared] : [];
-        }
-    }
-
-    // A workspace's registries are its own, so each workspace has its own cache.
-    string RegistryCachePath(string root) =>
-        Path.Combine(Store.Root, ".registry-cache", $"{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(root)))[..16]}.json");
-
-    // What the registries offered last time, so the catalog lists available bricks before (or without) the network.
-    void LoadRegistryCache(string? root)
-    {
-        if (registryRoot == root)
-        {
-            return;
-        }
-
-        registryRoot = root;
-        registryBricks = [];
-        if (root is null)
-        {
-            return;
-        }
-
-        try
-        {
-            if (File.Exists(RegistryCachePath(root)))
-            {
-                registryBricks = JsonSerializer.Deserialize<List<RegistryCacheEntry>>(File.ReadAllText(RegistryCachePath(root)))?
-                    .Select(static e => (e.Registry, e.Id, e.Latest)).ToList() ?? [];
-            }
-        }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
-        {
-            log.LogDebug(ex, "The registry cache could not be read");
-        }
-    }
-
-    void SaveRegistryCache(string root)
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(RegistryCachePath(root))!);
-            File.WriteAllText(RegistryCachePath(root), JsonSerializer.Serialize(
-                registryBricks.Select(static b => new RegistryCacheEntry(b.Registry, b.Id, b.Latest))));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            log.LogDebug(ex, "The registry cache could not be written");
-        }
-    }
-
-    sealed record RegistryCacheEntry(string Registry, string Id, string Latest);
 
     void Enqueue()
     {
