@@ -90,6 +90,15 @@ public interface IBrickWorkspace
     /// <returns>Registry, id and newest version; an unreadable registry is reported with an empty version.</returns>
     Task<IReadOnlyList<(string Registry, string Id, string Latest)>> SearchAsync(string query);
 
+    /// <summary>Stops linking a brick to a local folder, so it comes from its declared source again.</summary>
+    /// <param name="id">The brick id.</param>
+    /// <returns>Whether the workspace linked it.</returns>
+    bool Unlink(string id) => ProjectBricks.Unlink(Root, id);
+
+    /// <summary>Lists every brick the workspace's registries serve, with all versions and any store presentation.</summary>
+    /// <returns>The listings, and why a registry could not be read.</returns>
+    Task<RegistryCatalog> ListAsync() => BrickRegistries.ListAsync(Registries());
+
     /// <summary>Whether a brick ships prebuilt assemblies the host loads.</summary>
     /// <param name="brick">The resolved brick.</param>
     bool IsPrecast(ResolvedPackage brick);

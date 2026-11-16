@@ -114,13 +114,10 @@ public static class ProjectPackages
             Log.Logger.LogWarning("{Warning}", warning);
         }
 
-        if (resolution.UsesUserOverride)
+        if (!locked && Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName)))
         {
-            Log.Logger.LogInformation("Packages resolved with personal overrides; the lock file is left unchanged");
-        }
-        else if (!locked && Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName)))
-        {
-            resolution.Lock.Save(projectRoot);
+            // Personally overridden bricks keep their committed lock entries; the rest record what was resolved.
+            resolution.SharedLock(LockFile.Load(projectRoot)).Save(projectRoot);
         }
 
         lock (CacheLock)

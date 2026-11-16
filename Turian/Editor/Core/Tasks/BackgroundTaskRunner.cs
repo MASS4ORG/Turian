@@ -84,11 +84,12 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
             return tasks.Get(id)?.Status ?? BackgroundTaskStatus.Completed;
         }
 
-        await ExecuteAsync(id, spec, async (progress, ct) =>
+        // Task.Run keeps work that never yields off the caller's thread, which is the UI thread for a click handler.
+        await Task.Run(() => ExecuteAsync(id, spec, async (progress, ct) =>
         {
             await work(progress, ct).ConfigureAwait(false);
             return new BackgroundTaskResult(true, "");
-        }).ConfigureAwait(false);
+        })).ConfigureAwait(false);
         return tasks.Get(id)?.Status ?? BackgroundTaskStatus.Completed;
     }
 

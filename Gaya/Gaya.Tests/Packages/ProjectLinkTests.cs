@@ -82,6 +82,32 @@ public sealed class ProjectLinkTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, "checkout", PackageManifest.FileName)));
     }
 
+    /// <summary>Unlinking drops the shared and personal links of a brick, keeping the rest of those files and its folder.</summary>
+    [Fact]
+    public void UnlinkingDropsEveryLinkOfTheBrick()
+    {
+        new ProjectManifest
+        {
+            Dependencies = { ["com.acme.rules"] = "^1.0.0" },
+            Links = { ["com.acme.rules"] = "../../checkout", ["com.acme.other"] = "../../other" },
+        }.Save(Project);
+        var user = Path.Combine(Project, "Bricks", ProjectManifest.UserFileName);
+        File.WriteAllText(user, """{ "links": { "com.acme.rules": "../../personal" }, "dependencies": { "com.acme.x": "1.0.0" } }""");
+        var links = Path.Combine(Project, "Bricks", ProjectManifest.LinksFileName);
+        File.WriteAllText(links, """{ "links": { "com.acme.rules": "../../personal" } }""");
+
+        Assert.True(ProjectBricks.Unlink(Project, "com.acme.rules"));
+
+        var (manifest, _) = ProjectManifest.Load(Project);
+        Assert.Equal(["com.acme.other"], manifest.Links.Keys);
+        Assert.Equal("^1.0.0", manifest.Dependencies["com.acme.rules"]);
+        Assert.Contains("com.acme.x", File.ReadAllText(user), StringComparison.Ordinal);
+        Assert.DoesNotContain("com.acme.rules", File.ReadAllText(user), StringComparison.Ordinal);
+        Assert.DoesNotContain("links", File.ReadAllText(links), StringComparison.Ordinal);
+        Assert.False(ProjectBricks.Unlink(Project, "com.acme.rules"));
+        Assert.True(File.Exists(Path.Combine(root, "checkout", PackageManifest.FileName)));
+    }
+
     /// <summary>A missing link is reported on ordinary and locked restores rather than using the declared range.</summary>
     [Fact]
     public async Task MissingLinkedFoldersFailLoudly()
@@ -128,6 +154,57 @@ public sealed class ProjectLinkTests : IDisposable
         var (manifest, _) = ProjectManifest.Load(Project, includeUserOverride: false);
         Assert.Equal("../../checkout", manifest.Links["com.acme.rules"]);
     }
+
+    /// <summary>
+    /// Under a personal link, an update of another brick reaches the shared lock, while the linked brick and what only
+    /// its committed version needs keep their committed entries.
+    /// </summary>
+    [Fact]
+    public void PersonalLinksKeepTheirEntriesWhileOthersUpdate()
+    {
+        var committed = new LockFile
+        {
+            Dependencies =
+            {
+                ["com.acme.rules"] = Entry("1.0.0", "^1.0.0", "com.acme.helper"),
+                ["com.acme.helper"] = Entry("1.0.0", "^1.0.0"),
+                ["com.acme.shared"] = Entry("1.0.1", "^1.0.0"),
+            },
+        };
+        var resolved = new LockFile
+        {
+            Dependencies =
+            {
+                ["com.acme.rules"] = new LockEntry { Version = SemanticVersion.Parse("1.1.0"), Link = "../../personal" },
+                ["com.acme.shared"] = Entry("1.0.2", "^1.0.0"),
+            },
+        };
+        var resolution = new PackageResolution([Package("com.acme.rules", "1.1.0", overridden: true),
+            Package("com.acme.shared", "1.0.2", overridden: false)], resolved);
+
+        var shared = resolution.SharedLock(committed);
+
+        Assert.Same(committed.Dependencies["com.acme.rules"], shared.Dependencies["com.acme.rules"]);
+        Assert.Same(committed.Dependencies["com.acme.helper"], shared.Dependencies["com.acme.helper"]);
+        Assert.Equal(SemanticVersion.Parse("1.0.2"), shared.Dependencies["com.acme.shared"].Version);
+        Assert.Same(resolved, (resolution with { Packages = [Package("com.acme.shared", "1.0.2", overridden: false)] })
+            .SharedLock(committed));
+    }
+
+    static LockEntry Entry(string version, string source, params string[] dependencies)
+    {
+        var entry = new LockEntry { Version = SemanticVersion.Parse(version), Source = source };
+        foreach (var dependency in dependencies)
+        {
+            entry.Dependencies[dependency] = "^1.0.0";
+        }
+
+        return entry;
+    }
+
+    static ResolvedPackage Package(string id, string version, bool overridden) =>
+        new(id, new PackageManifest { Name = id, Version = SemanticVersion.Parse(version) }, "", PackageOrigin.Registry,
+            "^1.0.0", null, null, 1, overridden);
 
     /// <summary>A failed manifest save restores an embedded brick and leaves the shared declarations intact.</summary>
     [Theory]

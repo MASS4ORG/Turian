@@ -56,7 +56,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     /// <inheritdoc />
     public IReadOnlyList<ResolvedPackage> Resolve() => ResolveAll().Packages;
 
-    /// <summary>Resolves the studio's bricks and writes the lock file unless a user override applied.</summary>
+    /// <summary>Resolves the studio's bricks and writes the lock file, keeping committed entries of overridden bricks.</summary>
     /// <param name="locked">Install exactly what the lock file records.</param>
     /// <returns>The resolution; empty when the studio declares no bricks.</returns>
     /// <exception cref="PackageException">A brick cannot be fetched or does not fit.</exception>
@@ -69,9 +69,9 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
         }
 
         var resolution = Resolver(locked, new HashSet<string>()).ResolveAsync(Root).GetAwaiter().GetResult();
-        if (!resolution.UsesUserOverride && !locked)
+        if (!locked)
         {
-            resolution.Lock.Save(Root);
+            _ = resolution.SharedLock(LockFile.Load(Root)).Save(Root);
         }
 
         return resolution;
@@ -131,10 +131,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
 
         var resolution = Resolver(locked: false, ids.Count > 0 ? ids.ToHashSet(StringComparer.Ordinal) : null)
             .ResolveAsync(Root).GetAwaiter().GetResult();
-        if (!resolution.UsesUserOverride)
-        {
-            resolution.Lock.Save(Root);
-        }
+        _ = resolution.SharedLock(LockFile.Load(Root)).Save(Root);
     }
 
     /// <inheritdoc />
@@ -171,13 +168,14 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public bool RemoveRegistry(string name)
     {
         var (manifest, _) = ProjectManifest.Load(Root, includeUserOverride: false);
-        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0)
+        var shared = manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) > 0;
+        if (shared)
         {
-            return false;
+            manifest.Save(Root);
         }
 
-        manifest.Save(Root);
-        return true;
+        // A registry may be declared only in this machine's override, which the panel lists like any other.
+        return ProjectManifest.RemoveUserRegistry(Root, name) || shared;
     }
 
     /// <inheritdoc />
@@ -244,7 +242,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
 }
 
 /// <summary>Registry checks and searches shared by every brick workspace.</summary>
-public static class BrickRegistries
+public static partial class BrickRegistries
 {
     /// <summary>Checks a registry's name, address, optional scope filters and explicit signing trust.</summary>
     /// <param name="registry">The registry.</param>
