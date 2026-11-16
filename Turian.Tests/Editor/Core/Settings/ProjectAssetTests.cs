@@ -182,6 +182,72 @@ public sealed class ProjectAssetTests : IDisposable
         Assert.DoesNotContain(listed, static p => p.IsActive);
     }
 
+    /// <summary>Non-desktop profiles start with the platform's supported target and runtime identifier.</summary>
+    [Fact]
+    public void AddedPlatformProfilesUseTheirOwnDefaults()
+    {
+        ProjectSettingsFiles.CreateProjectAsset(Settings, [], []);
+        var platform = Substitute.For<IBuildPlatform>();
+        platform.Id.Returns("android");
+        platform.DisplayName.Returns("Android");
+        platform.Targets.Returns([BuildTarget.Client]);
+        platform.RuntimeIdentifiers.Returns(["android-arm64", "android-x64"]);
+
+        ProjectSettingsFiles.AddBuildProfile(Settings, platform, BuildTarget.Client);
+        ProjectSettingsFiles.AddBuildProfile(Settings, platform, BuildTarget.Client);
+
+        var profiles = BuildProfiles.List(Settings);
+        Assert.Equal(["Android Client", "Android Client 1"], profiles.Select(static profile => profile.Profile.Name));
+        Assert.All(profiles, static profile =>
+        {
+            Assert.Equal("android", profile.Profile.Profile.Platform);
+            Assert.Equal("android-arm64", profile.Profile.Profile.RuntimeIdentifier);
+            Assert.Equal(BuildTarget.Client, profile.Profile.Profile.Target);
+        });
+        Assert.Throws<ArgumentException>(() => ProjectSettingsFiles.AddBuildProfile(Settings, platform, BuildTarget.Server));
+        Assert.Equal(2, BuildProfiles.List(Settings).Count);
+    }
+
+    /// <summary>Removing the active profile selects the next registered profile and leaves authored files available.</summary>
+    [Fact]
+    public void RemovingProfilesKeepsTheActiveSelectionValid()
+    {
+        Assert.False(ProjectSettingsFiles.RemoveBuildProfile(Settings, Guid.NewGuid()));
+        ProjectSettingsFiles.CreateProjectAsset(Settings, [], []);
+        var first = ProjectSettingsFiles.CreateBuildProfile(Settings, new BuildProfile { Name = "Client" }, active: true);
+        ProjectSettingsFiles.AddBuildProfile(Settings, BuildTarget.Server);
+        var profiles = BuildProfiles.List(Settings);
+        Assert.False(ProjectSettingsFiles.RemoveBuildProfile(Settings, Guid.NewGuid()));
+
+        Assert.True(ProjectSettingsFiles.RemoveBuildProfile(Settings, profiles[0].Id));
+
+        Assert.Equal(profiles[1].Id, Assert.Single(BuildProfiles.List(Settings)).Id);
+        Assert.Equal("Server", BuildProfiles.Active(BuildSettings)!.Name);
+        Assert.True(File.Exists(first));
+        Assert.True(File.Exists(first + ".meta"));
+        Assert.False(ProjectSettingsFiles.RemoveBuildProfile(Settings, profiles[0].Id));
+        Assert.True(ProjectSettingsFiles.RemoveBuildProfile(Settings, profiles[1].Id));
+        Assert.Empty(BuildProfiles.List(Settings));
+        Assert.Null(BuildProfiles.Active(BuildSettings));
+    }
+
+    /// <summary>Removing an inactive profile preserves an explicitly active profile or the absence of one.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RemovingAnInactiveProfilePreservesTheActiveChoice(bool active)
+    {
+        ProjectSettingsFiles.CreateProjectAsset(Settings, [], []);
+        ProjectSettingsFiles.CreateBuildProfile(Settings, new BuildProfile { Name = "Client" }, active);
+        ProjectSettingsFiles.AddBuildProfile(Settings, BuildTarget.Server);
+        var profiles = BuildProfiles.List(Settings);
+
+        Assert.True(ProjectSettingsFiles.RemoveBuildProfile(Settings, profiles[1].Id));
+
+        Guid? expected = active ? profiles[0].Id : null;
+        Assert.Equal(expected, ProjectAsset.Load(Assets)!.ActiveBuildProfile?.AssetId);
+    }
+
     /// <summary>
     /// Opening stamps a project the engine has not saved or that an older engine saved; a project already at this
     /// version, or without a project asset, is left as it is.

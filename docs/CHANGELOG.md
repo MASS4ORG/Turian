@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Added: platform toolchain doctor command #267.
+- Fixed: Android build profiles #265 #367
 
 ## [5.0.0] - 2026-11-14
 

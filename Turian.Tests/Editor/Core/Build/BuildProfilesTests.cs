@@ -5,6 +5,28 @@ namespace Turian.Tests;
 /// <summary>Build profiles: discovery, what client and server builds ship, and the platform that publishes them.</summary>
 public sealed class BuildProfilesTests : IDisposable
 {
+    /// <summary>Generated launchers use the stable SDK policy that toolchain qualification checks.</summary>
+    [Fact]
+    public void GeneratedLauncherSdkPinExcludesPrereleases()
+    {
+        var launcher = Directory.CreateDirectory(Path.Combine(project, "launcher")).FullName;
+        var output = Directory.CreateDirectory(Path.Combine(project, "output")).FullName;
+        File.WriteAllText(Path.Combine(launcher, "Program.cs"), string.Empty);
+        var platform = Substitute.For<IBuildPlatform>();
+        platform.LauncherDirectory.Returns(launcher);
+        platform.SdkVersion.Returns("11.0.100");
+        var generated = ProjectRootElement.Create(Path.Combine(output, "app.csproj"));
+        var copy = typeof(CsProjectGenerator).GetMethod("CopyLauncherFiles", BindingFlags.Static | BindingFlags.NonPublic)!;
+
+        copy.Invoke(null, [generated, platform]);
+
+        using var global = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "global.json")));
+        var policy = global.RootElement.GetProperty("sdk");
+        Assert.Equal("11.0.100", policy.GetProperty("version").GetString());
+        Assert.Equal("latestPatch", policy.GetProperty("rollForward").GetString());
+        Assert.False(policy.GetProperty("allowPrerelease").GetBoolean());
+    }
+
     readonly string project = Directory.CreateTempSubdirectory("turian-build-profiles-").FullName;
     readonly string fixtures = Directory.CreateTempSubdirectory("turian-build-profiles-bricks-").FullName;
 

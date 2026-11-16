@@ -1,7 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Loads the prebuilt assemblies of the installed bricks in a game, which the export lists in its type manifest.
+/// Loads installed bricks' compiled runtime assemblies, which the export lists in its type manifest.
 /// </summary>
 public static class PrecastAssemblies
 {

@@ -586,7 +586,7 @@ public static class CsProjectGenerator
         {
             File.WriteAllText(Path.Combine(destDir, "global.json"), JsonSerializer.Serialize(new
             {
-                sdk = new { version = sdkVersion, rollForward = "latestPatch", allowPrerelease = true },
+                sdk = new { version = sdkVersion, rollForward = "latestPatch", allowPrerelease = false },
             }));
         }
     }

@@ -55,6 +55,40 @@ public sealed class HeadlessBrickTests : IDisposable
         Assert.False(TypeRegistry.TryGetType("Mateo.Headless.HeadlessComponent", out _));
     }
 
+    /// <summary>A fresh import can deserialize metadata whose asset type is supplied by a source brick.</summary>
+    [Fact]
+    public async Task SourceBrickAssetTypesLoadBeforeTheFirstImport()
+    {
+        var (project, _) = await CreateProjectAsync();
+        const string typeId = "4d34c337-722d-4b6c-84b1-56a511d4ec7f";
+        var assetId = Guid.NewGuid();
+        var brick = Path.Combine(root, "user.mateo.headless");
+        File.WriteAllText(Path.Combine(brick, "Runtime", "HeadlessPrefab.cs"), $$"""
+            using MASS4.Attributes;
+            using Turian.Engine.Core;
+            namespace Mateo.Headless;
+            [TypeId("{{typeId}}")]
+            public sealed class HeadlessPrefab : Prefab { }
+            """);
+        var path = Path.Combine(project, "Assets", "source.prefab");
+        Serializer.Save(path, new Node { Name = "Source brick asset" });
+        File.WriteAllText(path + ".meta", $$"""
+            {"__TypeId":"{{typeId}}","RelativePath":"Assets/source.prefab","Id":"{{assetId}}"}
+            """);
+        var settings = new BuildAppSettings { ProjectAbsoluteDir = project, Title = "Source asset" };
+        ProjectSettingsLoader.LoadFromSources(settings);
+
+        using var preparation = await global::Turian.Editor.CLI.Program.PrepareProjectAsync(settings,
+            reimport: true, loadUserCode: true);
+        Assert.True(preparation!.IsAssemblyLoaded);
+        var database = new AssetDatabase();
+        database.LoadCatalogFromProject(project);
+
+        Assert.True(database.Assets.TryGetValue(assetId, out var record));
+        Assert.Equal("Mateo.Headless.HeadlessPrefab", record.AssetTypeName);
+        Assert.True(File.Exists(record.ResolveContentPath()));
+    }
+
     /// <summary>A failed compilation leaves the diagnostic host able to report unavailable component placeholders.</summary>
     [Fact]
     public async Task FailedCompilationLeavesSourceComponentsUnavailable()

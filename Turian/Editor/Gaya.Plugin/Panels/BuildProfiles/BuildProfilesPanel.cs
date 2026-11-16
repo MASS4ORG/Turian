@@ -5,7 +5,7 @@ namespace Gaya.Plugin.Turian;
 /// marked, and the selected profile's properties on the right, edited through the inspector's forms and saved as they
 /// change. Profiles are added, switched to and built from here.
 /// </summary>
-sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService inspections, AssetAutoSave autoSave,
+sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectionService inspections, AssetAutoSave autoSave,
     UndoService undo, ReferenceDrawer references, BuildManager build, BackgroundTaskRunner tasks)
     : IPanel, IDisposable
 {
@@ -49,11 +49,8 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
             Details(gui);
         }
 
-        gui.CascadeMenu(ref addOpen, addAt, menu =>
-        {
-            menu.Item("Client", () => pending = () => Add(project, BuildTarget.Client));
-            menu.Item("Server", () => pending = () => Add(project, BuildTarget.Server));
-        });
+        gui.CascadeMenu(ref addOpen, addAt, menu => PopulateAddMenu(menu, project, BuildPlatforms.All()),
+            id: "buildProfiles/add-menu");
         references.DrawPendingPicker(gui);
 
         if (gui.Pass != Pass.Pass2Render || pending is not { } action)
@@ -89,6 +86,7 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
 
     void Select(Guid id)
     {
+        autoSave.Flush(force: true);
         selected = id;
         inspection = profiles.FirstOrDefault(p => p.Id == id) is { } listing
             ? inspections.Inspect(listing.Profile.Path)
@@ -211,6 +209,7 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
             TurianForms.ApplyStyle(gui);
             Title(gui, profile);
             Form(gui);
+            Toolchain(gui);
             Actions(gui, profile);
         }
     }
@@ -248,7 +247,11 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
                 var fields = model.Sections[s].BodyFields;
                 for (var f = 0; f < fields.Count; f++)
                 {
-                    gui.FormField(fields[f], $"buildProfiles/section{s}/field{f}", FormContext);
+                    var id = $"buildProfiles/{selected}/section{s}/field{f}";
+                    if (!PlatformField(gui, fields[f], id))
+                    {
+                        gui.FormField(fields[f], id, FormContext);
+                    }
                 }
             }
         }
@@ -259,6 +262,12 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight + 8f), "buildProfiles/actions").ExpandWidth()
                    .Direction(Axis.Horizontal).Gap(Theme.Gap).Padding(6f, 4f).Enter())
         {
+            if (StudioControls.SmallTextButton(gui, "Remove Profile", "buildProfiles/remove", Theme.Scale(110f),
+                    "Remove this profile from the project; keep its asset for reuse"))
+            {
+                pending = () => Remove(profile.Id);
+            }
+
             using (gui.Node().Expand().Enter()) { }
 
             if (!profile.IsActive
@@ -285,14 +294,26 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
         }
     }
 
-    void Add(AppSettings project, BuildTarget target)
+    void Add(AppSettings project, IBuildPlatform platform, BuildTarget target)
     {
-        var path = ProjectSettingsFiles.AddBuildProfile(project, target);
+        autoSave.Flush(force: true);
+        var path = ProjectSettingsFiles.AddBuildProfile(project, platform, target);
         listedFrom = null;
         Refresh(project);
         if (profiles.FirstOrDefault(p => p.Profile.Path == path) is { } added)
         {
             Select(added.Id);
+        }
+    }
+
+    internal void PopulateAddMenu(FlyoutBuilder menu, AppSettings project, IReadOnlyList<IBuildPlatform> platforms)
+    {
+        foreach (var platform in platforms)
+        {
+            foreach (var target in platform.Targets)
+            {
+                menu.Item($"{platform.DisplayName} {target}", () => pending = () => Add(project, platform, target));
+            }
         }
     }
 
@@ -305,6 +326,27 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
 
         ProjectSettingsFiles.SetActiveBuildProfile(project, id);
         listedFrom = null;
+    }
+
+    void Remove(Guid id)
+    {
+        if (settings.Settings is not { } project)
+        {
+            return;
+        }
+        autoSave.Flush(force: true);
+        var path = ProjectAsset.PathIn(project.AssetsAbsoluteDir);
+        var before = File.ReadAllText(path);
+        undo.Perform("Remove Build Profile", [], () =>
+        {
+            ProjectSettingsFiles.RemoveBuildProfile(project, id);
+            listedFrom = null;
+        }, () =>
+        {
+            File.WriteAllText(path, before);
+            listedFrom = null;
+        }, document: UndoService.ProjectDocument);
+        Refresh(project);
     }
 
     /// <summary>Saves pending edits first, so the export reads the profile as it is shown.</summary>

@@ -151,7 +151,7 @@ public static partial class Program
             var settings = CreateSettings(result.GetValue(projectArg)!);
             Log.Logger.LogInformation("Compiling {Title}…", settings.Title);
 
-            using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+            using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: true)
                 .ConfigureAwait(false);
 
             // Compile into a temp directory (no slot management needed for one-shot CLI)
@@ -209,7 +209,7 @@ public static partial class Program
         var profiles = profileNames.Select(name => BuildProfiles.Find(settings, name)).ToList();
         Log.Logger.LogInformation("Exporting {Title} [{Config}]…", settings.Title, config);
 
-        using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+        using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: true)
             .ConfigureAwait(false);
         // After the project's bricks are loaded, since platforms such as Android come from them.
         LoadUserSettings();
