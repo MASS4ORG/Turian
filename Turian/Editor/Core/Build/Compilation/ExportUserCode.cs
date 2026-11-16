@@ -14,6 +14,10 @@ public sealed class ExportUserCode(
     BuildDeployment? deployment = null)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
+    readonly ProjectBuildProfile? profile = deployment?.Development == true && profile is not null
+        ? profile with { Profile = profile.Profile.ForDevelopment() }
+        : profile;
+
     /// <inheritdoc />
     protected override ProjectSettingsCollection? SettingsOverrides => profile?.Profile;
 
@@ -24,14 +28,32 @@ public sealed class ExportUserCode(
     internal string OutputDirectory => outputDirectory ?? ExportOutputDir(Settings.ProjectAbsoluteDir,
         Path.Combine("Output", Settings.TitleToPathFriendly ?? "Game"));
 
-    /// <summary>Publishes the project and returns the export output directory.</summary>
-    public async Task<string> ExecuteAsync()
+    /// <summary>Checks effective profile settings and platform tools before expensive build work starts.</summary>
+    public void Validate()
     {
-        if (BuildPlatforms.For(profile?.Profile).ValidateSettings(Settings) is { } invalid)
+        ProjectSettingsLoader.LoadFromSources(Settings, SettingsOverrides);
+        var platform = BuildPlatforms.For(profile?.Profile);
+        if (deployment is not null && !platform.Deploys)
+        {
+            throw new InvalidOperationException(
+                $"{platform.DisplayName} runs on this computer. Select a device platform in Build Profiles to deploy.");
+        }
+        var context = Context(string.Empty);
+        if (platform.ValidateExport(context) is { } invalid)
         {
             throw new InvalidOperationException(invalid);
         }
 
+        if (platform.CheckToolchain() is { IsReady: false } status)
+        {
+            throw new InvalidOperationException(status.Message);
+        }
+    }
+
+    /// <summary>Publishes the project and returns the export output directory.</summary>
+    public async Task<string> ExecuteAsync()
+    {
+        Validate();
         var csprojFilePath = await SetupAsync(GenerateCsProjFile).ConfigureAwait(false);
         EnsureDirectory(csprojFilePath);
         if (profile?.Profile is { NativeAot: true } nativeProfile)
@@ -50,12 +72,8 @@ public sealed class ExportUserCode(
                 ProjectPackages.RenderBrick);
         }
 
-        var configName = (profile?.Profile.Configuration ?? configuration) == BuildConfiguration.Release
-            ? "Release"
-            : "Debug";
         var platform = BuildPlatforms.For(profile?.Profile);
-        var context = new BuildPlatformContext(Settings, Logger, csprojFilePath, exportOutputPath, configName,
-            profile?.Profile);
+        var context = Context(csprojFilePath);
 
         await platform.PrepareAsync(context, CancellationToken.None).ConfigureAwait(false);
 
@@ -110,6 +128,8 @@ public sealed class ExportUserCode(
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
+    BuildPlatformContext Context(string projectFile) => new(Settings, Logger, projectFile, OutputDirectory,
+        (profile?.Profile.Configuration ?? configuration).ToString(), profile?.Profile);
 
     string GenerateCsProjFile()
     {

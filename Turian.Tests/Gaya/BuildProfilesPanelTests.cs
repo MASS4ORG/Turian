@@ -75,6 +75,40 @@ public sealed class BuildProfilesPanelTests : IDisposable
 
     void AddClient() => AddTarget(0);
 
+    /// <summary>Device profiles expose a separate runnable action and both build buttons defer work until after rendering.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SelectedProfileOffersBuildAndDeviceRunActions(bool deploys)
+    {
+        ProjectSettingsFiles.CreateBuildProfile(settings.Settings!,
+            new BuildProfile { Name = "Player", Platform = "missing-device" });
+        var listing = Assert.Single(BuildProfiles.List(settings.Settings!));
+        var platform = Substitute.For<IBuildPlatform>();
+        platform.Deploys.Returns(deploys);
+        void RenderActions(Gui context) => panel.Actions(context, listing, platform);
+        Frame(RenderActions);
+        Frame(RenderActions);
+
+        Assert.Equal(deploys, Nodes().Any(static node => node.Id == "buildProfiles/run"));
+        Click(Nodes().Single(static node => node.Id == "buildProfiles/build"), RenderActions);
+        var pending = typeof(BuildProfilesPanel).GetField("pending", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.NotNull(pending.GetValue(panel));
+        if (deploys)
+        {
+            pending.SetValue(panel, null);
+            Click(Nodes().Single(static node => node.Id == "buildProfiles/run"), RenderActions);
+            Assert.NotNull(pending.GetValue(panel));
+        }
+        var completed = new TaskCompletionSource<BuildTaskStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        build.TaskRunner.TaskCompleted += status => completed.TrySetResult(status);
+        ((Action)pending.GetValue(panel)!)();
+        var result = await completed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(BuildTaskState.Failed, result.State);
+        Assert.Contains("missing-device", result.Message);
+        Assert.False(Assert.Single(BuildProfiles.List(settings.Settings!)).IsActive);
+    }
+
     void AddTarget(int index)
     {
         Click(Nodes().Single(static node => node.Id == "buildProfiles/add"));

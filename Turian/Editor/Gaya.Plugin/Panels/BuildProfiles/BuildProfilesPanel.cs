@@ -210,7 +210,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
             Title(gui, profile);
             Form(gui);
             Toolchain(gui);
-            Actions(gui, profile);
+            Actions(gui, profile, FindPlatform(profile.Profile.Profile.Platform));
         }
     }
 
@@ -257,7 +257,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
         }
     }
 
-    void Actions(Gui gui, BuildProfileListing profile)
+    internal void Actions(Gui gui, BuildProfileListing profile, IBuildPlatform? platform)
     {
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight + 8f), "buildProfiles/actions").ExpandWidth()
                    .Direction(Axis.Horizontal).Gap(Theme.Gap).Padding(6f, 4f).Enter())
@@ -281,6 +281,13 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
                     "Export the game with this profile"))
             {
                 pending = () => Build(profile.Id);
+            }
+
+            if (platform?.Deploys == true
+                && StudioControls.SmallTextButton(gui, "Build & Run", "buildProfiles/run", Theme.Scale(100f),
+                    "Build a Development player and run it on the selected device"))
+            {
+                pending = () => Build(profile.Id, install: true);
             }
         }
     }
@@ -350,7 +357,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
     }
 
     /// <summary>Saves pending edits first, so the export reads the profile as it is shown.</summary>
-    void Build(Guid id)
+    void Build(Guid id, bool install = false)
     {
         if (settings.Settings is not { } project)
         {
@@ -363,7 +370,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
             return;
         }
 
-        StudioCommands.RunExport(tasks, () => build.ExportAsync(profile.Profile));
+        StudioCommands.RunExport(tasks, () => build.ExportAsync(profile.Profile, install));
     }
 
     FormRenderContext FormContext => formContext ??= CreateFormContext();

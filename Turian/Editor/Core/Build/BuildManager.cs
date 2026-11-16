@@ -363,7 +363,9 @@ public sealed class BuildManager : IDisposable
     static BuildDeployment? Deployment(ProjectBuildProfile? profile, bool install)
     {
         var platform = BuildPlatforms.For(profile?.Profile);
-        return platform.ConfiguredDeployment ?? (install && platform.Deploys ? new BuildDeployment(null) : null);
+        return install && platform.Deploys
+            ? new BuildDeployment(null) { Development = true }
+            : platform.ConfiguredDeployment;
     }
 
     /// <summary>
@@ -371,7 +373,13 @@ public sealed class BuildManager : IDisposable
     /// the Build Profiles window's Build does.
     /// </summary>
     /// <param name="profile">The profile to build.</param>
-    public Task<BuildTaskStatus> ExportAsync(ProjectBuildProfile profile)
+    public Task<BuildTaskStatus> ExportAsync(ProjectBuildProfile profile) => ExportAsync(profile, install: false);
+
+    /// <summary>Exports a selected profile, optionally building a development player for a connected device.</summary>
+    /// <param name="profile">The profile to build.</param>
+    /// <param name="install">Build for local iteration and install on a device.</param>
+    /// <returns>The queued build's result.</returns>
+    public Task<BuildTaskStatus> ExportAsync(ProjectBuildProfile profile, bool install)
     {
         ArgumentNullException.ThrowIfNull(profile);
         return TaskRunner.EnqueueAsync(new DelegateTask(
@@ -382,7 +390,7 @@ public sealed class BuildManager : IDisposable
                 var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
                     settings.TitleToPathFriendly ?? "Game");
                 var exporter = new ExportUserCode(settings, logger, profile.Profile.Configuration, profile, output,
-                    Deployment(profile, install: false));
+                    Deployment(profile, install));
                 return $"Exported to: {await exporter.ExecuteAsync().ConfigureAwait(false)}";
             }));
     }

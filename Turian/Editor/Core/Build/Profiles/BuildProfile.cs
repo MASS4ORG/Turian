@@ -55,6 +55,16 @@ public class BuildProfile : ProjectSettingsCollection
     /// </summary>
     public bool Development { get; set; }
 
+    /// <summary>Copies this profile for a local development build without changing its authored settings.</summary>
+    /// <returns>A temporary profile retaining the platform, configuration and settings overrides.</returns>
+    internal BuildProfile ForDevelopment()
+    {
+        var copy = (BuildProfile)MemberwiseClone();
+        copy.Development = true;
+        copy.Settings = [.. Settings];
+        return copy;
+    }
+
     /// <summary>Uses generated startup composition and NativeAOT for a desktop server export.</summary>
     public bool NativeAot { get; set; }
 

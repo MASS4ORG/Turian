@@ -9,8 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [5.1.0] - 2026-11-16
 
 - Added: platform toolchain doctor command #267.
-- Fixed: Android build profiles #265 #367
 - Changed: brick panel improvements.
+- Fixed: Android build profiles #265 #367
+- Fixed: less export CLI verbosity.
 
 ## [5.0.0] - 2026-11-14
 
