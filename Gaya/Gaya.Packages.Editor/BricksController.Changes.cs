@@ -279,11 +279,12 @@ public sealed partial class BricksController
 
         var updating = changes.Any(static c => c.Kind is BrickChangeKind.Update or BrickChangeKind.UseVersion);
         var before = updating ? Versions(workspace) : null;
-        foreach (var change in changes.Where(static c => c is not { Kind: BrickChangeKind.Update, Source: null }))
+        // Bricks that need a disabled brick go first, the furthest first: it cannot leave while they still need it.
+        var direct = changes.Where(static c => c is not { Kind: BrickChangeKind.Update, Source: null }).ToList();
+        foreach (var change in direct.Where(static c => c.Because is not null).Reverse().Concat(direct.Where(static c => c.Because is null)))
         {
-            // A brick that the bricks this batch disables bring in leaves with them, even when it has no declaration
-            // of its own to drop and refuses to be disabled alone.
-            if (change.Kind == BrickChangeKind.Disable && changes.Any(c => c.Because == change.Id))
+            // A brick that only arrives with another has no declaration of its own to drop: it leaves with the others.
+            if (change.Because is not null)
             {
                 try
                 {

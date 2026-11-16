@@ -46,13 +46,12 @@ public sealed partial class BricksPanel
             using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/pending/text").Expand().ContentAlignY(0.5f).Enter())
             {
                 gui.ClipContent();
-                var text = now.Pending.Count == 1 ? now.Pending[0].Description : $"{now.Pending.Count} changes waiting";
-                gui.DrawText(text, Theme.Text(11f), Theme.Warning, centerInRect: false);
+                gui.DrawText(Summary(now.Pending), Theme.Text(11f), Theme.Warning, centerInRect: false);
                 gui.Tooltip(gui.CurrentNode, string.Join('\n', now.Pending.Select(static c => c.Description)), maxWidth: 360);
             }
 
             if (Button(gui, now, "Apply", "bricks/pending/apply", 56f,
-                    "Apply every waiting change at once: the bricks resolve and the project recompiles once."))
+                    "Apply every waiting change at once: the bricks resolve and the project recompiles once.", accent: true))
             {
                 _ = controller.ApplyPendingAsync();
             }
@@ -62,6 +61,21 @@ public sealed partial class BricksPanel
                 controller.DiscardPending();
             }
         }
+    }
+
+    /// <summary>What the pending bar says: the one change chosen with the bricks that must follow it, else a count.</summary>
+    /// <param name="pending">The staged changes.</param>
+    /// <returns>The text.</returns>
+    public static string Summary(IReadOnlyList<BrickChange> pending)
+    {
+        var chosen = pending.Where(static c => c.Because is null).ToList();
+        if (chosen.Count != 1)
+        {
+            return $"{pending.Count} changes waiting";
+        }
+
+        var followers = pending.Where(static c => c.Because is not null).Select(static c => c.Id).ToList();
+        return followers.Count == 0 ? chosen[0].Description : $"{chosen[0].Description}; also disables {string.Join(", ", followers)}";
     }
 
     void OpenCleanup()
@@ -161,20 +175,15 @@ public sealed partial class BricksPanel
             }
 
             var (text, color) = VersionCell(brick, pending);
-            Cell(gui, $"{id}/version", text, brick.HasUpdate || pending is not null ? 110f : 60f, height, color);
+            Cell(gui, $"{id}/version", text, brick.HasUpdate || pending is not null ? 120f : 60f, height, color);
         }
     }
 
     static (string Text, Color Color) VersionCell(CatalogBrick brick, BrickChange? pending)
     {
         var version = brick.InstalledVersion ?? brick.LatestVersion ?? "";
-        return pending?.Kind switch
-        {
-            BrickChangeKind.Enable => ("will enable", Theme.Warning),
-            BrickChangeKind.Disable => ("will disable", Theme.Warning),
-            BrickChangeKind.Update => ($"{version} → {brick.LatestVersion}", Theme.Warning),
-            BrickChangeKind.UseVersion => ($"{version} → {pending.Source}", Theme.Warning),
-            _ => (brick.HasUpdate ? $"{version} → {brick.LatestVersion}" : version, Theme.InkDim),
-        };
+        return pending is not null
+            ? (pending.Transition, Theme.Warning)
+            : (brick.HasUpdate ? $"{version} → {brick.LatestVersion}" : version, Theme.InkDim);
     }
 }

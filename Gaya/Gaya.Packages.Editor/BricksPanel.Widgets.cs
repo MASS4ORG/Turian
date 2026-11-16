@@ -87,10 +87,11 @@ public sealed partial class BricksPanel
         }
     }
 
-    static bool Button(Gui gui, Frame now, string label, string id, float width, string? tooltip = null) =>
-        SmallTextButton(gui, label, id, Theme.Scale(width), tooltip) && !now.Busy;
+    /// <summary>A text button; <paramref name="accent"/> fills it with the accent colour, for the one action to take next.</summary>
+    static bool Button(Gui gui, Frame now, string label, string id, float width, string? tooltip = null, bool accent = false) =>
+        SmallTextButton(gui, label, id, Theme.Scale(width), tooltip, accent) && !now.Busy;
 
-    static bool SmallTextButton(Gui gui, string label, string id, float width, string? tooltip)
+    static bool SmallTextButton(Gui gui, string label, string id, float width, string? tooltip, bool accent = false)
     {
         using (gui.Node(width, Theme.Scale(Theme.RowHeight), id).BlockInput().ContentAlignX(0.5f).ContentAlignY(0.5f)
                    .Enter())
@@ -100,10 +101,10 @@ public sealed partial class BricksPanel
 
             if (gui.Pass == Pass.Pass2Render)
             {
-                gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+                gui.DrawBackgroundRect(accent ? hot ? Theme.AccentHover : Theme.Accent : hot ? Theme.Hover : Theme.Chrome, 3f);
             }
 
-            gui.DrawText(label, Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim);
+            gui.DrawText(label, Theme.Text(11f), accent ? Theme.InkOnAccent : hot ? Theme.Ink : Theme.InkDim);
             if (tooltip is not null)
             {
                 gui.Tooltip(gui.CurrentNode, tooltip, maxWidth: 320);

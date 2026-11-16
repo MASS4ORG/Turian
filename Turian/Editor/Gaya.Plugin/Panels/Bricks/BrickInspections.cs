@@ -90,7 +90,9 @@ static class BrickInspections
             FormField.Display("Version", manifest, () => Version(brick, manifest)),
             FormField.Display("Id", manifest, () => brick.Id),
             .. Text("Installs In", manifest, InstallsIn(controller, brick)),
-            .. Text("Pending", manifest, pending?.Description),
+            .. Text("Pending", manifest, pending is null ? null : PendingText(pending)),
+            .. Text("Also Disables", manifest, string.Join(", ", controller.Pending.Where(c => c.Because == brick.Id).Select(static c => c.Id))),
+            .. Text("Linked To", manifest, brick.Link),
         ])
         { Buttons = pending is null ? Actions(controller, brick, resolved) : PendingActions(controller, brick) };
         var details = new FormSection("Details", manifest,
@@ -107,6 +109,13 @@ static class BrickInspections
         FormSection[] sections = Versions(controller, brick, manifest) is { } versions ? [summary, versions, details] : [summary, details];
         return new FormInspection(manifest, model with { Sections = sections }, $"brick:{brick.Id}", controller.WorkspaceRoot);
     }
+
+    // The staged version transition, with the brick it follows from when it was not chosen directly.
+    static string PendingText(BrickChange change) =>
+        change.Because is null ? change.Transition : $"{change.Transition}, because it needs {change.Because}";
+
+    /// <summary>The title of the registry form's section of signing keys, which starts folded.</summary>
+    public const string SigningTitle = "Signing Keys";
 
     /// <summary>
     /// The versions a registry lists, to use any one of them; the form in use and the forms published; and the copies
@@ -211,8 +220,12 @@ static class BrickInspections
         _ => "Available",
     };
 
-    static IReadOnlyList<Button> Actions(BricksController controller, CatalogBrick brick,
-        ResolvedPackage? resolved) => [.. FormActions(controller, brick, resolved), .. StandardActions(controller, brick, resolved)];
+    static IReadOnlyList<Button> Actions(BricksController controller, CatalogBrick brick, ResolvedPackage? resolved) =>
+    [
+        .. FormActions(controller, brick, resolved),
+        .. StandardActions(controller, brick, resolved),
+        .. brick.Link is null ? [] : (Button[])[Action(controller, "Remove Link", () => controller.UnlinkAsync(brick.Id))],
+    ];
 
     static IReadOnlyList<Button> FormActions(BricksController controller, CatalogBrick brick, ResolvedPackage? resolved)
     {
@@ -285,15 +298,20 @@ static class BrickInspections
         var model = InspectorForms.Build(draft, readOnly: readOnly);
         var savedName = name.Length == 0 ? null : name;
         var title = savedName is null ? "New registry" : $"Registry '{savedName}'";
-        var section = new FormSection(title, draft, model.Sections[0].Fields)
+        var fields = model.Sections[0].Fields;
+        static bool IsSigning(FormField field) => field.Name is nameof(ScopedRegistry.Keys) or nameof(ScopedRegistry.AllowUnsigned);
+        var section = new FormSection(title, draft, [.. fields.Where(field => !IsSigning(field))])
         {
             Buttons = readOnly ? [] :
             [
                 Action(controller, "Save", () => controller.SaveRegistryAsync(savedName, draft)),
-                Action(controller, "Remove", () => controller.RemoveRegistryAsync(savedName ?? draft.Name)),
+                .. savedName is null ? [] : (Button[])[Action(controller, "Remove", () => controller.RemoveRegistryAsync(savedName))],
             ],
         };
-        return new FormInspection(draft, model with { Sections = [section] }, $"registry:{name}", controller.WorkspaceRoot);
+
+        // The keys are for people who run their own registry; they start folded under their own heading.
+        var signing = new FormSection(SigningTitle, draft, [.. fields.Where(IsSigning)]);
+        return new FormInspection(draft, model with { Sections = [section, signing] }, $"registry:{name}", controller.WorkspaceRoot);
     }
 
     /// <summary>Builds the project's brick settings form with explicit persistence actions.</summary>

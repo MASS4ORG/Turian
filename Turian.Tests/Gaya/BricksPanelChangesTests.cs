@@ -113,6 +113,29 @@ public sealed class BricksPanelChangesTests : IDisposable
         Assert.DoesNotContain(Nodes(), static n => n.Id == "bricks/pending");
     }
 
+    /// <summary>Problems become one-line toasts: the first line, shortened, and how many more are in the log.</summary>
+    [Fact]
+    public void ProblemsAreToastedAsOneLine()
+    {
+        Assert.Equal("ui stays at 2.1.1", BricksPanel.ToastText("ui stays at 2.1.1"));
+        Assert.Equal("a (+1 more, see the log)", BricksPanel.ToastText("a\r\nb\na"));
+        Assert.EndsWith("...", BricksPanel.ToastText(new string('x', 300)), StringComparison.Ordinal);
+        Assert.True(BricksPanel.ToastText(new string('x', 300)).Length <= 110);
+    }
+
+    /// <summary>The pending bar names the one change chosen and the bricks that must follow it.</summary>
+    [Fact]
+    public void ThePendingBarNamesFollowers()
+    {
+        var disable = new BrickChange(BrickChangeKind.Disable, "ddd", BrickScope.Project) { From = "1.0.0" };
+        var follower = new BrickChange(BrickChangeKind.Disable, "ui", BrickScope.Project) { From = "2.1.1", Because = "ddd" };
+
+        Assert.Equal("ddd: 1.0.0 → disabled", BricksPanel.Summary([disable]));
+        Assert.Equal("ddd: 1.0.0 → disabled; also disables ui", BricksPanel.Summary([disable, follower]));
+        Assert.Equal("2 changes waiting", BricksPanel.Summary(
+            [disable, new BrickChange(BrickChangeKind.Enable, "x", BrickScope.Project)]));
+    }
+
     /// <summary>Ticking a staged brick again drops its change instead of staging the opposite one.</summary>
     [Fact]
     public async Task TickingAgainUndoesTheStagedChange()

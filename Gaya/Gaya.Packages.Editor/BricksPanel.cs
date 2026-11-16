@@ -49,6 +49,10 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
     Vector2 menuAt;
     int seenRevision = -1;
     Frame? frame;
+    bool listening;
+    readonly System.Collections.Concurrent.ConcurrentQueue<string> problems = new();
+
+    static readonly ToastOptions ProblemToast = new() { Duration = 7f, MaxWidth = 480f };
 
     static ThemeTokens Theme => ThemeTokens.Current;
 
@@ -63,12 +67,12 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
     /// again in the render pass could draw a node the build pass never laid out, at the window's corner.
     /// </summary>
     sealed record Frame(bool HasWorkspace, BricksTab Tab, BrickScope Scope, PackageScope? WorkspaceScope, bool Busy,
-        string? Error, bool RestartRequired, IReadOnlyList<CatalogBrick> Catalog, IReadOnlyList<BrickChange> Pending,
-        IReadOnlyList<ScopedRegistry> Registries)
+        bool RestartRequired, IReadOnlyList<CatalogBrick> Catalog, IReadOnlyList<BrickChange> Pending,
+        IReadOnlyList<ScopedRegistry> Registries, string? PublicRegistry)
     {
         public static Frame Of(BricksController controller) => new(controller.HasWorkspace, controller.Tab, controller.Scope,
-            controller.Workspace?.Scope, controller.IsBusy, controller.Error, controller.StudioRestartRequired,
-            controller.Catalog, controller.Pending, controller.Registries);
+            controller.Workspace?.Scope, controller.IsBusy, controller.StudioRestartRequired,
+            controller.Catalog, controller.Pending, controller.Registries, controller.Workspace?.PublicRegistry?.Name);
     }
 
     /// <summary>Shows the studio's bricks of one content category, as Settings' "Browse themes…" does.</summary>
@@ -108,9 +112,16 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
             inspector?.Refresh(controller);
         }
 
+        if (!listening)
+        {
+            listening = true;
+            controller.Problem += problems.Enqueue;
+        }
+
         if (gui.Pass == Pass.Pass1Build || frame is null)
         {
             frame = Frame.Of(controller);
+            ShowProblems(gui);
         }
 
         Draw(gui, frame);
@@ -236,12 +247,12 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
             gui.ScrollY();
             foreach (var registry in now.Registries)
             {
-                RegistryRow(gui, registry, height);
+                RegistryRow(gui, now, registry, height);
             }
         }
     }
 
-    void RegistryRow(Gui gui, ScopedRegistry registry, float height)
+    void RegistryRow(Gui gui, Frame now, ScopedRegistry registry, float height)
     {
         var id = $"bricks/registry/{registry.Name}";
         using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Padding(6f, 0f)
@@ -256,7 +267,14 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
                 gui.DrawText(registry.Url, Theme.Text(10f), Theme.InkDim, centerInRect: false);
             }
 
-            Cell(gui, $"{id}/scopes", registry.Scopes.Count == 0 ? "*" : string.Join(", ", registry.Scopes), 150f, height);
+            Cell(gui, $"{id}/scopes", registry.Scopes.Count == 0 ? "*" : string.Join(", ", registry.Scopes), 110f, height);
+
+            // The built-in registry is every workspace's own; any other is the user's to stop using.
+            if (registry.Name != now.PublicRegistry
+                && Button(gui, now, "Remove", $"{id}/remove", 60f, "Stop taking bricks from this registry."))
+            {
+                _ = controller.RemoveRegistryAsync(registry.Name);
+            }
         }
     }
 
@@ -403,13 +421,30 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
         {
             Line(gui, "Working…", Theme.InkDim);
         }
-        else if (now.Error is { } error)
+    }
+
+    /// <summary>Problems are toasts, not lines in the panel: the first line of each, the log holds the rest.</summary>
+    void ShowProblems(Gui gui)
+    {
+        while (problems.TryDequeue(out var message))
         {
-            foreach (var line in error.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                         .Distinct(StringComparer.Ordinal))
-            {
-                Line(gui, line, Theme.Error);
-            }
+            gui.Toast(ToastText(message), ProblemToast);
         }
+    }
+
+    /// <summary>One line a toast can show: the message's first line, shortened, and how many more lines there were.</summary>
+    /// <param name="message">The problem, possibly several lines.</param>
+    /// <returns>The text to toast.</returns>
+    public static string ToastText(string message)
+    {
+        var lines = message.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal).ToList();
+        var first = lines.Count > 0 ? lines[0] : message.Trim();
+        if (first.Length > 110)
+        {
+            first = $"{first[..107]}...";
+        }
+
+        return lines.Count > 1 ? $"{first} (+{lines.Count - 1} more, see the log)" : first;
     }
 }

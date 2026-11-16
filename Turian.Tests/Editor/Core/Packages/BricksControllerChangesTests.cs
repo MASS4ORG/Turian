@@ -62,6 +62,8 @@ public sealed class BricksControllerChangesTests : IDisposable
     [Fact]
     public async Task AFailedChangeDoesNotStopTheOthers()
     {
+        var problems = new List<string>();
+        controller.Problem += problems.Add;
         controller.Refresh();
         controller.Stage(new BrickChange(BrickChangeKind.Enable, "user.mateo.rules", BrickScope.Project, Source("user.mateo.rules")));
         controller.Stage(new BrickChange(BrickChangeKind.Enable, "user.mateo.missing", BrickScope.Project, "file:../nowhere"));
@@ -71,7 +73,81 @@ public sealed class BricksControllerChangesTests : IDisposable
         Assert.Contains("user.mateo.rules", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
         Assert.DoesNotContain("user.mateo.missing", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
         Assert.Contains("nowhere", controller.Error, StringComparison.Ordinal);
+        Assert.Contains("nowhere", Assert.Single(problems), StringComparison.Ordinal);
         applier.Received(1).ApplyBrickChanges();
+    }
+
+    /// <summary>A change reads as a version transition, the same way for enabling, updating and disabling.</summary>
+    [Fact]
+    public void ChangesReadAsVersionTransitions()
+    {
+        Assert.Equal("disabled → 1.0.1", new BrickChange(BrickChangeKind.Enable, "a", BrickScope.Project) { To = "1.0.1" }.Transition);
+        Assert.Equal("2.1.1 → disabled", new BrickChange(BrickChangeKind.Disable, "a", BrickScope.Project) { From = "2.1.1" }.Transition);
+        Assert.Equal("1.0.0 → 1.2.0", new BrickChange(BrickChangeKind.Update, "a", BrickScope.Project) { From = "1.0.0", To = "1.2.0" }.Transition);
+        Assert.Equal("a: 1.0.0 → disabled in Studio (needs b)", new BrickChange(BrickChangeKind.Disable, "a", BrickScope.Studio)
+        { From = "1.0.0", Because = "b" }.Description);
+    }
+
+    /// <summary>Disabling a brick stages every brick in use that needs it, and ticking it again drops them all.</summary>
+    [Fact]
+    public async Task DisablingABrickDisablesWhatNeedsIt()
+    {
+        var core = BrickService.New(Path.Combine(root, "fixtures"), "user.mateo.core");
+        new PackageManifest { Name = "user.mateo.core", Version = SemanticVersion.Parse("0.1.0") }.Save(core);
+        var app = BrickService.New(Path.Combine(root, "fixtures"), "user.mateo.app");
+        new PackageManifest
+        {
+            Name = "user.mateo.app",
+            Version = SemanticVersion.Parse("0.2.0"),
+            Dependencies = { ["user.mateo.core"] = "*" },
+        }.Save(app);
+        controller.Refresh();
+        controller.Stage(new BrickChange(BrickChangeKind.Enable, "user.mateo.core", BrickScope.Project, $"file:{core}"),
+            new BrickChange(BrickChangeKind.Enable, "user.mateo.app", BrickScope.Project, $"file:{app}"));
+        Assert.True(await controller.ApplyPendingAsync(), controller.Error);
+
+        controller.Toggle(controller.Catalog.Single(static b => b.Id == "user.mateo.core"));
+
+        Assert.Equal(["user.mateo.core", "user.mateo.app"], controller.Pending.Select(static c => c.Id));
+        Assert.Equal(["0.1.0 → disabled", "0.2.0 → disabled"], controller.Pending.Select(static c => c.Transition));
+        Assert.Equal("user.mateo.core", controller.PendingFor("user.mateo.app")!.Because);
+
+        controller.Toggle(controller.Catalog.Single(static b => b.Id == "user.mateo.app"));
+        Assert.Empty(controller.Pending);
+
+        controller.Toggle(controller.Catalog.Single(static b => b.Id == "user.mateo.core"));
+        Assert.True(await controller.ApplyPendingAsync(), controller.Error);
+        Assert.DoesNotContain(controller.Rows, static r => r.Id is "user.mateo.core" or "user.mateo.app");
+    }
+
+    /// <summary>A brick linked to a local folder is not updated from its registry; the reason is reported.</summary>
+    [Fact]
+    public void LinkedBricksRefuseToUpdate()
+    {
+        var problems = new List<string>();
+        controller.Problem += problems.Add;
+        var brick = new CatalogBrick("user.mateo.remote", null, null, null, BrickState.Enabled, "2.1.1", "2.2.1",
+            "link:../source", "^2.2.1", IsBuiltin: false)
+        { Link = "../source" };
+
+        controller.StageUpdate(brick);
+
+        Assert.Empty(controller.Pending);
+        Assert.Contains("linked to ../source", Assert.Single(problems), StringComparison.Ordinal);
+        Assert.False(brick.HasUpdate);
+    }
+
+    /// <summary>Removing a link that is not there is reported, not silent.</summary>
+    [Fact]
+    public async Task UnlinkingAnUnlinkedBrickIsReported()
+    {
+        var problems = new List<string>();
+        controller.Problem += problems.Add;
+        controller.Refresh();
+
+        Assert.False(await controller.UnlinkAsync("user.mateo.rules"));
+
+        Assert.Contains("not linked", Assert.Single(problems), StringComparison.Ordinal);
     }
 
     /// <summary>An update replaces a declared range that excludes the newest version, keeping an exact pin exact.</summary>
@@ -143,9 +219,12 @@ public sealed class BricksControllerChangesTests : IDisposable
         applier.DidNotReceive().ApplyBrickChanges();
     }
 
-    /// <summary>A studio brick the studio already uses shows as in use while managing the project, not as one to add again.</summary>
+    /// <summary>
+    /// A studio brick the studio already uses stays out of the project's list, which would otherwise look as if the
+    /// project had installed it, and is in use when the studio is shown.
+    /// </summary>
     [Fact]
-    public async Task StudioBricksInUseShowAsInUseFromTheProject()
+    public async Task StudioBricksInUseStayOutOfTheProjectList()
     {
         var folder = BrickService.New(Path.Combine(root, "fixtures"), "user.mateo.panel");
         new PackageManifest { Name = "user.mateo.panel", Version = SemanticVersion.Parse("0.1.0"), Scopes = [PackageScope.Studio] }
@@ -156,6 +235,10 @@ public sealed class BricksControllerChangesTests : IDisposable
         CopyDirectory(folder, Path.Combine(controller.Store.Root, "user.mateo.panel@a"));
 
         controller.Scope = BrickScope.Project;
+
+        Assert.DoesNotContain(controller.Catalog, static b => b.Id == "user.mateo.panel");
+
+        controller.Scope = BrickScope.Studio;
 
         var brick = controller.Catalog.Single(static b => b.Id == "user.mateo.panel");
         Assert.Equal(BrickState.Enabled, brick.State);

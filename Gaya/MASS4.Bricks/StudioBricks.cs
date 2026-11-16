@@ -168,13 +168,14 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public bool RemoveRegistry(string name)
     {
         var (manifest, _) = ProjectManifest.Load(Root, includeUserOverride: false);
-        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0)
+        var shared = manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) > 0;
+        if (shared)
         {
-            return false;
+            manifest.Save(Root);
         }
 
-        manifest.Save(Root);
-        return true;
+        // A registry may be declared only in this machine's override, which the panel lists like any other.
+        return ProjectManifest.RemoveUserRegistry(Root, name) || shared;
     }
 
     /// <inheritdoc />

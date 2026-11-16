@@ -335,9 +335,12 @@ public sealed class BricksControllerTests : IDisposable
         controller.Tab = BricksTab.Registries;
         controller.SelectedRegistry = string.Empty;
 
-        var fields = Assert.Single(Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections).Fields;
+        var sections = Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections;
 
-        Assert.Equal(["Url", "Name"], fields.Take(2).Select(static f => f.Name));
+        Assert.Equal(["Url", "Name"], sections[0].Fields.Take(2).Select(static f => f.Name));
+        Assert.DoesNotContain(sections[0].Fields, static f => f.Name is "Keys" or "AllowUnsigned");
+        Assert.Equal(["AllowUnsigned", "Keys"], sections[1].Fields.Select(static f => f.Name).Order());
+        Assert.Equal(BrickInspections.SigningTitle, sections[1].Title);
     }
 
     /// <summary>
@@ -424,7 +427,7 @@ public sealed class BricksControllerTests : IDisposable
         controller.SelectedRegistry = ProjectPackages.PublicRegistry.Name;
         var publicRegistry = Assert.IsType<FormInspection>(controller.InspectSelection());
         Assert.IsType<ScopedRegistry>(publicRegistry.Target);
-        Assert.All(Assert.Single(publicRegistry.Model.Sections).Fields, static f => Assert.True(f.IsReadOnly));
+        Assert.All(publicRegistry.Model.Sections.SelectMany(static s => s.Fields), static f => Assert.True(f.IsReadOnly));
         Assert.Empty(publicRegistry.Model.Sections[0].Buttons);
     }
 

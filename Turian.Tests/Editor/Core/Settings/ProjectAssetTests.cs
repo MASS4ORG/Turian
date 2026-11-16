@@ -304,6 +304,29 @@ public sealed class ProjectAssetTests : IDisposable
     }
 
     /// <summary>
+    /// Deleting a registered profile or setting by hand can leave a <c>null</c> entry in the project asset; it is
+    /// skipped rather than crashing the editor and the command line.
+    /// </summary>
+    [Fact]
+    public void NullEntriesLeftByHandEditsAreSkipped()
+    {
+        var player = Save("Settings/PlayerSettings.dataasset", new PlayerSettings());
+        var profile = Save("Settings/Build/Server.dataasset", new BuildProfile { Target = BuildTarget.Server });
+        ProjectSettingsFiles.CreateProjectAsset(Settings, [player], [profile]);
+        var path = ProjectAsset.PathIn(Assets);
+        var json = JsonNode.Parse(File.ReadAllText(path))!;
+        json["BuildProfiles"]!.AsArray().Insert(0, null);
+        json["Settings"]!.AsArray().Insert(0, null);
+        File.WriteAllText(path, json.ToJsonString());
+
+        var asset = ProjectAsset.Load(Assets)!;
+        Assert.Equal([profile], asset.BuildProfiles.Select(static r => r.AssetId));
+        Assert.Equal([player], asset.Settings.Select(static r => r.AssetId));
+        Assert.Equal("Server", Assert.Single(BuildProfiles.Discover(BuildSettings)).Name);
+        Assert.Single(BuildProfiles.List(Settings));
+    }
+
+    /// <summary>
     /// The source index reads the editor's catalog and falls back to meta files for ids it does not know.
     /// </summary>
     [Fact]

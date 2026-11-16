@@ -6,8 +6,15 @@ namespace Turian.Engine.Core;
 /// </summary>
 public abstract class ProjectSettingsCollection : DataAsset
 {
-    /// <summary>The registered settings assets; a kind listed twice uses its first entry.</summary>
-    public List<DataAssetReference<ProjectSettingsAsset>> Settings { get; set; } = [];
+    /// <summary>
+    /// The registered settings assets; a kind listed twice uses its first entry. A <c>null</c> entry, left by editing
+    /// the file by hand, is dropped.
+    /// </summary>
+    public List<DataAssetReference<ProjectSettingsAsset>> Settings
+    {
+        get;
+        set => field = [.. value.Where(static r => r is not null)];
+    } = [];
 }
 
 /// <summary>
@@ -23,8 +30,12 @@ public class ProjectAsset : ProjectSettingsCollection
     /// <summary>The engine version that last saved the project, which decides whether it needs upgrading.</summary>
     public string? EngineVersion { get; set; }
 
-    /// <summary>The build profiles of the project.</summary>
-    public List<DataAssetReference<ProjectSettingsCollection>> BuildProfiles { get; set; } = [];
+    /// <summary>The build profiles of the project; a <c>null</c> entry, left by deleting one by hand, is dropped.</summary>
+    public List<DataAssetReference<ProjectSettingsCollection>> BuildProfiles
+    {
+        get;
+        set => field = [.. value.Where(static r => r is not null)];
+    } = [];
 
     /// <summary>
     /// The profile Build &amp; Run and exports without a named profile follow; none builds the plain project.

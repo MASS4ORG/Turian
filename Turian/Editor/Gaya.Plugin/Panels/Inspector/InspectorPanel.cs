@@ -22,6 +22,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     static ThemeTokens Theme => ThemeTokens.Current;
 
     readonly HashSet<string> collapsed = [];
+    bool foldedSigning;
     readonly FormDrawers drawers = new(TurianForms.Drawers);
     IDisposable? referenceRegistration;
     FormRenderContext? formContext;
@@ -231,6 +232,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             Node => InspectorForms.BuildForNodes(frameNodes, inspector.CreateMutationNotifier()),
             _ => InspectorForms.Build(target, _ => assets.AlterAssetForSelectedNode()),
         };
+        FoldSigningKeys();
         builtFor = target;
         builtComponents = components;
         selectionComponents = frameNodes.Sum(node => node.Components.Count);
@@ -245,6 +247,16 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             {
                 collapsed.Add(section.Title);
             }
+        }
+    }
+
+    // A registry's signing keys start folded the first time they are shown; after that the user's choice stands.
+    void FoldSigningKeys()
+    {
+        if (!foldedSigning && model.Sections.Any(static s => s.Title == BrickInspections.SigningTitle))
+        {
+            foldedSigning = true;
+            _ = collapsed.Add(BrickInspections.SigningTitle);
         }
     }
 
