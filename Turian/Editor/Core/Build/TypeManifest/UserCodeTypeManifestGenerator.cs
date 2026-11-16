@@ -37,10 +37,7 @@ public static class UserCodeTypeManifestGenerator
         var manifest = new UserCodeTypeManifest
         {
             AssemblyName = assemblyName,
-            PrecastAssemblies = [.. bricks.Where(static brick => !brick.Manifest.EditorOnly)
-                .SelectMany(BrickAssemblies.RuntimeAssemblies)
-                .Select(Path.GetFileNameWithoutExtension)
-                .OfType<string>()],
+            PrecastAssemblies = CompiledBrickAssemblies(bricks, graph),
         };
         manifest.Types.AddRange(bricks.SelectMany(BrickAssemblies.PrecastTypes));
 
@@ -85,6 +82,20 @@ public static class UserCodeTypeManifestGenerator
 
         logger.LogInformation("Type manifest generated: {Count} entry(ies)", manifest.Types.Count);
         return manifest;
+    }
+
+    static List<string> CompiledBrickAssemblies(IReadOnlyList<MASS4.Bricks.ResolvedPackage> bricks, AssemblyGraph? graph)
+    {
+        var runtime = bricks.Where(static brick => !brick.Manifest.EditorOnly).ToList();
+        var roots = runtime.Select(static brick => Path.TrimEndingDirectorySeparator(Path.GetFullPath(brick.RootPath))
+            + Path.DirectorySeparatorChar).ToArray();
+        var source = (graph?.Definitions ?? []).Where(static assembly => !assembly.EditorOnly)
+            .Where(assembly => assembly.Directories.Any(directory =>
+                roots.Any(root => Path.GetFullPath(directory).StartsWith(root, StringComparison.Ordinal))))
+            .Select(static assembly => assembly.Name);
+        return [.. runtime.SelectMany(BrickAssemblies.RuntimeAssemblies)
+            .Select(Path.GetFileNameWithoutExtension).OfType<string>()
+            .Concat(source).Distinct(StringComparer.Ordinal)];
     }
 
     /// <summary>

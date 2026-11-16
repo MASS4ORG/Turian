@@ -40,8 +40,8 @@ public sealed class UserCodeTypeManifest
     public string? AssemblyName { get; init; }
 
     /// <summary>
-    /// The prebuilt assemblies of the installed bricks a game loads by name to register their types; an editor-only
-    /// brick's are left out.
+    /// The compiled runtime assemblies of installed bricks a game loads by name to register their types and modules.
+    /// Includes source-built bricks; editor-only assemblies are left out.
     /// </summary>
     public List<string> PrecastAssemblies { get; init; } = [];
 

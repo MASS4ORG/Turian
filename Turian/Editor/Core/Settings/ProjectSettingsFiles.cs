@@ -120,18 +120,61 @@ public static class ProjectSettingsFiles
     /// <param name="target">What the profile builds.</param>
     /// <returns>Absolute path of the written asset.</returns>
     public static string AddBuildProfile(IAppSettings project, BuildTarget target)
+        => AddBuildProfile(project, BuildPlatforms.Find(null), target);
+
+    /// <summary>Adds a named profile for an installed platform and one of its supported targets.</summary>
+    /// <param name="project">The project.</param>
+    /// <param name="platform">The platform whose defaults the profile uses.</param>
+    /// <param name="target">What the profile builds.</param>
+    /// <returns>Absolute path of the written asset.</returns>
+    public static string AddBuildProfile(IAppSettings project, IBuildPlatform platform, BuildTarget target)
     {
         ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(platform);
+        if (!platform.Targets.Contains(target))
+        {
+            throw new ArgumentException($"{platform.DisplayName} does not support {target} builds.", nameof(target));
+        }
 
         var taken = BuildProfiles.List(project).Select(static p => p.Profile.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var name = target.ToString();
+        var baseName = platform.Id == BuildPlatforms.Desktop ? target.ToString() : $"{platform.DisplayName} {target}";
+        var name = baseName;
         for (var index = 1; taken.Contains(name); index++)
         {
-            name = $"{target} {index}";
+            name = $"{baseName} {index}";
         }
 
-        return CreateBuildProfile(project, new BuildProfile { Name = name, Target = target });
+        return CreateBuildProfile(project, new BuildProfile
+        {
+            Name = name,
+            Platform = platform.Id,
+            Target = target,
+            RuntimeIdentifier = platform.Id == BuildPlatforms.Desktop ? null : platform.RuntimeIdentifiers.FirstOrDefault(),
+        });
+    }
+
+    /// <summary>Removes a profile from the project, retaining its asset and selecting another active profile when needed.</summary>
+    /// <param name="project">The project.</param>
+    /// <param name="profileId">The registered profile to remove.</param>
+    /// <returns>True when the profile was registered and removed.</returns>
+    public static bool RemoveBuildProfile(IAppSettings project, Guid profileId)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry
+            || registry.BuildProfiles.All(profile => profile.AssetId != profileId))
+        {
+            return false;
+        }
+
+        registry.BuildProfiles.RemoveAll(profile => profile.AssetId == profileId);
+        if (registry.ActiveBuildProfile?.AssetId == profileId)
+        {
+            var next = BuildProfiles.List(project).FirstOrDefault(profile => profile.Id != profileId);
+            registry.ActiveBuildProfile = next is null ? null : new DataAssetReference<ProjectSettingsCollection>(next.Id);
+        }
+        SaveProjectAsset(project, registry);
+        return true;
     }
 
     /// <summary>

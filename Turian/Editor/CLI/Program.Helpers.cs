@@ -63,6 +63,25 @@ public static partial class Program
         {
             buildManager.UpdateSettings(settings);
 
+            if (loadUserCode)
+            {
+                Log.Logger.LogInformation("Compiling and loading user code…");
+                BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), Log.Logger,
+                    settings.ProjectAbsoluteDir);
+                var status = await buildManager.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
+
+                if (status.State == BuildTaskState.Succeeded)
+                {
+                    Log.Logger.LogInformation("User code loaded: {Message}", status.Message);
+                }
+                else
+                {
+                    Log.Logger.LogWarning(
+                        "User code did not load ({State}): {Message}. Custom components will report as MissingComponent",
+                        status.State, status.Message);
+                }
+            }
+
             if (reimport)
             {
                 var assetsDir = settings.AssetsAbsoluteDir;
@@ -78,25 +97,6 @@ public static partial class Program
                 importer.GenerateMetaFiles(assetsDir);
 
                 Log.Logger.LogInformation("Asset import completed");
-            }
-
-            if (loadUserCode)
-            {
-                Log.Logger.LogInformation("Compiling and loading user code…");
-                // User types deriving from or holding a precast brick's types resolve against its loaded assemblies.
-                BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), Log.Logger, settings.ProjectAbsoluteDir);
-                var status = await buildManager.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
-
-                if (status.State == BuildTaskState.Succeeded)
-                {
-                    Log.Logger.LogInformation("User code loaded: {Message}", status.Message);
-                }
-                else
-                {
-                    Log.Logger.LogWarning(
-                        "User code did not load ({State}): {Message}. Custom components will report as MissingComponent",
-                        status.State, status.Message);
-                }
             }
 
             return buildManager;

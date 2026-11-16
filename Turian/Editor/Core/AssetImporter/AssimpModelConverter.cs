@@ -8,18 +8,20 @@ public static partial class AssimpModelConverter
     // them in every environment, so the full paths are tried first and version 6 before 5.
     static readonly string[] NativeLibraryNames = BuildNativeLibraryNames();
 
-    static string[] BuildNativeLibraryNames()
+    internal static string[] BuildNativeLibraryNames(string? baseDirectory = null)
     {
+        baseDirectory ??= AppContext.BaseDirectory;
         string[] fileNames = OperatingSystem.IsWindows()
             ? ["Assimp64.dll", "Assimp32.dll"]
             : OperatingSystem.IsMacOS()
                 ? ["libassimp.6.dylib", "libassimp.5.dylib"]
                 : ["libassimp.so.6", "libassimp.so.5"];
 
-        var runtimes = Path.Combine(AppContext.BaseDirectory, "runtimes");
+        var runtimes = Path.Combine(baseDirectory, "runtimes");
         List<string> directories =
         [
-            AppContext.BaseDirectory,
+            baseDirectory,
+            Path.Combine(baseDirectory, "lib"),
             Path.Combine(runtimes, RuntimeInformation.RuntimeIdentifier, "native"),
             Path.Combine(runtimes, PortableRuntimeIdentifier(), "native")
         ];

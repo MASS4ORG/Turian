@@ -3,6 +3,30 @@ namespace Turian.Tests;
 /// <summary>Verifies native conversion produces standard glTF tangent data for mirrored UVs.</summary>
 public class AssimpModelConverterTests
 {
+    /// <summary>Installed launchers find the native converter in the shared library directory.</summary>
+    [Fact]
+    public void PublishedLayoutFindsAssimpInLib()
+    {
+        var directory = Directory.CreateTempSubdirectory("turian-assimp-layout-").FullName;
+        try
+        {
+            var lib = Directory.CreateDirectory(Path.Combine(directory, "lib")).FullName;
+            var file = OperatingSystem.IsWindows() ? "Assimp64.dll"
+                : OperatingSystem.IsMacOS() ? "libassimp.6.dylib" : "libassimp.so.6";
+            var library = Path.Combine(lib, file);
+            File.WriteAllText(library, string.Empty);
+
+            var candidates = AssimpModelConverter.BuildNativeLibraryNames(directory);
+
+            Assert.Contains(library, candidates);
+            Assert.True(Array.IndexOf(candidates, library) < Array.IndexOf(candidates, file));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     /// <summary>Verifies animation-only exports can omit the meshes collection.</summary>
     [Theory]
     [InlineData("{}")]
