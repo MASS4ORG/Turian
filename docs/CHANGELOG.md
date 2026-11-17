@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: external editor contract #396 #404.
+- Changed: Project Settings menu.
+
 ## [5.2.0] - 2026-11-17
 
 - Added: component test runner #66.

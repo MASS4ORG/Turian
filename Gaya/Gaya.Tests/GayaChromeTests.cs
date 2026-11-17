@@ -379,6 +379,53 @@ public sealed class GayaChromeTests
         Assert.DoesNotContain(Descendants(frame.Gui.RootNode!), node => node.Id == "/menubar/File/v0");
     }
 
+    /// <summary>Commands and submenus share the same group and order in the rendered menu.</summary>
+    [Fact]
+    public void ProjectSettingsSubmenuFollowsTheSolutionGroup()
+    {
+        using var frame = new WorkbenchFrame();
+        Add("Regenerate C# Solution", "0-solution");
+        Add("Player", "1-settings", "Project Settings");
+        Add("Test Runner", "2-tools");
+        Add("Build", "1-settings", "Project Settings");
+
+        var rows = new List<ControlSemantics>();
+        var sink = Substitute.For<IControlSemanticsSink>();
+        sink.When(s => s.Publish(Arg.Any<ControlSemantics>())).Do(call => rows.Add(call.Arg<ControlSemantics>()));
+        frame.Gui.ControlSemantics = sink;
+
+        frame.Draw();
+        var menu = Descendants(frame.Gui.RootNode!).Single(node => node.Id == "menubar");
+        frame.Input.MousePosition.Returns(menu.Rect.Position + new Vector2(15, 15));
+        frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
+        frame.Draw();
+        frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
+        frame.Draw();
+        var projectMenu = Assert.Single(rows, row => row.Label == "Project" && row.Role == ControlRole.Menu);
+        frame.Input.MousePosition.Returns(projectMenu.Bounds.Position + new Vector2(5, 5));
+        frame.Draw();
+        rows.Clear();
+        frame.Draw();
+
+        var settings = Assert.Single(rows, row => row.Label == "Project Settings");
+        Assert.Equal(["Regenerate C# Solution", "Project Settings", "Test Runner"],
+            rows.Where(row => row.Id.StartsWith("/menubar/Project/v0/i", StringComparison.Ordinal))
+                .Select(row => row.Label));
+
+        frame.Input.MousePosition.Returns(settings.Bounds.Position + new Vector2(5, 5));
+        rows.Clear();
+        frame.Draw();
+        Assert.Equal(["Player", "Build"],
+            rows.Where(row => row.Id.StartsWith("/menubar/Project/Project Settings/v1/i", StringComparison.Ordinal))
+                .Select(row => row.Label));
+
+        void Add(string label, string group, string path = "")
+        {
+            frame.Commands.Register(new CommandDescriptor(label, label, _ => { }));
+            frame.Menus.Add(new MenuItemDescriptor(MenuIds.Project, label, group, Path: path));
+        }
+    }
+
     /// <summary>Application window controls route close requests through the host's close capability.</summary>
     [Fact]
     public void WindowCloseButtonUsesTheGuardedCloseRequest()

@@ -28,7 +28,7 @@ public sealed class SettingsPanelTests
     [EditorSetting("Scene Viewer/Grid", Id = "grid")]
     sealed class GridPage : SamplePage;
 
-    /// <summary>With no plugin loaded, the host contributes the panel, its File entry and its shortcut.</summary>
+    /// <summary>With no plugin loaded, the host contributes the panel, its Edit entry and its shortcut.</summary>
     [Fact]
     public void HostContributesSettingsWithoutPlugins()
     {
@@ -37,7 +37,7 @@ public sealed class SettingsPanelTests
         Assert.Empty(app.LoadedPluginIds);
         Assert.Contains(app.Panels.All, static panel => panel.Id == ShellPanels.Settings);
         Assert.NotNull(app.Commands.Find(ShellCommands.Settings));
-        Assert.Contains(app.Menus.ItemsFor(MenuIds.File), static item => item.CommandId == ShellCommands.Settings);
+        Assert.Contains(app.Menus.ItemsFor(MenuIds.Edit), static item => item.CommandId == ShellCommands.Settings);
         Assert.NotEmpty(app.Shortcuts.DisplayFor(ShellCommands.Settings));
     }
 

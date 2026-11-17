@@ -29,10 +29,6 @@ sealed class BackgroundTasksPanel(BackgroundTaskManager tasks) : IPanel
             using (gui.Node(-1, -1, "tasks/list").Expand().Direction(Axis.Vertical).Gap(6).Enter())
             {
                 gui.ScrollY();
-                if (roots.Count == 0)
-                {
-                    Label(gui, "No background tasks.", Theme.InkDim);
-                }
 
                 foreach (var root in roots)
                 {
