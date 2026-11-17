@@ -31,6 +31,7 @@ public static partial class Program
         {
             NewCommand(),
             CompileCommand(projectArg),
+            TestCommand(projectArg),
             ExportCommand(projectArg, configOption),
             DeployCommand(projectArg, configOption),
             DevicesCommand(projectArg),

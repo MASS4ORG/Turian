@@ -4,7 +4,7 @@ namespace Turian.Editor.Core;
 /// Creates the on-disk scaffold for a new project: directories, default scene,
 /// meta file, settings assets, and bootstrap source.
 /// </summary>
-public sealed class ProjectBootstrapper
+public sealed partial class ProjectBootstrapper
 {
     const string defaultProjectTitle = "New Project";
     const string defaultSceneFileName = "scene-01.prefab";
@@ -96,6 +96,7 @@ public sealed class ProjectBootstrapper
                     "namespace Usercode;\n\npublic static class Game\n{\n}\n");
             }
 
+            await CreateTestTemplateAsync(projectDirectory).ConfigureAwait(false);
             return settings.ProjectAbsoluteDir;
         }
         catch (Exception ex)

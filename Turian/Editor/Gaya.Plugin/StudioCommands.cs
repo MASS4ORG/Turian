@@ -7,6 +7,14 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 static class StudioCommands
 {
+    /// <summary>Registers the project test runner command and its menu entry.</summary>
+    /// <param name="context">The plugin registration surface.</param>
+    public static void RegisterTests(IPluginContext context) =>
+        Add(context, MenuIds.Project, "3", 9, new CommandDescriptor(
+                "gaya.turian.tests", "Run: Test Runner…",
+                static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.TestRunnerPanelId), HasProject)
+        { DynamicLabel = Localized("Test Runner…") });
+
     /// <summary>Registers every command, its menu entry and its key binding.</summary>
     /// <param name="context">The registration surface handed to the plugin.</param>
     public static void Register(IPluginContext context)

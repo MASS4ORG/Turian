@@ -22,7 +22,7 @@ public enum ExecutableGenerationMode
 /// <summary>
 /// Create CSProj
 /// </summary>
-public static class CsProjectGenerator
+public static partial class CsProjectGenerator
 {
     const string codeGeneratorName = "Turian.CSharp.CodeGenerator";
 
