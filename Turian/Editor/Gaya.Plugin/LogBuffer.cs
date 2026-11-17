@@ -12,19 +12,27 @@ public static class LogBuffer
     /// <summary>The provider to add with <c>builder.AddProvider(LogBuffer.Provider)</c>.</summary>
     public static ILoggerProvider Provider { get; } = new BufferLoggerProvider();
 
+    // Boxed so a reader on another thread sees a whole line, never a half-written struct.
+    static volatile object? latest;
+
     /// <summary>A snapshot of the buffered lines, oldest first.</summary>
     public static IReadOnlyList<LogLine> Snapshot() => [.. Lines];
+
+    /// <summary>The most recent line, or null when the buffer is empty; cheap enough to read every frame.</summary>
+    public static LogLine? Latest => latest as LogLine?;
 
     /// <summary>Drops every buffered line, so the Output panel's Clear button empties the console.</summary>
     public static void Clear()
     {
         while (Lines.TryDequeue(out _)) { }
+        latest = null;
         Changed?.Invoke();
     }
 
     static void Add(LogLine line)
     {
         Lines.Enqueue(line);
+        latest = line;
         while (Lines.Count > capacity && Lines.TryDequeue(out _)) { }
         Changed?.Invoke();
     }

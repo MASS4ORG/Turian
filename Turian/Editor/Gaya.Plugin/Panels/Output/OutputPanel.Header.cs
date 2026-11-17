@@ -11,7 +11,7 @@ sealed partial class OutputPanel
     public void RenderHeader(Gui gui, PanelHeaderContext context)
     {
         var theme = ThemeTokens.Current;
-        var contentHeight = theme.Scale(7 * theme.RowHeight + 6f + 16f);
+        var contentHeight = theme.Scale(8 * theme.RowHeight + 6f + 16f);
         var titleBar = theme.Scale(24f);
 
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, $"{context.PanelId}/tabMenu")
@@ -66,6 +66,8 @@ sealed partial class OutputPanel
                 () => settings.ShowTimestamp, value => settings.ShowTimestamp = value);
             changed |= Toggle(gui, "monospace", localization.T("Monospace"), box, size, entryHeight,
                 () => settings.Monospace, value => settings.Monospace = value);
+            changed |= Toggle(gui, "showStudio", localization.T("Studio"), box, size, entryHeight,
+                () => settings.ShowStudio, value => settings.ShowStudio = value);
             changed |= Toggle(gui, "clearOnPlay", localization.T("Clear on Play"), box, size, entryHeight,
                 () => settings.ClearOnPlay, value => settings.ClearOnPlay = value);
             changed |= Toggle(gui, "clearOnBuild", localization.T("Clear on Build"), box, size, entryHeight,

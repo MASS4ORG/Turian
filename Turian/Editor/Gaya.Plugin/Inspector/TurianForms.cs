@@ -38,6 +38,9 @@ static class TurianForms
         drawers.AddCustomEditors(typeof(TurianForms).Assembly);
         _ = drawers.Add(WrappedTextDrawer.Takes, WrappedTextDrawer.Instance);
         _ = drawers.Add(BrickVersionDrawer.Takes, BrickVersionDrawer.Instance);
+        _ = drawers.Add(EngineColorDrawer.Takes, EngineColorDrawer.Instance);
+        _ = drawers.Add(typeof(Vector3), ColorVectorDrawer.Instance);
+        _ = drawers.Add(typeof(Vector4), ColorVectorDrawer.Instance);
         return drawers;
     }
 }

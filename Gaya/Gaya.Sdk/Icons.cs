@@ -118,6 +118,18 @@ public static class Icons
     /// <summary>An instance whose prefab is missing.</summary>
     public const string PrefabMissing = "prefab.missing";
 
+    /// <summary>A logged error.</summary>
+    public const string LogError = "log.error";
+
+    /// <summary>A logged warning.</summary>
+    public const string LogWarning = "log.warning";
+
+    /// <summary>A logged information message.</summary>
+    public const string LogInfo = "log.info";
+
+    /// <summary>A logged debug or trace message.</summary>
+    public const string LogDebug = "log.debug";
+
     /// <summary>Every id above, which each built-in icon theme defines.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -125,6 +137,6 @@ public static class Icons
         SceneNode, PlayStart, PlayPause, PlayStop, PlayRestart, PlayStep, CaretRight, CaretDown, Close, External,
         Revert, Lock, Unlock, Favorite, AssetFolder, AssetFile, AssetScene, AssetMaterial, AssetData, AssetImage,
         AssetModel, AssetScript, AssetText, AssetUiDocument, AssetStyleSheet, PrefabInstance, PrefabNested,
-        PrefabVariant, PrefabMissing,
+        PrefabVariant, PrefabMissing, LogError, LogWarning, LogInfo, LogDebug,
     ];
 }

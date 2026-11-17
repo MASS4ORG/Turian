@@ -277,12 +277,14 @@ public sealed record UiBlockerProgress(string Title, string Detail = "", float? 
 /// <param name="Factory">Builds the item; called once and cached.</param>
 /// <param name="Height">Strip height in pixels. Zero lets the workbench choose.</param>
 /// <param name="Order">Lower sorts first within the slot.</param>
+/// <param name="Weight">Share of the status bar's free width relative to the other items; the default shares it equally.</param>
 public sealed record ChromeDescriptor(
     string Id,
     ChromeSlot Slot,
     Func<IServiceProvider, IChromeItem> Factory,
     float Height = 0,
-    int Order = 0);
+    int Order = 0,
+    float Weight = 1f);
 
 /// <summary>Registry of chrome contributions.</summary>
 public interface IChromeRegistry

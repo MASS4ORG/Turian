@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Added: component test runner #66.
+- Added: Output icons, multi-select copy and links.
+- Added: Output icons, multi-select copy and links.
+- Added: status bar enhanced with frame time, memory and latest message.
+- Changed: Color fields.
 
 ## [5.1.0] - 2026-11-16
 

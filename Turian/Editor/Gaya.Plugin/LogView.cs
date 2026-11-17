@@ -68,6 +68,45 @@ public static class LogView
         return rows;
     }
 
+    /// <summary>
+    /// How many buffered entries each severity filter would show, for the counts beside the toggles. Counts ignore
+    /// the text filter and the severity toggles themselves, so a hidden category still shows what it holds.
+    /// </summary>
+    /// <param name="lines">The raw buffered lines.</param>
+    /// <param name="studio">Whether events from Studio and engine services count.</param>
+    /// <returns>The entries per category.</returns>
+    public static LogCounts Count(IReadOnlyList<LogLine> lines, bool studio)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        int errors = 0, warnings = 0, information = 0, debug = 0;
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var line = lines[index];
+            if (!studio && line.IsInternal)
+            {
+                continue;
+            }
+
+            switch (line.Level)
+            {
+                case LogLevel.Critical or LogLevel.Error:
+                    errors++;
+                    break;
+                case LogLevel.Warning:
+                    warnings++;
+                    break;
+                case LogLevel.Information:
+                    information++;
+                    break;
+                case LogLevel.Debug or LogLevel.Trace:
+                    debug++;
+                    break;
+            }
+        }
+
+        return new LogCounts(errors, warnings, information, debug);
+    }
+
     static bool Matches(LogLine line, string filter, bool errors, bool warnings, bool debug,
         bool? information, bool studio) => (studio || !line.IsInternal)
         && Visible(line.Level, errors, warnings, debug, information)
@@ -103,6 +142,13 @@ public static class LogView
         return string.Join('\n', lines.Take(lineCount)) + "…";
     }
 }
+
+/// <summary>The number of buffered entries in each severity category of the Output panel.</summary>
+/// <param name="Errors">Errors and critical failures.</param>
+/// <param name="Warnings">Warnings.</param>
+/// <param name="Information">Information messages.</param>
+/// <param name="Debug">Debug and trace messages.</param>
+public readonly record struct LogCounts(int Errors, int Warnings, int Information, int Debug);
 
 /// <summary>One visible row of the Output panel.</summary>
 /// <param name="Line">The representative buffered line.</param>

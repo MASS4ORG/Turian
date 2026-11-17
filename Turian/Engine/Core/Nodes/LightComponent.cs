@@ -27,6 +27,7 @@ public class LightComponent : Component
     /// <summary>
     /// Gets or sets the color of the light as RGBA.
     /// </summary>
+    [ColorUsage]
     public Vector4 Color { get; set; } = new(1f);
 
     /// <summary>

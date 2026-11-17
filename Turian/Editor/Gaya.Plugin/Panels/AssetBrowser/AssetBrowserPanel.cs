@@ -276,6 +276,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
             favoritesProject = projectRoot;
             favorites = new AssetFavoritesStore(projectRoot);
             navigation.Reset(root);
+            state.SetExpanded(root, true);
         }
         if (!entries.Any(entry => entry.IsDirectory && entry.AbsolutePath == navigation.Current))
         {

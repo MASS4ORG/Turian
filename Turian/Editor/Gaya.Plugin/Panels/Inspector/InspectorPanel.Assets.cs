@@ -60,15 +60,44 @@ sealed partial class InspectorPanel
         }
     }
 
+    /// <summary>
+    /// The inspected asset's identity as <c>Name (Type)</c>. For a single asset it is a link: a click asks the asset
+    /// browser to show and select it, which brings it back when the inspector is locked on something else.
+    /// </summary>
     void RenderAssetName(Gui gui, AssetInspection inspection)
     {
+        var single = frameAssets.Count == 1;
         using (gui.Node(-1, Theme.Scale(24f), "inspector/asset/name").ExpandWidth()
                    .Padding(6, 2).ContentAlignY(0.5f).Enter())
         {
-            gui.DrawText(frameAssets.Count > 1 ? $"{frameAssets.Count} Assets" : Path.GetFileName(inspection.AbsolutePath),
-                Theme.Text(13), Theme.Ink,
+            if (!single)
+            {
+                gui.DrawText($"{frameAssets.Count} Assets", Theme.Text(13), Theme.Ink, centerInRect: false);
+                return;
+            }
+
+            var interactable = gui.GetInteractable();
+            var hot = interactable.OnHover();
+            gui.CurrentNode.Cursor(PointerCursor.Hand);
+            gui.DrawText(AssetHeading(inspection), Theme.Text(13), hot ? Theme.AccentHover : Theme.Info,
                 centerInRect: false);
+
+            if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick() && inspection.Metadata is { } metadata)
+            {
+                reveal.Reveal(metadata.Id);
+            }
         }
+    }
+
+    /// <summary>
+    /// The asset's file name followed by its kind in parentheses, the way Unity titles an inspected asset; the
+    /// kind is the inspection's own title when there is no asset metadata behind it.
+    /// </summary>
+    internal static string AssetHeading(AssetInspection inspection)
+    {
+        var kind = inspection.Metadata?.GetType().Name ?? inspection.Title;
+        kind = kind.Length > "Asset".Length && kind.EndsWith("Asset", StringComparison.Ordinal) ? kind[..^"Asset".Length] : kind;
+        return $"{Path.GetFileName(inspection.AbsolutePath)} ({kind})";
     }
 
     void RenderAssetFields(Gui gui, AssetInspection inspection)

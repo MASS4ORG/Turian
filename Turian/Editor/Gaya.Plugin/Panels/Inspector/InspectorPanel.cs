@@ -329,6 +329,11 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             // The name box and the active toggle cannot turn bold, so their overrides mark the header's margin.
             RenderHeaderOverride(gui, section.Target);
 
+            if (section.Target is Node identified && frameNodes.Count <= 1)
+            {
+                RenderNodeLink(gui, identified);
+            }
+
             if (active is not null)
             {
                 Toggle(gui, active, "inspector/header/active");
@@ -358,6 +363,31 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             }
 
             DrawButtons(gui, section.Buttons, "inspector/header/button");
+        }
+    }
+
+    /// <summary>
+    /// The node's icon as a link: a click selects the inspected node in the scene tree, which brings it back
+    /// into focus there when the inspector is locked on it while the selection moved elsewhere.
+    /// </summary>
+    void RenderNodeLink(Gui gui, Node node)
+    {
+        using (gui.Node(Theme.Scale(20f), Theme.Scale(20f), "inspector/header/link").ContentAlignX(0.5f)
+                   .ContentAlignY(0.5f).Enter())
+        {
+            var interactable = gui.GetInteractable();
+            var hot = interactable.OnHover();
+            gui.CurrentNode.Cursor(PointerCursor.Hand);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 3);
+            }
+
+            _ = gui.ThemedIcon(Icons.SceneNode, Theme.Text(13), hot ? 1f : 0.8f);
+            if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick())
+            {
+                inspector.Select(node);
+            }
         }
     }
 
