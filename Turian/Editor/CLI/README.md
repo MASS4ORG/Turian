@@ -1,5 +1,9 @@
 # Turian CLI
 
+## Component tests
+
+`turian-cli test <project> [--filter <name>] [--list] [--results <junit.xml>]` builds the project's top-level `Tests/` folder separately and runs `[SceneTest]` methods without graphics or audio. Failures, compilation errors and empty runs exit nonzero. Reports default to `TestResults/results.xml`. See [Component testing](https://turian.mass4.org/docs/manual/debugging/component-testing/).
+
 ## Brick commands
 
 The CLI discovers public `ICliPlugin` implementations in the compiled runtime and editor assemblies of installed bricks before parsing commands. Plugins reference `MASS4.Turian.Cli.Sdk` and `System.CommandLine`; they receive their brick folder, selected project and logger through `CliPluginContext`. Providers must have a public parameterless constructor and keep command creation free of workspace changes.

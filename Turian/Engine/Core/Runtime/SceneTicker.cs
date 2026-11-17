@@ -90,6 +90,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>The gameplay scheduler owned by this running session.</summary>
     public GameLoopScheduler Async { get; init; } = new();
 
+    /// <summary>Receives component callback failures before logging; a strict host can rethrow to fail a test.</summary>
+    public Action<Exception>? ComponentException { get; init; }
+
     /// <summary>
     /// Gameplay assets whose worker events drain in <see cref="GameLoopPhase.FixedCommit"/>, after the session's own
     /// <see cref="DataAssetSession"/> subsystem when that is a different instance.
@@ -440,8 +443,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// must not stop every other script or tear down the game loop. Each component and callback is
     /// reported once, since a callback that throws usually throws on every frame.
     /// </summary>
-    static void LogComponentException(Component component, string callback, Exception ex)
+    void LogComponentException(Component component, string callback, Exception ex)
     {
+        ComponentException?.Invoke(ex);
         if (!FailedCallbacks.GetOrCreateValue(component).Add(callback))
         {
             return;

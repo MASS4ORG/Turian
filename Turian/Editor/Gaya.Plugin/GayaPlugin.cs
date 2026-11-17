@@ -20,10 +20,12 @@ public sealed class GayaPlugin : IPlugin
         RegisterSettings(context);
         ViewportThemeTokens.Register(context.Themes);
         RegisterPanels(context);
+        RegisterTestPanel(context);
         RegisterShellChrome(context);
         RegisterBrickServices(context);
         RegisterDialogs(context);
         StudioCommands.Register(context);
+        StudioCommands.RegisterTests(context);
         StudioCommands.RegisterNewScene(context);
         PanelCommands.Register(context);
     }
@@ -176,6 +178,13 @@ public sealed class GayaPlugin : IPlugin
         { OpenByDefault = false });
     }
 
+    static void RegisterTestPanel(IPluginContext context) => context.Panels.Register(new PanelDescriptor(
+        TestRunnerPanelId, "Test Runner", PanelPlacement.Center,
+        static sp => new TestRunnerPanel(sp.GetRequiredService<SettingsService>(),
+            sp.GetRequiredService<BackgroundTaskRunner>(), sp.GetRequiredService<PlayModeService>(),
+            sp.GetRequiredService<BuildManager>(), sp.GetRequiredService<ILogger>()))
+    { OpenByDefault = false });
+
     static void RegisterShellChrome(IPluginContext context)
     {
         context.Chrome.Register(new ChromeDescriptor(
@@ -247,6 +256,9 @@ public sealed class GayaPlugin : IPlugin
 
     /// <summary>The Build Profiles window's id, which the Project menu's entry brings to the front.</summary>
     public const string BuildProfilesPanelId = "gaya.turian.buildProfiles";
+
+    /// <summary>The component test runner panel's id.</summary>
+    public const string TestRunnerPanelId = "gaya.turian.tests";
 
     /// <summary>The Bricks panel's id, which the Project menu's entry brings to the front.</summary>
     public const string BricksPanelId = BricksPanel.PanelId;

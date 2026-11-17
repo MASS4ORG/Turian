@@ -10,12 +10,15 @@ public static partial class Program
     /// <summary>Entry point.</summary>
     public static async Task<int> Main(string[] args)
     {
-        using var loggerFactory = LoggerFactory.Create(static builder => builder
-#if DEBUG
-            .SetMinimumLevel(LogLevel.Debug)
-#else
-            .SetMinimumLevel(LogLevel.Information)
-#endif
+        LogLevel minimumLevel;
+        try { minimumLevel = CliLogOptions.MinimumLevel(args); }
+        catch (ArgumentException error)
+        {
+            Console.Error.WriteLine(error.Message);
+            return 1;
+        }
+        using var loggerFactory = LoggerFactory.Create(builder => builder
+            .SetMinimumLevel(minimumLevel)
             .AddConsole());
         Log.Configure(loggerFactory);
 
@@ -28,6 +31,7 @@ public static partial class Program
         {
             NewCommand(),
             CompileCommand(projectArg),
+            TestCommand(projectArg),
             ExportCommand(projectArg, configOption),
             DeployCommand(projectArg, configOption),
             DevicesCommand(projectArg),
@@ -47,8 +51,31 @@ public static partial class Program
             Description = "Load CLI plugins from this project's bricks (defaults to the current project)",
             Recursive = true,
         });
+        root.Options.Add(new Option<LogLevel>("--verbosity", "--log-level")
+        {
+            Description = "Minimum logging level: Trace, Debug, Information (default), Warning, Error, Critical or None",
+            DefaultValueFactory = static _ => LogLevel.Information,
+            Recursive = true,
+        });
         CliPlugins.Load(root, args, Log.Logger);
-        return await root.Parse(args).InvokeAsync();
+        try
+        {
+            return await root.Parse(args).InvokeAsync(new InvocationConfiguration
+            {
+                EnableDefaultExceptionHandler = false,
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            return 1;
+        }
+        catch (Exception error) when (error is IOException or InvalidOperationException or UnauthorizedAccessException
+                                      or MASS4.Bricks.PackageException or ArgumentException)
+        {
+            Log.Logger.LogError("{Message}", error.Message);
+            Log.Logger.LogDebug(error, "Command failed");
+            return 1;
+        }
     }
 
     // ── Arguments & options ────────────────────────────────────────────────────
@@ -206,37 +233,33 @@ public static partial class Program
         IReadOnlyList<string> profileNames, BuildDeployment? deployment)
     {
         var settings = CreateSettings(project);
+        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), Log.Logger,
+            settings.ProjectAbsoluteDir);
+        LoadUserSettings();
         var profiles = profileNames.Select(name => BuildProfiles.Find(settings, name)).ToList();
+        var exports = new List<ExportUserCode>();
+        if (profiles.Count == 0)
+        {
+            exports.Add(new ExportUserCode(settings, Log.Logger, config, BuildProfiles.Active(settings),
+                deployment: deployment));
+        }
+        foreach (var profile in profiles)
+        {
+            var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
+                settings.TitleToPathFriendly ?? "Game");
+            exports.Add(new ExportUserCode(settings, Log.Logger, config, profile, output, deployment));
+        }
+        foreach (var export in exports)
+        {
+            export.Validate();
+        }
         Log.Logger.LogInformation("Exporting {Title} [{Config}]…", settings.Title, config);
 
         using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: true)
             .ConfigureAwait(false);
-        // After the project's bricks are loaded, since platforms such as Android come from them.
-        LoadUserSettings();
-
-        // Compile library first
-        var slotDir = Path.Combine(settings.CacheAbsoluteDir, "bin", "CLI");
-        Directory.CreateDirectory(slotDir);
-        var compiler = new CompileUserCode(settings, Log.Logger, slotDir);
-        await compiler.ExecuteAsync();
-
-        if (profiles.Count == 0)
+        foreach (var export in exports)
         {
-            var export = new ExportUserCode(settings, Log.Logger, config, BuildProfiles.Active(settings),
-                deployment: deployment);
             await export.ExecuteAsync();
-            return [export];
-        }
-
-        List<ExportUserCode> exports = [];
-        foreach (var profile in profiles)
-        {
-            Log.Logger.LogInformation("Build profile {Profile}: {Target}", profile.Name, profile.Profile.Target);
-            var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
-                settings.TitleToPathFriendly ?? "Game");
-            var export = new ExportUserCode(settings, Log.Logger, config, profile, output, deployment);
-            await export.ExecuteAsync();
-            exports.Add(export);
         }
 
         return exports;
@@ -264,17 +287,24 @@ public static partial class Program
             Description = "The device to install on, as turian devices lists it. Without it, the device from the user "
                           + "settings, else the only one connected"
         };
+        var releaseOption = new Option<bool>("--release")
+        {
+            Description = "Deploy the authored profile with its release signing; defaults to a temporary Development build",
+        };
         var cmd = new Command("deploy",
             "Export, install on a device, start the game and show its log until it exits; Ctrl+C stops it")
         {
-            projectArg, configOption, profileOption, deviceOption
+            projectArg, configOption, profileOption, deviceOption, releaseOption
         };
 
         cmd.SetAction(async (result, cancellationToken) =>
         {
             var profile = result.GetValue(profileOption);
             var exports = await ExportAsync(result.GetValue(projectArg)!, result.GetValue(configOption),
-                profile is null ? [] : [profile], new BuildDeployment(result.GetValue(deviceOption)))
+                profile is null ? [] : [profile], new BuildDeployment(result.GetValue(deviceOption))
+                {
+                    Development = !result.GetValue(releaseOption),
+                })
                 .ConfigureAwait(false);
             if (exports.Single().Deployed is { } deployed)
             {

@@ -29,6 +29,7 @@
     <Project Path="Gaya/Gaya.Tests/Gaya.Tests.csproj" />
   </Folder>
   <Folder Name="/Libraries/">
+    <Project Path="Turian/Testing/Turian.Testing.csproj" />
     <Project Path="Turian/LocalizationAbstractions/MASS4.Localization.Abstractions.csproj" />
     <Project Path="Turian/Localization/MASS4.Localization.csproj" />
   </Folder>

@@ -110,6 +110,18 @@ public partial class SceneManager : ISceneManager
     public void BindAssetLoader(IAssetLoader loader) =>
         assetLoader = loader ?? throw new ArgumentNullException(nameof(loader));
 
+    /// <summary>Creates and activates an empty in-memory scene with ordinary scene loading and lifetime events.</summary>
+    /// <param name="name">The new scene's name.</param>
+    /// <returns>The tracked scene, ready for nodes and components.</returns>
+    public LoadedScene CreateScene(string name = "Scene")
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var root = new Node { Name = name };
+        if (services is null) { root.Awake(null); }
+        else { root.Awake(null, services, missingServicesAllowed); }
+        return TrackLoadedScene(Guid.NewGuid(), root, setActive: true);
+    }
+
     /// <inheritdoc />
     public Task<Node> LoadNodeAsync(Guid assetId)
     {

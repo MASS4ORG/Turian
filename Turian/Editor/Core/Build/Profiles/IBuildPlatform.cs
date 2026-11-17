@@ -17,7 +17,11 @@ public sealed record BuildArtifact(string OutputDirectory);
 /// <summary>A request to install a finished build on a device and start it.</summary>
 /// <param name="Device">The device's id, or <c>null</c> for the one the platform's user settings or the connection
 /// make unambiguous.</param>
-public sealed record BuildDeployment(string? Device);
+public sealed record BuildDeployment(string? Device)
+{
+    /// <summary>Whether to use a temporary development profile for local iteration.</summary>
+    public bool Development { get; init; }
+}
 
 /// <summary>A build installed on a device and started there.</summary>
 /// <param name="Platform">The platform that installed it.</param>
@@ -134,6 +138,11 @@ public interface IBuildPlatform
     /// <param name="settings">The project settings.</param>
     /// <returns>What the user must fix, or <c>null</c> when the settings are acceptable.</returns>
     string? ValidateSettings(IAppSettings settings) => null;
+
+    /// <summary>Checks profile-dependent export requirements before compilation, import or package restore.</summary>
+    /// <param name="context">The effective settings and profile; no generated project exists yet.</param>
+    /// <returns>What the user must fix, or null when the export can start.</returns>
+    string? ValidateExport(BuildPlatformContext context) => ValidateSettings(context.Settings);
 
     /// <summary>Stages content that a platform must include inside its published artifact.</summary>
     /// <param name="context">The generated project and export settings.</param>
