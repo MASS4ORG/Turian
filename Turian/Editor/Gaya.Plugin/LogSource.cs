@@ -22,7 +22,13 @@ public static class LogSource
     /// <summary>The file and line a message references, when it references one.</summary>
     /// <param name="message">The rendered log message.</param>
     /// <returns>The file and line, or null when the message names no source location.</returns>
-    public static (string Path, int Line)? TryParse(string message)
+    public static (string Path, int Line)? TryParse(string message) =>
+        Locate(message) is { } hit ? (hit.Path, hit.Line) : null;
+
+    /// <summary>The file and line a message references, together with where that reference sits in the text.</summary>
+    /// <param name="message">The rendered log message, or one line of it.</param>
+    /// <returns>The reference, or null when the message names no source location.</returns>
+    public static LogLocation? Locate(string message)
     {
         if (string.IsNullOrEmpty(message))
         {
@@ -36,16 +42,44 @@ public static class LogSource
                 continue;
             }
 
-            var path = match.Groups["path"].Value.Trim();
-            if (path.Length == 0 || string.IsNullOrWhiteSpace(path))
+            var group = match.Groups["path"];
+            var path = group.Value.Trim();
+            if (path.Length == 0)
             {
                 continue;
             }
 
-            return (path, line);
+            var start = group.Index + group.Value.Length - group.Value.TrimStart().Length;
+            return new LogLocation(path, line, start, match.Index + match.Length - start);
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The clickable file references of a message: one per line that names an existing source file, so a stack
+    /// trace's frames inside the project become links while engine and runtime frames stay plain text.
+    /// </summary>
+    /// <param name="text">The whole rendered message, one frame per line.</param>
+    /// <param name="projectDirectory">The open project's folder, or null when none is open.</param>
+    /// <returns>The links in text order, each pointing at its range of <paramref name="text"/>.</returns>
+    public static IReadOnlyList<LogLink> Links(string text, string? projectDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var links = new List<LogLink>();
+        var offset = 0;
+        foreach (var raw in text.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+            if (Locate(line) is { } hit && ResolvePath(line, projectDirectory) is not null)
+            {
+                links.Add(new LogLink(offset + hit.Start, hit.Length, line));
+            }
+
+            offset += raw.Length + 1;
+        }
+
+        return links;
     }
 
     /// <summary>
@@ -125,5 +159,17 @@ public static class LogSource
             log.LogWarning(ex, "Output: could not open {File}", info.FileName);
         }
     }
-
 }
+
+/// <summary>A source reference found in a message: the file and line, and the character range that names them.</summary>
+/// <param name="Path">The referenced file as written in the message.</param>
+/// <param name="Line">The referenced line number.</param>
+/// <param name="Start">Offset of the reference's first character in the message.</param>
+/// <param name="Length">Length of the reference in characters.</param>
+public readonly record struct LogLocation(string Path, int Line, int Start, int Length);
+
+/// <summary>A clickable file reference inside a message's text.</summary>
+/// <param name="Start">Offset of the link's first character in the message.</param>
+/// <param name="Length">Length of the link in characters.</param>
+/// <param name="Line">The message line holding the reference; opening it jumps to that file.</param>
+public readonly record struct LogLink(int Start, int Length, string Line);

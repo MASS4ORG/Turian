@@ -225,23 +225,38 @@ public sealed partial class Workbench
 
             foreach (var item in items)
             {
-                using (gui.Node(-1, height, $"chrome/StatusBar/{item.Id}").Expand().Enter())
+                using (gui.Node(-1, height, $"chrome/StatusBar/{item.Id}").ExpandWidth(item.Weight).ExpandHeight().Enter())
                 {
                     ResolveChrome(item).Render(gui);
                 }
             }
 
-            using (gui.Node(t.Scale(statusSummaryWidth), height).ContentAlignY(0.5f).Enter())
+            using (gui.Node(t.Scale(statusSummaryWidth), height, "chrome/StatusBar/readout").ContentAlignY(0.5f)
+                       .ContentAlignX(1f).Padding(t.Gap, 0f).Enter())
             {
-                gui.DrawText(
-                    $"{gui.Time.SmoothFps:0} fps   ·   Gaya",
+                gui.DrawText(StatusReadout.Format(gui.Time.SmoothFps, MemoryBytes(gui.Time.Elapsed)),
                     t.Text(12), t.InkDim);
             }
         }
     }
 
+    /// <summary>The studio process's resident memory, sampled about once a second because reading it is not free.</summary>
+    long MemoryBytes(float now)
+    {
+        if (now - memorySampledAt >= 1f || memoryBytes == 0)
+        {
+            memoryBytes = Environment.WorkingSet;
+            memorySampledAt = now;
+        }
+
+        return memoryBytes;
+    }
+
+    long memoryBytes;
+    float memorySampledAt;
+
     /// <summary>Width reserved on the right of the status bar for the workbench's own readout.</summary>
-    const float statusSummaryWidth = 220f;
+    const float statusSummaryWidth = 300f;
 
     IPanel Resolve(PanelDescriptor descriptor)
     {

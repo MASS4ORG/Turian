@@ -18,6 +18,9 @@ public sealed class OutputPanelSettings
     /// <summary>Whether entries are drawn in a monospaced font.</summary>
     public bool Monospace { get; set; }
 
+    /// <summary>Whether messages from Studio and engine services are listed beside the project's own.</summary>
+    public bool ShowStudio { get; set; } = true;
+
     /// <summary>Whether the console clears when a play session starts.</summary>
     public bool ClearOnPlay { get; set; } = true;
 

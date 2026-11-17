@@ -47,3 +47,8 @@ icon#prefab\.instance { src = url("Icons/mono/box.svg"); color = $accent; }
 icon#prefab\.nested { src = url("Icons/mono/box.svg"); color = $ink-dim; }
 icon#prefab\.variant { src = url("Icons/mono/copy.svg"); color = $accent; }
 icon#prefab\.missing { src = url("Icons/mono/unlink.svg"); color = $error; }
+
+icon#log\.error { src = url("Icons/mono/alert-circle.svg"); color = $error; }
+icon#log\.warning { src = url("Icons/mono/alert-triangle.svg"); color = $warning; }
+icon#log\.info { src = url("Icons/mono/info-circle.svg"); }
+icon#log\.debug { src = url("Icons/mono/bug.svg"); color = $ink-dim; }

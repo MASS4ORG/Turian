@@ -55,6 +55,8 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands, context.Menus,
             context.Logger));
 
+        context.Services.AddSingleton<OutputRevealService>();
+
         context.Services.AddSingleton(sp => new OutputLogBridge(
             sp.GetRequiredService<OutputPanelSettings>(),
             sp.GetRequiredService<PlayModeService>(),
@@ -152,7 +154,19 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<OutputLogBridge>(),
                 sp.GetRequiredService<SettingsService>(),
                 sp.GetRequiredService<IFocusTracker>(),
-                sp.GetRequiredService<StudioLocalization>())));
+                sp.GetRequiredService<StudioLocalization>(),
+                sp.GetRequiredService<OutputRevealService>())));
+
+        context.Panels.Register(new PanelDescriptor(
+            TasksPanelId, "Background Tasks", PanelPlacement.Bottom,
+            static sp => new BackgroundTasksPanel(sp.GetRequiredService<BackgroundTaskManager>()))
+        { OpenByDefault = false });
+
+        context.Commands.Register(new CommandDescriptor(
+            "gaya.turian.tasks.show", "Window: Background Tasks",
+            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(TasksPanelId))
+        { MenuLabel = "Background Tasks" });
+        context.Menus.Add(new MenuItemDescriptor(MenuIds.View, "gaya.turian.tasks.show", "9"));
 
         context.Panels.Register(new PanelDescriptor(
             ShortcutsPanelId, "Shortcuts", PanelPlacement.Center,
@@ -211,8 +225,15 @@ public sealed class GayaPlugin : IPlugin
             DocumentTabsChrome.Height));
 
         context.Chrome.Register(new ChromeDescriptor(
+            "gaya.turian.lastLog", ChromeSlot.StatusBar,
+            static sp => new LastLogChrome(
+                sp.GetRequiredService<OutputRevealService>(), sp.GetRequiredService<IShellHost>()),
+            TaskBarChrome.Height, Order: -10, Weight: 4f));
+
+        context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.taskBar", ChromeSlot.StatusBar,
-            static sp => new TaskBarChrome(sp.GetRequiredService<BackgroundTaskManager>()),
+            static sp => new TaskBarChrome(
+                sp.GetRequiredService<BackgroundTaskManager>(), sp.GetRequiredService<IShellHost>()),
             TaskBarChrome.Height));
     }
 
@@ -280,6 +301,9 @@ public sealed class GayaPlugin : IPlugin
 
     /// <summary>The Output console's id, which is also the context whose tab strip bears its … menu.</summary>
     public const string OutputPanelId = "gaya.turian.output";
+
+    /// <summary>The Background Tasks panel's id.</summary>
+    public const string TasksPanelId = "gaya.turian.tasks";
 
     /// <summary>
     /// The studio's own settings pages. Each one is a plain object carrying <c>[EditorSetting]</c>, the

@@ -2,14 +2,15 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// The console: the tail of the log buffer under a toolbar. A filter box narrows the
-/// messages, independent severity and Studio toggles control visibility, a Collapse toggle merges consecutive
+/// messages, independent severity toggles control visibility, a Collapse toggle merges consecutive
 /// duplicates behind a count badge, and the list follows the tail as long as it is pinned to the
-/// bottom. The entries list and its message detail sit above and below a drag divider, the detail
-/// always visible even with nothing selected. The detail shows the whole message — the stack traces
-/// the list only shows a line or two of — wrapped and scrollable, and is text-selectable: a drag
-/// highlights a run and Ctrl+C copies just that, while a click copies the whole entry. Clicking a row
-/// selects it, a double click jumps to its source, and the row and detail jump together to wherever
-/// the split leaves them. The preferences live in the … menu on the tab strip
+/// bottom. Each entry carries an icon for its severity. The entries list and its message detail sit above
+/// and below a drag divider, the detail always visible even with nothing selected. Click, Ctrl+click and
+/// Shift+click select entries, Ctrl+C or the context menu's Copy puts the whole text of every selected
+/// entry on the clipboard, and a double click jumps to the source. The detail shows the whole message — the
+/// stack traces the list only shows a line or two of — wrapped and scrollable, with each frame that names a
+/// project file as a link; a drag highlights a run for Ctrl+C. The preferences, Studio messages among
+/// them, live in the … menu on the tab strip.
 /// </summary>
 sealed partial class OutputPanel(
     ILogger log,
@@ -17,7 +18,8 @@ sealed partial class OutputPanel(
     OutputLogBridge bridge,
     SettingsService settingsService,
     IFocusTracker focusTracker,
-    StudioLocalization localization) : IPanel
+    StudioLocalization localization,
+    OutputRevealService? requests = null) : IPanel
 {
     const string scrollId = "gaya.turian.output/log";
     const string detailNodeId = "gaya.turian.output/detail";
@@ -25,6 +27,7 @@ sealed partial class OutputPanel(
     const string splitId = "gaya.turian.output/split";
     const string filterId = "gaya.turian.output/filter";
     const string clearId = "gaya.turian.output/clear";
+    const string toggleId = "gaya.turian.output/toggle";
     const string rowPrefix = "gaya.turian.output/row/";
     const float rowHeight = 16f;
     const float defaultSplit = 0.68f;
@@ -35,8 +38,8 @@ sealed partial class OutputPanel(
     bool showWarnings = true;
     bool showLog = log.IsEnabled(LogLevel.Debug);
     bool showInformation = true;
-    bool showStudio = true;
 
+    readonly LogSelection selection = new();
     int selectedIndex = -1;
     bool followTail = true;
     float priorTailBottom;
@@ -47,6 +50,10 @@ sealed partial class OutputPanel(
     float monoSize;
 
     IReadOnlyList<LogRow> rows = [];
+    IReadOnlyList<LogLine> lines = [];
+    LogCounts counts;
+    LogLine? revealing;
+    bool scrollToSelected;
 
     static ThemeTokens Theme => ThemeTokens.Current;
 
@@ -56,8 +63,19 @@ sealed partial class OutputPanel(
         if (bridge.Generation != lastGeneration)
         {
             lastGeneration = bridge.Generation;
-            selectedIndex = -1;
+            ClearSelection();
             followTail = true;
+        }
+
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            if (requests?.Take() is { } wanted)
+            {
+                PrepareReveal(wanted);
+            }
+
+            lines = LogBuffer.Snapshot();
+            counts = LogView.Count(lines, settings.ShowStudio);
         }
 
         Navigate(gui);
@@ -68,24 +86,62 @@ sealed partial class OutputPanel(
 
             using (gui.Node(-1, -1, splitId).Expand().Direction(Axis.Vertical).Enter())
             {
+                Rect above;
                 using (gui.Node().ExpandWidth().ExpandHeight(split).Enter())
                 {
+                    above = gui.CurrentNode.Rect;
                     Entries(gui);
                 }
 
-                gui.Splitter(ref split, Axis.Vertical,
-                    thickness: Theme.Scale(2f), min: 0.25f);
+                gui.Splitter(ref split, Axis.Vertical, thickness: Theme.Scale(Theme.Gap), min: 0.25f);
 
+                Rect below;
                 using (gui.Node().ExpandWidth().ExpandHeight(1f - split).Enter())
                 {
+                    below = gui.CurrentNode.Rect;
                     Detail(gui);
                 }
+
+                DrawDivider(gui, above, below);
             }
         }
         gui.CascadeMenu(ref menuOpen, menuAt, menu => BuildContextMenu(menu, gui));
     }
 
-    /// <summary>The filter box and the Collapse/severity toggles. The Clear button empties the log.</summary>
+    /// <summary>
+    /// Paints the strip between the list and the detail as a draggable divider: a window-colored track with a
+    /// centered grip, the same thickness as the dividers between docked panels.
+    /// </summary>
+    static void DrawDivider(Gui gui, Rect above, Rect below)
+    {
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            return;
+        }
+
+        var top = above.Y + above.H;
+        var track = new Rect(above.X, top, above.W, below.Y - top);
+        if (track.H <= 0f)
+        {
+            return;
+        }
+
+        gui.DrawRect(track, Theme.Background);
+        var grip = new Vector2(Theme.Scale(28f), Theme.Scale(2f));
+        gui.DrawRect(new Rect(track.X + (track.W - grip.X) / 2f, track.Y + (track.H - grip.Y) / 2f, grip.X, grip.Y),
+            Theme.InkFaint);
+    }
+
+    void ClearSelection()
+    {
+        selection.Clear();
+        selectedIndex = -1;
+    }
+
+    /// <summary>
+    /// The Collapse toggle, the filter box, then one icon toggle per severity with its entry count, and the Clear
+    /// button that empties the log.
+    /// </summary>
     void Header(Gui gui)
     {
         var height = Theme.Scale(Theme.RowHeight + 4f);
@@ -95,19 +151,21 @@ sealed partial class OutputPanel(
                    .Direction(Axis.Horizontal).Gap(10f).ContentAlignY(0.5f).Enter())
         {
             gui.Checkbox(ref collapse, localization.T("Collapse"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showErrors, localization.T("Errors"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showWarnings, localization.T("Warnings"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showInformation, localization.T("Information"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showLog, localization.T("Debug"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showStudio, localization.T("Studio"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
 
             filter = gui.TextInput(filter, width: 0, height: height, placeholder: localization.T("Filter output"),
                 fontSize: Theme.Text(12), padding: 5, id: filterId);
 
+            SeverityToggle(gui, "errors", Icons.LogError, counts.Errors, localization.T("Errors"), ref showErrors);
+            SeverityToggle(gui, "warnings", Icons.LogWarning, counts.Warnings, localization.T("Warnings"),
+                ref showWarnings);
+            SeverityToggle(gui, "information", Icons.LogInfo, counts.Information, localization.T("Information"),
+                ref showInformation);
+            SeverityToggle(gui, "debug", Icons.LogDebug, counts.Debug, localization.T("Debug"), ref showLog);
+
             if (StudioControls.SmallTextButton(gui, localization.T("Clear"), clearId, Theme.Scale(62f)))
             {
                 LogBuffer.Clear();
-                selectedIndex = -1;
+                ClearSelection();
                 followTail = true;
             }
         }
@@ -121,12 +179,14 @@ sealed partial class OutputPanel(
 
             if (gui.Pass == Pass.Pass1Build)
             {
-                rows = LogView.Project(LogBuffer.Snapshot(), filter, showErrors, showWarnings, showLog, collapse,
-                    information: showInformation, studio: showStudio);
-                if (selectedIndex >= rows.Count)
+                rows = LogView.Project(lines, filter, showErrors, showWarnings, showLog, collapse,
+                    information: showInformation, studio: settings.ShowStudio);
+                if (selectedIndex >= rows.Count || selectedIndex >= 0 && !selection.Contains(rows[selectedIndex]))
                 {
-                    selectedIndex = -1;
+                    selectedIndex = selection.LastIndex(rows);
                 }
+
+                SelectRevealed();
             }
 
             for (var index = 0; index < rows.Count; index++)
@@ -137,6 +197,12 @@ sealed partial class OutputPanel(
             if (gui.Pass == Pass.Pass2Render)
             {
                 FollowTail(gui);
+                if (scrollToSelected && selectedIndex >= 0)
+                {
+                    RevealRow(gui, selectedIndex);
+                }
+
+                scrollToSelected = false;
             }
         }
     }
@@ -162,6 +228,11 @@ sealed partial class OutputPanel(
         }
 
         if (gui.Focus.IsTextInputFocused)
+        {
+            return;
+        }
+
+        if (HandleClipboardKeys(gui))
         {
             return;
         }
@@ -206,6 +277,15 @@ sealed partial class OutputPanel(
         if (target == selectedIndex)
         {
             return;
+        }
+
+        if (Shift(gui))
+        {
+            selection.Extend(rows, target, additive: false);
+        }
+        else
+        {
+            selection.Set(rows, target);
         }
 
         selectedIndex = target;
@@ -279,11 +359,11 @@ sealed partial class OutputPanel(
         var font = settings.Monospace ? Mono(size) : null;
         var id = $"{rowPrefix}{row.RawIndex}";
 
-        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Enter())
+        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hovered = interactable.OnHover();
-            if (index == selectedIndex)
+            if (selection.Contains(row))
             {
                 gui.DrawBackgroundRect(Theme.AccentFill, 2f);
             }
@@ -292,6 +372,8 @@ sealed partial class OutputPanel(
                 gui.DrawBackgroundRect(Theme.Hover, 2f);
             }
 
+            _ = gui.ThemedIcon(LevelIcon(row.Line.Level), Theme.Scale(size + 3f));
+
             if (settings.ShowTimestamp)
             {
                 gui.DrawText(
@@ -299,7 +381,7 @@ sealed partial class OutputPanel(
                     size, Theme.InkFaint, font);
             }
 
-            gui.DrawText(text, size, LevelColor(row.Line.Level), font);
+            gui.DrawText(text, size, TextColor(row.Line.Level), font);
 
             if (row.Count > 1)
             {
@@ -311,31 +393,6 @@ sealed partial class OutputPanel(
             {
                 HandleRowInput(gui, interactable, row, index);
             }
-        }
-    }
-
-    /// <summary>
-    /// The message pane under the entries list. Always present: selected, it shows the whole message
-    /// wrapped and scrollable through <c>WrappedLabel</c>, which also handles drag-to-select and the
-    /// copy shortcut; otherwise a hint. The scroll state and the text selection are keyed by the
-    /// selected row, so picking another message starts at its top with nothing selected.
-    /// </summary>
-    void Detail(Gui gui)
-    {
-        var size = Theme.Text(12);
-        var id = selectedIndex >= 0 ? $"{detailNodeId}/{rows[selectedIndex].RawIndex}" : detailNodeId;
-
-        using (gui.Node(-1, -1, id).Expand().Enter())
-        {
-            gui.ScrollY();
-
-            if (selectedIndex < 0 || selectedIndex >= rows.Count)
-            {
-                return;
-            }
-
-            var row = rows[selectedIndex];
-            gui.WrappedLabel(row.Line.Text, size, settings.Monospace ? Mono(size) : null);
         }
     }
 
@@ -401,11 +458,15 @@ sealed partial class OutputPanel(
         return monoFont;
     }
 
-    static GuiColor LevelColor(LogLevel level) => level switch
+    /// <summary>The icon that marks an entry's severity in the list.</summary>
+    internal static string LevelIcon(LogLevel level) => level switch
     {
-        LogLevel.Critical or LogLevel.Error => Theme.Error,
-        LogLevel.Warning => Theme.Warning,
-        LogLevel.Debug or LogLevel.Trace => Theme.InkDim,
-        _ => Theme.Ink,
+        LogLevel.Critical or LogLevel.Error => Icons.LogError,
+        LogLevel.Warning => Icons.LogWarning,
+        LogLevel.Debug or LogLevel.Trace => Icons.LogDebug,
+        _ => Icons.LogInfo,
     };
+
+    static GuiColor TextColor(LogLevel level) =>
+        level is LogLevel.Debug or LogLevel.Trace ? Theme.InkDim : Theme.Ink;
 }

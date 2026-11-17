@@ -8,6 +8,7 @@ namespace Turian.Engine.Core;
 public class MaterialAsset : Asset
 {
     /// <summary>RGBA base color factor. Multiplied with the base color texture sample if present.</summary>
+    [ColorUsage]
     public Vector4 BaseColorFactor { get; set; } = new(1f, 1f, 1f, 1f);
 
     /// <summary>Metallic factor in [0,1]. Multiplied with the B channel of the metallic-roughness texture.</summary>

@@ -27,8 +27,8 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
         using (gui.Node(-1, ButtonSize, "play/buttons").Direction(Axis.Horizontal).Gap(3f)
                    .Padding(8f, 0f).ContentAlignY(0.5f).Enter())
         {
-            Button(gui, "play", playing ? Icons.PlayStop : Icons.PlayStart, "gaya.turian.play", playing);
             Button(gui, "startup", Icons.PlayRestart, "gaya.turian.playStartupScene", false);
+            Button(gui, "play", playing ? Icons.PlayStop : Icons.PlayStart, "gaya.turian.play", playing);
             Button(gui, "pause", paused ? Icons.PlayStart : Icons.PlayPause, "gaya.turian.playPause", paused);
             Button(gui, "step", Icons.PlayStep, "gaya.turian.playStep", false);
         }

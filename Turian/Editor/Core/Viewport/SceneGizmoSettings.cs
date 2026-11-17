@@ -12,14 +12,17 @@ public sealed class SceneGizmoSettings
 
     /// <summary>Gets or sets the normalized RGB channels of the X axis color.</summary>
     [Gaya.EditorSetting("X Axis Color")]
+    [ColorUsage]
     public Vector3 XColor { get; set; } = new(0.96f, 0.36f, 0.4f);
 
     /// <summary>Gets or sets the normalized RGB channels of the Y axis color.</summary>
     [Gaya.EditorSetting("Y Axis Color")]
+    [ColorUsage]
     public Vector3 YColor { get; set; } = new(0.35f, 0.89f, 0.55f);
 
     /// <summary>Gets or sets the normalized RGB channels of the Z axis color.</summary>
     [Gaya.EditorSetting("Z Axis Color")]
+    [ColorUsage]
     public Vector3 ZColor { get; set; } = new(0.28f, 0.55f, 1f);
 
     /// <summary>Returns the clamped axis color with the requested opacity.</summary>

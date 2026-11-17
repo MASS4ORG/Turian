@@ -45,5 +45,6 @@ public sealed class SceneViewSettings
 
     /// <summary>Gets or sets normalized linear RGB channels for empty pixels in Studio's Scene view.</summary>
     [Gaya.EditorSetting("Empty Sky Color", Description = "Background color for the Scene view.")]
+    [ColorUsage]
     public Vector3 EmptySkyColor { get; set; } = new(0.39f, 0.58f, 0.93f);
 }
