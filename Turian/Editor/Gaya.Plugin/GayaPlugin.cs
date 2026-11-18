@@ -443,6 +443,10 @@ public sealed class GayaPlugin : IPlugin
             project =>
             {
                 editorSettings.BindWorkspace(project.ProjectAbsoluteDir);
+
+                // Personal values are keyed by the project's own identity, so they follow it when the
+                // folder is renamed or moved. A project without a project asset has no identity yet.
+                editorSettings.BindPersonal(ProjectAsset.Load(project.AssetsAbsoluteDir)?.Id.ToString("D"));
                 var recent = services.GetRequiredService<RecentProjectsSettings>();
                 recent.Add(project.ProjectAbsoluteDir);
                 editorSettings.NotifyChanged("gaya.turian.recentProjects");

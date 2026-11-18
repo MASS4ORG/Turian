@@ -242,6 +242,53 @@ public sealed class PackageResolverTests : IDisposable
         await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
     }
 
+    /// <summary>
+    /// A studio-only brick never becomes a project dependency, whether the project names it or a project brick
+    /// pulls it in.
+    /// </summary>
+    [Fact]
+    public async Task StudioOnlyBricksCannotBeProjectDependencies()
+    {
+        var studio = Package("theme", "com.acme.theme", "1.0.0");
+        var manifest = PackageManifest.Load(studio);
+        manifest.Scopes = [PackageScope.Studio];
+        manifest.Save(studio);
+        Package("shop", "com.acme.shop", "1.0.0", ("com.acme.theme", "file:../theme"));
+
+        Manifest(("com.acme.theme", "file:../../theme"));
+        await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
+
+        Manifest(("com.acme.shop", "file:../../shop"));
+        await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    /// Only a brick that lists the project scope can be a project dependency: studio-only, game-only and
+    /// studio-and-game bricks are all refused, while one that also lists project is accepted.
+    /// </summary>
+    [Theory]
+    [InlineData(new[] { PackageScope.Studio }, false)]
+    [InlineData(new[] { PackageScope.Game }, false)]
+    [InlineData(new[] { PackageScope.Studio, PackageScope.Game }, false)]
+    [InlineData(new[] { PackageScope.Project, PackageScope.Studio }, true)]
+    public async Task OnlyProjectScopedBricksAreProjectDependencies(PackageScope[] scopes, bool accepted)
+    {
+        var path = Package("tool", "com.acme.tool", "1.0.0");
+        var manifest = PackageManifest.Load(path);
+        manifest.Scopes = [.. scopes];
+        manifest.Save(path);
+        Manifest(("com.acme.tool", "file:../../tool"));
+
+        if (accepted)
+        {
+            Assert.Single((await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken)).Packages);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
+        }
+    }
+
     /// <summary>Categories must be prefixed by the package, one of its dependencies or a reserved prefix.</summary>
     [Fact]
     public void CategoryPrefixesAreChecked()

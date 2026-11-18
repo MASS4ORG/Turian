@@ -29,12 +29,177 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     {
         ArgumentNullException.ThrowIfNull(page);
 
+        Apply(page, previousId);
+        restored[page.Id] = SerializePage(page)?.DeepClone();
+    }
+
+    /// <summary>
+    /// Copies only the members this file mentions onto a page's target, without recording a baseline.
+    /// This is how one layer of a cascade is applied over the layers beneath it.
+    /// </summary>
+    /// <param name="page">The page to apply onto.</param>
+    /// <param name="previousId">An earlier storage id used when migrating the same settings object.</param>
+    public void Apply(SettingsPageDescriptor page, string? previousId = null)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+
         if (Load()?[previousId ?? page.Id] is JsonObject values)
         {
             RestoreMembers(page, values);
         }
+    }
 
-        restored[page.Id] = SerializePage(page)?.DeepClone();
+    /// <summary>Whether the file holds a value for a member of a page.</summary>
+    /// <param name="pageId">The page's storage id.</param>
+    /// <param name="member">The member's name; matched without regard to case, as a restore does.</param>
+    public bool Has(string pageId, string member) => Find(pageId, member) is not null;
+
+    /// <summary>The JSON a file holds for a member of a page, or null when it holds none.</summary>
+    /// <param name="pageId">The page's storage id.</param>
+    /// <param name="member">The member's name.</param>
+    public JsonNode? Get(string pageId, string member) =>
+        Find(pageId, member) is { } key ? Load()![pageId]![key]?.DeepClone() : null;
+
+    string? Find(string pageId, string member)
+    {
+        if (Load()?[pageId] is not JsonObject values)
+        {
+            return null;
+        }
+
+        return values.Select(static pair => pair.Key)
+            .FirstOrDefault(key => string.Equals(key, member, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Changes individual members of one page in the latest contents of the file and writes it back,
+    /// keeping a backup. Nothing else in the file is touched, which is what keeps a layer sparse.
+    /// </summary>
+    /// <param name="pageId">The page's storage id.</param>
+    /// <param name="set">Members to store, by name.</param>
+    /// <param name="remove">Members to take out, by name.</param>
+    /// <returns>Whether the file now holds the change. A file that cannot be read or written is left as it was.</returns>
+    public bool Update(string pageId, IReadOnlyDictionary<string, JsonNode?> set, IReadOnlyCollection<string> remove)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+        ArgumentNullException.ThrowIfNull(remove);
+
+        if (set.Count == 0 && remove.Count == 0)
+        {
+            return true;
+        }
+
+        try
+        {
+            var document = ReadDocument() ?? new JsonObject();
+            ChangePage(document, pageId, set, remove);
+
+            if (document.Count == 0)
+            {
+                DeleteFiles();
+                stored = document;
+                return true;
+            }
+
+            var directory = System.IO.Path.GetDirectoryName(Path);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            WriteDocument(document);
+            stored = document;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            log.LogWarning(ex, "Settings: could not be saved to {Path}", Path);
+            return false;
+        }
+    }
+
+    /// <summary>Removes a file that holds nothing, with its backup and its folder when that is left empty.</summary>
+    void DeleteFiles()
+    {
+        File.Delete(Path);
+        File.Delete($"{Path}.bak");
+
+        var directory = System.IO.Path.GetDirectoryName(Path);
+        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory)
+            && !Directory.EnumerateFileSystemEntries(directory).Any())
+        {
+            Directory.Delete(directory);
+        }
+    }
+
+    /// <summary>Applies member changes to one page of a document, dropping the page when nothing is left in it.</summary>
+    static void ChangePage(JsonObject document, string pageId, IReadOnlyDictionary<string, JsonNode?> set,
+        IReadOnlyCollection<string> remove)
+    {
+        var values = document[pageId] as JsonObject ?? new JsonObject();
+        foreach (var name in remove.Concat(set.Keys))
+        {
+            foreach (var key in values.Select(static pair => pair.Key)
+                         .Where(key => string.Equals(key, name, StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                values.Remove(key);
+            }
+        }
+
+        foreach (var (name, value) in set)
+        {
+            values[name] = value?.DeepClone();
+        }
+
+        if (values.Count == 0)
+        {
+            document.Remove(pageId);
+        }
+        else
+        {
+            document[pageId] = values;
+        }
+    }
+
+    /// <summary>A page's members as JSON, the way they are stored; null when the page cannot be serialized.</summary>
+    /// <param name="page">The page to read.</param>
+    public JsonObject? Snapshot(SettingsPageDescriptor page) => SerializePage(page) as JsonObject;
+
+    /// <summary>Converts a value to the JSON a member of a type stores.</summary>
+    /// <param name="type">The settings class.</param>
+    /// <param name="member">The member's name.</param>
+    /// <param name="value">The value to convert.</param>
+    /// <exception cref="ArgumentException">The class has no such writable member, or the value does not fit it.</exception>
+    public static JsonNode? ToNode(Type type, string member, object? value)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        if (Writable(type, member) is not { } info)
+        {
+            throw new ArgumentException($"{type.Name} has no settable member {member}.", nameof(member));
+        }
+
+        try
+        {
+            return JsonSerializer.SerializeToNode(value, MemberType(info), JsonOptions);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
+        {
+            throw new ArgumentException($"{member} cannot hold that value.", nameof(value), ex);
+        }
+    }
+
+    /// <summary>Converts stored JSON to the type of a member.</summary>
+    /// <param name="type">The settings class.</param>
+    /// <param name="member">The member's name.</param>
+    /// <param name="node">The stored JSON.</param>
+    public static object? FromNode(Type type, string member, JsonNode? node)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        return Writable(type, member) is { } info && node is not null
+            ? node.Deserialize(MemberType(info), JsonOptions)
+            : null;
     }
 
     void RestoreMembers(SettingsPageDescriptor page, JsonObject values)

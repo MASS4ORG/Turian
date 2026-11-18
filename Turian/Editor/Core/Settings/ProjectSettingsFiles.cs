@@ -268,6 +268,37 @@ public static class ProjectSettingsFiles
         return previous;
     }
 
+    /// <summary>
+    /// Gives a copied or template-made project a new identity, which keys the user's personal settings so the copy
+    /// does not share them with the original. The project asset's meta file and payload are rewritten together.
+    /// </summary>
+    /// <param name="project">The project to renew.</param>
+    /// <returns>The new identity, or <c>null</c> when the project has no project asset.</returns>
+    public static Guid? RenewIdentity(IAppSettings project)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+
+        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry)
+        {
+            return null;
+        }
+
+        var path = ProjectAsset.PathIn(project.AssetsAbsoluteDir);
+        var identity = Guid.NewGuid();
+        var meta = File.Exists($"{path}.meta") ? Asset.Load($"{path}.meta") : null;
+        meta ??= new DataAssetAsset
+        {
+            RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path).Replace('\\', '/'),
+        };
+        meta.Id = identity;
+        registry.Id = identity;
+
+        // The meta file decides the id when the asset is next read, so it is written first.
+        Serializer.Save($"{path}.meta", meta);
+        Serializer.Save<DataAsset>(path, registry);
+        return identity;
+    }
+
     // A data asset's payload id is its asset id, so the meta file decides it.
     static string SaveProjectAsset(IAppSettings project, ProjectAsset asset)
     {

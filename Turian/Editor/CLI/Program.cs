@@ -32,6 +32,7 @@ public static partial class Program
             NewCommand(),
             CompileCommand(projectArg),
             RegenerateCommand(projectArg),
+            NewIdentityCommand(projectArg),
             TestCommand(projectArg),
             ExportCommand(projectArg, configOption),
             DeployCommand(projectArg, configOption),

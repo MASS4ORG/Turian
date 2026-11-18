@@ -1,3 +1,5 @@
+using Gaya.Sdk;
+
 namespace Gaya;
 
 /// <summary>Declares a settings page on a class, or the label and description of one option on a member.</summary>
@@ -20,6 +22,18 @@ public sealed class EditorSettingAttribute(string path = "") : Attribute
 
     /// <summary>Whether the page's values are stored with the project instead of the user.</summary>
     public bool Workspace { get; set; }
+
+    /// <summary>
+    /// The scope the page lives in, which is where it is listed and where a value nobody has set yet is
+    /// written. <see cref="SettingsScope.None"/> derives it from <see cref="Workspace"/>.
+    /// </summary>
+    public SettingsScope Scope { get; set; }
+
+    /// <summary>
+    /// The scopes besides <see cref="Scope"/> that may hold this page's values. Left empty, the page is
+    /// stored in its own scope only.
+    /// </summary>
+    public SettingsScope Scopes { get; set; }
 
     /// <summary>Whether the page is persisted without appearing in the Settings panel.</summary>
     public bool Hidden { get; set; }

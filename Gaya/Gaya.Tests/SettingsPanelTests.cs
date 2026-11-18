@@ -170,6 +170,76 @@ public sealed class SettingsPanelTests
         Assert.Null(Find(gui.RootNode!, "settings/sample/field1/editor"));
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
+    [EditorSetting("Own", Id = "layered", Scope = SettingsScope.Personal, Scopes = SettingsScope.User)]
+    sealed class PersonalPage
+    {
+        public int Value { get; set; } = 1;
+    }
+
+    /// <summary>
+    /// Personal and Studio tabs appear once a page lives there; a page that cascades draws its options and
+    /// the scope controls beside them.
+    /// </summary>
+    [Fact]
+    public void ScopeTabsAppearWhenPagesLiveThere()
+    {
+        using var app = PluginHost.Load([], NullLogger.Instance);
+        var panel = app.Panels.All.Single(static p => p.Id == ShellPanels.Settings).Factory(app.Services);
+        var input = Substitute.For<IInputHandler>();
+        input.MousePosition.Returns(new Vector2(-1));
+        var gui = new Gui { Input = input };
+        using var surface = SKSurface.Create(new SKImageInfo(900, 600));
+        var font = Font.FromFamilyName("sans-serif", 14);
+
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+        Assert.NotNull(Find(gui.RootNode!, "settings/scope/User"));
+        Assert.Null(Find(gui.RootNode!, "settings/scope/Personal"));
+        Assert.Null(Find(gui.RootNode!, "settings/scope/Studio"));
+
+        app.Settings.Register(new PersonalPage());
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+        Assert.NotNull(Find(gui.RootNode!, "settings/scope/Personal"));
+
+        panel.GetType().GetField("scope", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(panel, SettingsScope.Personal);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+        Assert.NotNull(Find(gui.RootNode!, "settings/layered/field0/editor"));
+    }
+
+    /// <summary>A scope with nothing to show says why: no project, no project identity, a filter, or nothing registered.</summary>
+    [Theory]
+    [InlineData(SettingsScope.Workspace, "")]
+    [InlineData(SettingsScope.Personal, "")]
+    [InlineData(SettingsScope.Studio, "")]
+    [InlineData(SettingsScope.User, "no-such-setting")]
+    public void EmptyScopesRenderWithoutPages(SettingsScope scope, string filter)
+    {
+        using var app = PluginHost.Load([], NullLogger.Instance);
+        foreach (var page in app.Settings.Pages.ToArray())
+        {
+            app.Settings.Remove(page.Id);
+        }
+
+        app.Settings.BindWorkspace(null);
+        app.Settings.BindPersonal(null);
+        var panel = app.Panels.All.Single(static p => p.Id == ShellPanels.Settings).Factory(app.Services);
+        var type = panel.GetType();
+        type.GetField("scope", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(panel, scope);
+        type.GetField("filter", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(panel, filter);
+        var input = Substitute.For<IInputHandler>();
+        input.MousePosition.Returns(new Vector2(-1));
+        var gui = new Gui { Input = input };
+        using var surface = SKSurface.Create(new SKImageInfo(900, 600));
+        var font = Font.FromFamilyName("sans-serif", 14);
+
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+
+        Assert.Null(Find(gui.RootNode!, "settings/layered/field0/editor"));
+    }
+
     static LayoutNode? Find(LayoutNode node, string id)
     {
         if (node.Id == id)
