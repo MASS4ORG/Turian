@@ -110,6 +110,7 @@ public static class PluginHost
         var themes = new ThemeService(logger);
         services.AddSingleton(AppearanceSettings.Register(settings, previousAppearancePageId));
         services.AddSingleton<IEditorSettings>(settings);
+        services.AddSingleton<ISettingsFieldEditors>(new SettingsFieldEditors());
         services.AddSingleton<IThemeService>(themes);
 
         var panels = new PanelRegistry();
@@ -190,6 +191,7 @@ public static class PluginHost
                 services.GetRequiredService<ILogger>(),
                 services.GetService<IShellLocalization>(),
                 services.GetRequiredService<IThemeService>(),
+                services.GetService<ISettingsFieldEditors>(),
                 category =>
                 {
                     services.GetService<BricksPanel>()?.Browse(category switch

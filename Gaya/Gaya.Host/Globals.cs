@@ -5,6 +5,7 @@ global using System.Text.Json.Nodes;
 global using Autoformers;
 global using Gaya.Packages.Editor;
 global using Gaya.Sdk;
+global using Gaya.Storage;
 global using Guinevere;
 global using MASS4.Attributes;
 global using MASS4.Bricks;

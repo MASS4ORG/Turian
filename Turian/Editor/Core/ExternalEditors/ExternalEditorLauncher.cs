@@ -20,7 +20,7 @@ public sealed class ExternalEditorLauncher(
     int hinted;
 
     /// <summary>The editor to open things with, or <c>null</c> to use the operating system's default program.</summary>
-    internal ExternalEditorSelection? Selection { get; set; }
+    public ExternalEditorSelection? Selection { get; set; }
 
     /// <summary>Opens <paramref name="context"/> and reports what happened.</summary>
     /// <param name="context">What to open.</param>

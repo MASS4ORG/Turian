@@ -12,19 +12,22 @@ namespace Gaya.Host;
 public sealed class EditorSettings : IEditorSettings
 {
     /// <summary>The project sub-directory a workspace's settings live in.</summary>
-    public const string WorkspaceDirectory = ".gaya";
+    public const string WorkspaceDirectory = SettingsPaths.WorkspaceDirectory;
 
     /// <summary>The file name the user, workspace and personal scopes use, in their own directory.</summary>
-    public const string FileName = "settings.json";
+    public const string FileName = SettingsPaths.FileName;
 
     /// <summary>The file name of the Studio scope, in the per-user directory.</summary>
-    public const string StudioFileName = "studio.json";
+    public const string StudioFileName = SettingsPaths.StudioFileName;
 
     /// <summary>The per-user directory holding one sub-directory of personal values per project.</summary>
-    public const string PersonalDirectory = "projects";
+    public const string PersonalDirectory = SettingsPaths.PersonalDirectory;
 
     /// <summary>How long an edit may sit unwritten while the user keeps changing it.</summary>
     static readonly TimeSpan WriteInterval = TimeSpan.FromSeconds(1);
+
+    /// <summary>How often <see cref="Flush"/> checks the files for changes made by another process.</summary>
+    public TimeSpan ExternalChangeInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     readonly ILogger log;
     readonly string personalRoot;
@@ -32,6 +35,7 @@ public sealed class EditorSettings : IEditorSettings
     readonly HashSet<SettingsScope> dirty = [];
     readonly Dictionary<string, JsonObject> baselines = new(StringComparer.Ordinal);
     readonly Stopwatch sinceWrite = Stopwatch.StartNew();
+    readonly Stopwatch sinceCheck = Stopwatch.StartNew();
 
     readonly StudioSettingsStore studio;
     readonly StudioSettingsStore user;
@@ -49,10 +53,9 @@ public sealed class EditorSettings : IEditorSettings
 
         this.log = log;
         this.personalRoot = personalRoot ?? UserConfigPath.For(PersonalDirectory);
-        user = new StudioSettingsStore(log, userPath ?? UserConfigPath.For(FileName));
+        user = new StudioSettingsStore(log, userPath ?? SettingsPaths.User(UserConfigPath.Directory));
         studio = new StudioSettingsStore(log,
-            studioPath ?? (userPath is null ? UserConfigPath.For(StudioFileName)
-                : Path.Combine(Path.GetDirectoryName(userPath) ?? "", StudioFileName)));
+            studioPath ?? SettingsPaths.Studio(userPath is null ? UserConfigPath.Directory : Path.GetDirectoryName(userPath) ?? ""));
     }
 
     /// <inheritdoc />
@@ -112,8 +115,7 @@ public sealed class EditorSettings : IEditorSettings
 
         workspace = string.IsNullOrWhiteSpace(projectDirectory)
             ? null
-            : new StudioSettingsStore(log,
-                Path.Combine(projectDirectory, WorkspaceDirectory, FileName));
+            : new StudioSettingsStore(log, SettingsPaths.Workspace(projectDirectory));
 
         ResolveAll(SettingsScope.Workspace);
 
@@ -126,10 +128,7 @@ public sealed class EditorSettings : IEditorSettings
     {
         WriteBeforeRebind(SettingsScope.Personal);
 
-        // The id becomes a directory name, so only a GUID is accepted: no separators, no traversal.
-        personal = Guid.TryParse(projectId, out var id)
-            ? new StudioSettingsStore(log, Path.Combine(personalRoot, id.ToString("D"), FileName))
-            : null;
+        personal = SettingsPaths.Personal(projectId, personalRoot) is { } path ? new StudioSettingsStore(log, path) : null;
 
         ResolveAll(SettingsScope.Personal);
 
@@ -313,12 +312,45 @@ public sealed class EditorSettings : IEditorSettings
     /// </summary>
     public void Flush()
     {
+        PickUpExternalChanges();
         if (dirty.Count == 0 || sinceWrite.Elapsed < WriteInterval)
         {
             return;
         }
 
         Save();
+    }
+
+    /// <summary>
+    /// Re-reads a scope's file when another process, such as a CLI command, changed it, so a value written
+    /// elsewhere applies without a restart. Pending edits are written first and so are never lost.
+    /// </summary>
+    void PickUpExternalChanges()
+    {
+        if (sinceCheck.Elapsed < ExternalChangeInterval)
+        {
+            return;
+        }
+
+        sinceCheck.Restart();
+        var changed = SettingsScopes.Ascending.Where(scope => Store(scope)?.ChangedOnDisk() == true).ToList();
+        if (changed.Count == 0)
+        {
+            return;
+        }
+
+        if (dirty.Count > 0)
+        {
+            Save();
+        }
+
+        foreach (var scope in changed)
+        {
+            Store(scope)!.Reload();
+            ResolveAll(scope);
+        }
+
+        Changed?.Invoke();
     }
 
     void WriteBeforeRebind(SettingsScope scope)

@@ -19,6 +19,7 @@ global using Gaya.Host;
 global using Gaya.Packages.Editor;
 global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
+global using Gaya.Storage;
 global using Gaya.Tests;
 global using Guinevere;
 global using Ktx2;

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 
 [assembly: TypeForwardedTo(typeof(Gaya.Sdk.SettingsScope))]
+[assembly: TypeForwardedTo(typeof(Gaya.Sdk.SettingsScopes))]
 
 namespace Gaya.Sdk;
 
@@ -89,14 +90,6 @@ public sealed class SettingsPageDescriptor
         is { Length: > 0 } segments
         ? segments[^1]
         : Id;
-}
-
-/// <summary>The scopes as an ordered set.</summary>
-public static class SettingsScopes
-{
-    /// <summary>Every single scope, lowest precedence first: a later scope overrides an earlier one.</summary>
-    public static IReadOnlyList<SettingsScope> Ascending { get; } =
-        [SettingsScope.Studio, SettingsScope.User, SettingsScope.Workspace, SettingsScope.Personal];
 }
 
 /// <summary>What a scope operation did: whether it took effect, and where the value now resolves from.</summary>

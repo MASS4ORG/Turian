@@ -15,6 +15,13 @@ public interface IExternalEditor
     /// <summary>What the editor can do.</summary>
     ExternalEditorCapabilities Capabilities { get; }
 
+    /// <summary>The settings this editor adds to the preferences; none unless it overrides this.</summary>
+    IReadOnlyList<ExternalEditorOption> Options => [];
+
+    /// <summary>Whether a program the user browsed to is a copy of this editor, so it can be launched as one.</summary>
+    /// <param name="executable">The full path of the program.</param>
+    bool Recognizes(string executable) => false;
+
     /// <summary>Finds the copies of this editor on the machine.</summary>
     /// <returns>The installations, newest first; empty when the editor is absent or not available on this OS.</returns>
     IReadOnlyList<EditorInstallation> Discover();

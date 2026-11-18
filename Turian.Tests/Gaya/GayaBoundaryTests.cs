@@ -9,7 +9,7 @@ namespace Turian.Tests;
 public class GayaBoundaryTests
 {
     static readonly string[] GayaAssemblies =
-        ["Gaya.Attributes", "Gaya.Sdk", "MASS4.Bricks", "Gaya.Packages.Editor", "Gaya.Host"];
+        ["Gaya.Attributes", "Gaya.Storage", "Gaya.Sdk", "MASS4.Bricks", "Gaya.Packages.Editor", "Gaya.Host"];
 
     /// <summary>Generic libraries shared by Gaya and Turian: MASS4.Attributes and the Guinevere generic forms.</summary>
     static readonly string[] SharedLibraries = ["Attributes", "Autoformers"];
@@ -38,6 +38,22 @@ public class GayaBoundaryTests
 
         Assert.True(offenders.Length == 0,
             $"MASS4.Bricks must stay free of the workbench and UI: {string.Join("; ", offenders)}.");
+    }
+
+    /// <summary>
+    /// The settings storage stays neutral so any host or tool can share it: it needs only the framework, never another
+    /// Gaya assembly, the workbench or the UI.
+    /// </summary>
+    [Fact]
+    public void Storage_DependsOnNothingButTheFramework()
+    {
+        var offenders = AssemblyClosure.Offenders(Assembly.Load("Gaya.Storage"), static reference =>
+            !reference.StartsWith("System", StringComparison.Ordinal)
+            && !reference.StartsWith("Microsoft", StringComparison.Ordinal)
+            && reference is not ("netstandard" or "mscorlib" or "Gaya.Storage"));
+
+        Assert.True(offenders.Length == 0,
+            $"Gaya.Storage must stay free of other assemblies: {string.Join("; ", offenders)}.");
     }
 
     /// <summary>The generic libraries Gaya and Turian build on reference neither of them.</summary>

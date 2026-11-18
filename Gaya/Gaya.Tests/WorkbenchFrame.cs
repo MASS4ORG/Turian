@@ -19,7 +19,7 @@ sealed class WorkbenchFrame : IDisposable
         var themes = new ThemeService();
         var registrations = new ServiceCollection().AddSingleton<ILogger>(NullLogger.Instance)
             .AddSingleton<IEditorSettings>(settings).AddSingleton<IThemeService>(themes)
-            .AddSingleton(Blocker);
+            .AddSingleton<ISettingsFieldEditors>(FieldEditors).AddSingleton(Blocker);
         if (identity is not null)
         {
             registrations.AddSingleton(identity);
@@ -41,6 +41,8 @@ sealed class WorkbenchFrame : IDisposable
         Gui.Input = Input;
     }
 
+    /// <summary>The custom settings editors the Settings panel draws members with.</summary>
+    public SettingsFieldEditors FieldEditors { get; } = new();
     /// <summary>The contributions rendered by the workbench.</summary>
     public ChromeRegistry Chrome { get; } = new();
     /// <summary>The input state supplied to both passes.</summary>

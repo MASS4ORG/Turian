@@ -1,0 +1,142 @@
+namespace Gaya.Plugin.Turian;
+
+/// <summary>The parts below the editor dropdown: the custom command, the warning, the editor's options and Test.</summary>
+sealed partial class ExternalEditorFieldEditor
+{
+    /// <summary>The executable and argument template of a custom editor.</summary>
+    void CustomFields(Gui gui, SettingsFieldContext field, ExternalEditorChoice choice)
+    {
+        using (gui.Node(-1, InputHeight, $"{field.Id}/program").Direction(Axis.Horizontal).Gap(4f)
+                   .ContentAlignY(0.5f).Enter())
+        {
+            var program = gui.TextInput(choice.Executable, width: Theme.Scale(controlWidth), height: InputHeight,
+                placeholder: T("Path to the program"), fontSize: Theme.Text(12), padding: inputPadding,
+                id: $"{field.Id}/program/text");
+            if (program != choice.Executable)
+            {
+                field.SetValue(choice with { Executable = program });
+            }
+
+            if (gui.Button(T("Browse…"), width: Theme.Scale(70f), height: Theme.Scale(Theme.RowHeight),
+                    fontSize: Theme.Text(11), id: $"{field.Id}/program/browse"))
+            {
+                Browse(field, keepEditor: true);
+            }
+        }
+
+        using (gui.Node(-1, InputHeight, $"{field.Id}/arguments").Direction(Axis.Horizontal)
+                   .ContentAlignY(0.5f).Enter())
+        {
+            var template = gui.TextInput(choice.Arguments, width: Theme.Scale(controlWidth), height: InputHeight,
+                placeholder: CustomEditor.DefaultTemplate, fontSize: Theme.Text(12), padding: inputPadding,
+                id: $"{field.Id}/arguments/text");
+            if (template != choice.Arguments)
+            {
+                field.SetValue(choice with { Arguments = template });
+            }
+        }
+
+        Line(gui, $"{T("Arguments")}: {string.Join(' ', EditorArgumentTemplate.Tokens)}", Theme.InkDim);
+    }
+
+    /// <summary>A badge and a quick fix when the chosen editor cannot be started.</summary>
+    void Warning(Gui gui, SettingsFieldContext field, ExternalEditorChoice choice)
+    {
+        var status = choice.Check(registry, Exists);
+        if (status is not (ExternalEditorStatus.ExecutableMissing or ExternalEditorStatus.EditorMissing))
+        {
+            return;
+        }
+
+        var missing = status == ExternalEditorStatus.ExecutableMissing;
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{field.Id}/warning").Direction(Axis.Horizontal).Gap(6f)
+                   .ContentAlignY(0.5f).Enter())
+        {
+            gui.DrawText(WarningText(choice, missing), Theme.Text(11f), Theme.Warning, centerInRect: false);
+
+            if (gui.Button(missing ? T("Choose again…") : T("Use system default"), width: Theme.Scale(120f),
+                    height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(11), id: $"{field.Id}/fix"))
+            {
+                if (missing)
+                {
+                    Browse(field, keepEditor: true);
+                }
+                else
+                {
+                    field.SetValue(new ExternalEditorChoice());
+                }
+            }
+        }
+    }
+
+    string WarningText(ExternalEditorChoice choice, bool missing)
+    {
+        if (!missing)
+        {
+            return $"⚠ {T("This editor is not available; its brick may have been removed.")}";
+        }
+
+        return choice.Executable.Length == 0
+            ? $"⚠ {T("No program chosen yet.")}"
+            : $"⚠ {T("Not found")}: {choice.Executable}";
+    }
+
+    /// <summary>The options the chosen editor's brick contributes, such as reusing an existing window.</summary>
+    void Options(Gui gui, SettingsFieldContext field, ExternalEditorChoice choice)
+    {
+        if (registry.Find(choice.EditorId) is not { } editor)
+        {
+            return;
+        }
+
+        foreach (var option in editor.Options)
+        {
+            var stored = option.ValueIn(choice.Options);
+            var next = option.Kind == ExternalEditorOptionKind.Toggle
+                ? ToggleOption(gui, field, option, stored)
+                : TextOption(gui, field, option, stored);
+            if (next != stored)
+            {
+                field.SetValue(choice with { Options = WithOption(choice.Options, option.Key, next) });
+            }
+
+            Line(gui, option.Description, Theme.InkDim);
+        }
+    }
+
+    string ToggleOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored) =>
+        gui.Checkbox(string.Equals(stored, bool.TrueString, StringComparison.OrdinalIgnoreCase), T(option.Label),
+            id: $"{field.Id}/option/{option.Key}")
+            ? bool.TrueString.ToLowerInvariant()
+            : bool.FalseString.ToLowerInvariant();
+
+    string TextOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored)
+    {
+        gui.DrawText(T(option.Label), Theme.Text(12f), Theme.Ink, centerInRect: false);
+        return gui.TextInput(stored, width: Theme.Scale(controlWidth), height: InputHeight, fontSize: Theme.Text(12),
+            padding: inputPadding, id: $"{field.Id}/option/{option.Key}");
+    }
+
+    static Dictionary<string, string> WithOption(IReadOnlyDictionary<string, string>? options, string key, string value)
+    {
+        var values = options is null ? [] : new Dictionary<string, string>(options, StringComparer.Ordinal);
+        values[key] = value;
+        return values;
+    }
+
+    /// <summary>Opens the project with the editor that applies now, so a wrong choice shows up here and not later.</summary>
+    void TestRow(Gui gui, SettingsFieldContext field)
+    {
+        if (field.Value is not ExternalEditorChoice { UsesSystemDefault: false })
+        {
+            return;
+        }
+
+        var directory = project.Settings?.ProjectAbsoluteDir;
+        if (gui.Button(T("Test"), width: Theme.Scale(60f), height: Theme.Scale(Theme.RowHeight),
+                fontSize: Theme.Text(11), enabled: directory is not null, id: $"{field.Id}/test") && directory is not null)
+        {
+            _ = Task.Run(() => launcher.OpenAsync(new EditorContext(directory)));
+        }
+    }
+}
