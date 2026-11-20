@@ -23,6 +23,12 @@ public sealed class EditorSettings : IEditorSettings
     /// <summary>The per-user directory holding one sub-directory of personal values per project.</summary>
     public const string PersonalDirectory = SettingsPaths.PersonalDirectory;
 
+    /// <summary>The file name of the Studio scope, in the per-user directory.</summary>
+    public const string StudioFileName = "studio.json";
+
+    /// <summary>The per-user directory holding one sub-directory of personal values per project.</summary>
+    public const string PersonalDirectory = "projects";
+
     /// <summary>How long an edit may sit unwritten while the user keeps changing it.</summary>
     static readonly TimeSpan WriteInterval = TimeSpan.FromSeconds(1);
 
