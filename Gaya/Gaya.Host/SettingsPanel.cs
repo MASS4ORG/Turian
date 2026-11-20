@@ -19,7 +19,7 @@ namespace Gaya.Host;
 /// Opens the installable bricks of a category, such as <see cref="ThemeCategories.Look"/>; without it the Browse
 /// buttons are hidden.
 /// </param>
-sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
+sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
     IThemeService themes, Action<string>? browseThemes = null) : IPanel
 {
     const float categoryWidth = 210f;
@@ -92,8 +92,9 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     }
 
     /// <summary>
-    /// The two scopes as tabs: what the user carries between projects, and what belongs to the open
-    /// one. The active tab is underlined rather than filled, the way an IDE marks it.
+    /// The scopes as tabs: what the user carries between projects, what belongs to the open one, and
+    /// — once a page lives there — the machine-wide defaults and the user's own values for one
+    /// project. The active tab is underlined rather than filled, the way an IDE marks it.
     /// </summary>
     void ScopeTabs(Gui gui)
     {
@@ -103,10 +104,17 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
         {
             gui.DrawBackgroundRect(Theme.Chrome);
 
-            ScopeTab(gui, SettingsScope.User, T("User"), height);
-            ScopeTab(gui, SettingsScope.Workspace, T("Workspace"), height);
+            foreach (var tab in Tabs())
+            {
+                ScopeTab(gui, tab, T(tab.ToString()), height);
+            }
         }
     }
+
+    /// <summary>User and Workspace always; Studio and Personal only when some page lives there.</summary>
+    IEnumerable<SettingsScope> Tabs() => SettingsScopes.Ascending.Where(tab =>
+        tab is SettingsScope.User or SettingsScope.Workspace
+        || settings.Pages.Any(page => !page.Hidden && page.Scope == tab));
 
     void ScopeTab(Gui gui, SettingsScope target, string label, float height)
     {
@@ -265,6 +273,11 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             return T("Open a project to edit the settings stored with it.");
         }
 
+        if (scope == SettingsScope.Personal && !settings.HasPersonal)
+        {
+            return T("Open a project that has a project asset to edit your own settings for it.");
+        }
+
         return T(filter.Length > 0 ? "No setting matches the filter." : "Nothing is registered in this scope.");
     }
 
@@ -312,6 +325,11 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             SettingsStyle.ApplyFormStyle(gui);
             FieldEditor(gui, field, id);
         }
+
+        if (page.IsLayered)
+        {
+            Overridden(gui, page, field.Name);
+        }
     }
 
     void OptionHeading(Gui gui, SettingsPageDescriptor page, FormField field, string id, string title, bool modified)
@@ -323,6 +341,11 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             if (modified && RevertButton(gui, $"{id}/revert"))
             {
                 Revert(page, field);
+            }
+
+            if (page.IsLayered)
+            {
+                ScopeControls(gui, page, field, id);
             }
 
             using (gui.Node().Expand().Enter()) { }
