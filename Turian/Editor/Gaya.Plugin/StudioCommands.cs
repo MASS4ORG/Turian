@@ -7,6 +7,9 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 static class StudioCommands
 {
+    internal const string OpenCSharpProjectId = "gaya.turian.openCSharpProject";
+    internal const string OpenCSharpProjectLabel = "Open C# Project";
+
     /// <summary>Registers the project test runner command and its menu entry.</summary>
     /// <param name="context">The plugin registration surface.</param>
     public static void RegisterTests(IPluginContext context) =>
@@ -92,11 +95,11 @@ static class StudioCommands
             HasProject)
         { DynamicLabel = Localized("Regenerate C# Solution") });
         Add(context, MenuIds.Project, "0-solution", 1, new CommandDescriptor(
-            "gaya.turian.openCSharpProject", "Project: Open C# Project",
+            OpenCSharpProjectId, "Project: " + OpenCSharpProjectLabel,
             OpenCSharpProject,
             HasProject)
-        { DynamicLabel = Localized("Open C# Project") });
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.openCSharpProject", KeyboardKey.O,
+        { DynamicLabel = Localized(OpenCSharpProjectLabel) });
+        context.Shortcuts.Add(new KeyBinding(OpenCSharpProjectId, KeyboardKey.O,
             KeyModifiers.Ctrl | KeyModifiers.Shift));
     }
 

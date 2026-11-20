@@ -217,6 +217,10 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<IEditorSettings>(),
                 sp.GetRequiredService<UnsavedChangesGuard>())));
         context.Chrome.Register(new ChromeDescriptor(
+            "gaya.turian.openCSharpProjectToolbar", ChromeSlot.MenuBar,
+            static sp => new OpenCSharpProjectChrome(
+                sp.GetRequiredService<ICommandDispatcher>(), sp.GetRequiredService<StudioLocalization>())));
+        context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.playToolbar", ChromeSlot.MenuBar,
             static sp => new PlayToolbarChrome(
                 sp.GetRequiredService<ICommandDispatcher>(),

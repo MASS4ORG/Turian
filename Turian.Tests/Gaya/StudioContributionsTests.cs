@@ -129,7 +129,7 @@ public class StudioContributionsTests
     public void DialogsUseTheOverlaySlot()
     {
         var contributions = Configure();
-        Assert.Equal(["gaya.turian.projectSwitcher", "gaya.turian.playToolbar"],
+        Assert.Equal(["gaya.turian.projectSwitcher", "gaya.turian.openCSharpProjectToolbar", "gaya.turian.playToolbar"],
             contributions.Chrome.Where(static item => item.Slot == ChromeSlot.MenuBar).Select(static item => item.Id));
         Assert.Equal(["gaya.turian.fileDialog", "gaya.turian.unsavedChangesDialog",
                 "gaya.turian.confirmDialog", "gaya.turian.aboutDialog", "gaya.turian.notifications"],
