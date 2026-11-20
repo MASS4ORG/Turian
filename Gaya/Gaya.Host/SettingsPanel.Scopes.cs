@@ -54,6 +54,17 @@ sealed partial class SettingsPanel
         }
     }
 
+    /// <summary>A member a plugin draws itself: a column as tall as its editor needs, in the same form style.</summary>
+    void CustomEditor(Gui gui, SettingsPageDescriptor page, FormField field, string id, ISettingsFieldEditor editor)
+    {
+        var context = new SettingsFieldContext(page, field.Name, id, field.GetValue, value => field.SetValue(value));
+        using (gui.Node(Theme.Scale(editorWidth + 120f), -1, $"{id}/editor").Direction(Axis.Vertical).Gap(4f).Enter())
+        {
+            SettingsStyle.ApplyFormStyle(gui);
+            editor.Draw(gui, context);
+        }
+    }
+
     /// <summary>What a member can do from where it stands: the scopes it could go to, and the ones it could leave.</summary>
     List<(string Label, Func<SettingsChange> Run)> ScopeActions(SettingsPageDescriptor page, string member,
         SettingsScope? effective)

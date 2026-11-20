@@ -38,14 +38,14 @@ public class StudioContributionsTests
         Assert.All(drawing.WorldLines, line => Assert.Equal(0f, line.A.X % 3));
     }
 
-    sealed record Contributions(
+    internal sealed record Contributions(
         List<CommandDescriptor> Commands,
         List<MenuItemDescriptor> Menus,
         List<KeyBinding> Shortcuts,
         List<PanelDescriptor> Panels,
         List<ChromeDescriptor> Chrome);
 
-    static Contributions Configure()
+    internal static Contributions Configure()
     {
         var found = new Contributions([], [], [], [], []);
         var context = Substitute.For<IPluginContext>();
@@ -129,7 +129,7 @@ public class StudioContributionsTests
     public void DialogsUseTheOverlaySlot()
     {
         var contributions = Configure();
-        Assert.Equal(["gaya.turian.projectSwitcher", "gaya.turian.playToolbar"],
+        Assert.Equal(["gaya.turian.projectSwitcher", "gaya.turian.openCSharpProjectToolbar", "gaya.turian.playToolbar"],
             contributions.Chrome.Where(static item => item.Slot == ChromeSlot.MenuBar).Select(static item => item.Id));
         Assert.Equal(["gaya.turian.fileDialog", "gaya.turian.unsavedChangesDialog",
                 "gaya.turian.confirmDialog", "gaya.turian.aboutDialog", "gaya.turian.notifications"],

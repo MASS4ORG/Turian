@@ -7,6 +7,7 @@
     { "key": "Project", "source": "Project", "translation": "Projeto" },
     { "key": "Run", "source": "Run", "translation": "Executar" },
     { "key": "Regenerate Project Files", "source": "Regenerate Project Files", "translation": "Regenerar arquivos do projeto" },
+    { "key": "Open C# Project", "source": "Open C# Project", "translation": "Abrir projeto C#" },
     { "key": "Themes", "source": "Themes", "translation": "Temas" },
     { "key": "Localization", "source": "Localization", "translation": "Localização" },
     { "key": "Undo", "source": "Undo", "translation": "Desfazer" },

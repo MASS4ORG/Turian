@@ -15,12 +15,13 @@ namespace Gaya.Host;
 /// <param name="log">Receives file and form failures.</param>
 /// <param name="localization">Translates the panel's strings; null leaves them in English.</param>
 /// <param name="themes">The looks, themes and icon themes available through the appearance dropdowns.</param>
+/// <param name="fieldEditors">The custom editors plugins registered for members; null draws every member generically.</param>
 /// <param name="browseThemes">
 /// Opens the installable bricks of a category, such as <see cref="ThemeCategories.Look"/>; without it the Browse
 /// buttons are hidden.
 /// </param>
 sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
-    IThemeService themes, Action<string>? browseThemes = null) : IPanel
+    IThemeService themes, ISettingsFieldEditors? fieldEditors = null, Action<string>? browseThemes = null) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -319,11 +320,18 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
                 centerInRect: false);
         }
 
-        using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
-                   .Direction(Axis.Horizontal).Gap(4f).Enter())
+        if (fieldEditors?.Find(page.Id, field.Name) is { } custom)
         {
-            SettingsStyle.ApplyFormStyle(gui);
-            FieldEditor(gui, field, id);
+            CustomEditor(gui, page, field, id, custom);
+        }
+        else
+        {
+            using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
+                       .Direction(Axis.Horizontal).Gap(4f).Enter())
+            {
+                SettingsStyle.ApplyFormStyle(gui);
+                FieldEditor(gui, field, id);
+            }
         }
 
         if (page.IsLayered)

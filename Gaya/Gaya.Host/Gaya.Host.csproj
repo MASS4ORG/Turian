@@ -21,6 +21,7 @@
 
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj" />
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Storage/Gaya.Storage.csproj" />
         <ProjectReference Include="$(SolutionDir)/Gaya/MASS4.Bricks/MASS4.Bricks.csproj" />
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages.Editor/Gaya.Packages.Editor.csproj" />
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj" Condition="'$(GuinevereLocalPath)' != ''" />

@@ -33,6 +33,7 @@ public static partial class Program
             CompileCommand(projectArg),
             RegenerateCommand(projectArg),
             NewIdentityCommand(projectArg),
+            EditorCommand(projectArg),
             TestCommand(projectArg),
             ExportCommand(projectArg, configOption),
             DeployCommand(projectArg, configOption),

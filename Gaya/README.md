@@ -85,6 +85,10 @@ public sealed class ExternalToolsSettings
 
 Editing a value in the panel, or in code, writes it to the scope that already holds it, or to the page's home scope when none does, and writes only that member. For explicit control, `IEditorSettings` offers `Write`, `Copy`, `Move` and `Reset`, each taking a scope and returning a `SettingsChange` that reports whether it worked and which scope the member now resolves from. `ScopesHolding` and `TryRead` expose the layers beneath the winner.
 
+A running host notices when another process, such as a command-line tool, changes a scope's file: `EditorSettings.Flush`, called once a frame, checks the files about once a second (`ExternalChangeInterval`), writes pending edits first, and then applies the new values with no restart. Headless tools use the same file engine through `Gaya.Storage.SettingsFile` and `SettingsPaths`, a neutral assembly with no dependencies beyond the framework, which carry the atomic write, backup, case-insensitive members and delete-when-empty rules, so a scope's file behaves the same whoever writes it.
+
+A plugin can draw one member itself when no form control fits its value: implement `ISettingsFieldEditor` and register it with `ISettingsFieldEditors.Register(pageId, member, editor)`. The panel still draws the title, the scope controls and the description, and hands the editor a `SettingsFieldContext` to read the member and store a new value. A value that must always come from one scope, such as an editor with its executable and options, should be one member holding an immutable record so it never mixes scopes.
+
 Brick scopes are a separate concept: a Studio-only Brick can never become a project dependency, and the resolver refuses one that a project, or a project Brick, asks for.
 
 ## Panel headers

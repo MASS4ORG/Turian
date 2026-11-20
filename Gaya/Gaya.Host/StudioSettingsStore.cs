@@ -6,18 +6,13 @@ namespace Gaya.Host;
 /// </summary>
 public sealed class StudioSettingsStore(ILogger log, string path)
 {
-    static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        IncludeFields = true,
-        PropertyNameCaseInsensitive = true,
-    };
+    static JsonSerializerOptions JsonOptions => SettingsFile.JsonOptions;
 
-    JsonObject? stored;
+    readonly SettingsFile file = new(path, (message, exception) => log.LogWarning(exception, "{Message}", message));
     readonly Dictionary<string, JsonNode?> restored = new(StringComparer.Ordinal);
 
     /// <summary>The file this store reads and writes.</summary>
-    public string Path { get; } = path;
+    public string Path => file.Path;
 
     /// <summary>
     /// Copies the values saved for a page onto its target. Members the file does not mention keep
@@ -43,7 +38,7 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     {
         ArgumentNullException.ThrowIfNull(page);
 
-        if (Load()?[previousId ?? page.Id] is JsonObject values)
+        if (file.Load()?[previousId ?? page.Id] is JsonObject values)
         {
             RestoreMembers(page, values);
         }
@@ -52,114 +47,29 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     /// <summary>Whether the file holds a value for a member of a page.</summary>
     /// <param name="pageId">The page's storage id.</param>
     /// <param name="member">The member's name; matched without regard to case, as a restore does.</param>
-    public bool Has(string pageId, string member) => Find(pageId, member) is not null;
+    public bool Has(string pageId, string member) => file.Has(pageId, member);
 
     /// <summary>The JSON a file holds for a member of a page, or null when it holds none.</summary>
     /// <param name="pageId">The page's storage id.</param>
     /// <param name="member">The member's name.</param>
-    public JsonNode? Get(string pageId, string member) =>
-        Find(pageId, member) is { } key ? Load()![pageId]![key]?.DeepClone() : null;
-
-    string? Find(string pageId, string member)
-    {
-        if (Load()?[pageId] is not JsonObject values)
-        {
-            return null;
-        }
-
-        return values.Select(static pair => pair.Key)
-            .FirstOrDefault(key => string.Equals(key, member, StringComparison.OrdinalIgnoreCase));
-    }
+    public JsonNode? Get(string pageId, string member) => file.Get(pageId, member);
 
     /// <summary>
     /// Changes individual members of one page in the latest contents of the file and writes it back,
-    /// keeping a backup. Nothing else in the file is touched, which is what keeps a layer sparse.
+    /// keeping a backup. A file left holding nothing is deleted.
     /// </summary>
     /// <param name="pageId">The page's storage id.</param>
     /// <param name="set">Members to store, by name.</param>
     /// <param name="remove">Members to take out, by name.</param>
     /// <returns>Whether the file now holds the change. A file that cannot be read or written is left as it was.</returns>
-    public bool Update(string pageId, IReadOnlyDictionary<string, JsonNode?> set, IReadOnlyCollection<string> remove)
-    {
-        ArgumentNullException.ThrowIfNull(set);
-        ArgumentNullException.ThrowIfNull(remove);
+    public bool Update(string pageId, IReadOnlyDictionary<string, JsonNode?> set, IReadOnlyCollection<string> remove) =>
+        file.Update(pageId, set, remove);
 
-        if (set.Count == 0 && remove.Count == 0)
-        {
-            return true;
-        }
+    /// <summary>Whether another process changed the file since this store last read or wrote it.</summary>
+    public bool ChangedOnDisk() => file.ChangedOnDisk();
 
-        try
-        {
-            var document = ReadDocument() ?? new JsonObject();
-            ChangePage(document, pageId, set, remove);
-
-            if (document.Count == 0)
-            {
-                DeleteFiles();
-                stored = document;
-                return true;
-            }
-
-            var directory = System.IO.Path.GetDirectoryName(Path);
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            WriteDocument(document);
-            stored = document;
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            log.LogWarning(ex, "Settings: could not be saved to {Path}", Path);
-            return false;
-        }
-    }
-
-    /// <summary>Removes a file that holds nothing, with its backup and its folder when that is left empty.</summary>
-    void DeleteFiles()
-    {
-        File.Delete(Path);
-        File.Delete($"{Path}.bak");
-
-        var directory = System.IO.Path.GetDirectoryName(Path);
-        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory)
-            && !Directory.EnumerateFileSystemEntries(directory).Any())
-        {
-            Directory.Delete(directory);
-        }
-    }
-
-    /// <summary>Applies member changes to one page of a document, dropping the page when nothing is left in it.</summary>
-    static void ChangePage(JsonObject document, string pageId, IReadOnlyDictionary<string, JsonNode?> set,
-        IReadOnlyCollection<string> remove)
-    {
-        var values = document[pageId] as JsonObject ?? new JsonObject();
-        foreach (var name in remove.Concat(set.Keys))
-        {
-            foreach (var key in values.Select(static pair => pair.Key)
-                         .Where(key => string.Equals(key, name, StringComparison.OrdinalIgnoreCase)).ToList())
-            {
-                values.Remove(key);
-            }
-        }
-
-        foreach (var (name, value) in set)
-        {
-            values[name] = value?.DeepClone();
-        }
-
-        if (values.Count == 0)
-        {
-            document.Remove(pageId);
-        }
-        else
-        {
-            document[pageId] = values;
-        }
-    }
+    /// <summary>Forgets what was read, so the next restore reads the file again.</summary>
+    public void Reload() => file.Invalidate();
 
     /// <summary>A page's members as JSON, the way they are stored; null when the page cannot be serialized.</summary>
     /// <param name="page">The page to read.</param>
@@ -235,7 +145,7 @@ public sealed class StudioSettingsStore(ILogger log, string path)
 
         try
         {
-            var document = ReadDocument() ?? new JsonObject();
+            var document = file.ReadDocument() ?? new JsonObject();
             var snapshots = new Dictionary<string, JsonNode?>();
             foreach (var page in pages)
             {
@@ -248,14 +158,7 @@ public sealed class StudioSettingsStore(ILogger log, string path)
                 snapshots[page.Id] = values;
             }
 
-            var directory = System.IO.Path.GetDirectoryName(Path);
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            WriteDocument(document);
-            stored = document;
+            file.WriteDocument(document);
             foreach (var (id, values) in snapshots)
             {
                 restored[id] = values;
@@ -300,52 +203,6 @@ public sealed class StudioSettingsStore(ILogger log, string path)
 
             existing[name] = value?.DeepClone();
         }
-    }
-
-    void WriteDocument(JsonObject document)
-    {
-        var temporary = $"{Path}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(temporary, document.ToJsonString(JsonOptions));
-            if (File.Exists(Path))
-            {
-                File.Copy(Path, $"{Path}.bak", overwrite: true);
-            }
-
-            File.Move(temporary, Path, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporary))
-            {
-                File.Delete(temporary);
-            }
-        }
-    }
-
-    JsonObject? ReadDocument() => !File.Exists(Path) ? null
-        : JsonNode.Parse(File.ReadAllText(Path)) as JsonObject
-          ?? throw new JsonException("Settings must contain an object keyed by page id.");
-
-    /// <summary>The file's contents, read once and kept, or null when there is nothing usable.</summary>
-    JsonObject? Load()
-    {
-        if (stored is not null)
-        {
-            return stored;
-        }
-
-        try
-        {
-            stored = ReadDocument();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            log.LogWarning(ex, "Settings: could not be read from {Path}", Path);
-        }
-
-        return stored;
     }
 
     /// <summary>The public property or field a stored name refers to, or null when there is none.</summary>

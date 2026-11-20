@@ -11,6 +11,47 @@ public class EditorSettingsFileTests : IDisposable
         public int Language { get; [UsedImplicitly] set; }
     }
 
+    [EditorSetting("Mixed", Id = "test.mixed")]
+    sealed class MixedPage
+    {
+        public int Field = -1;
+
+        public int Number { get; [UsedImplicitly] set; }
+    }
+
+    [EditorSetting("Unserializable", Id = "test.unserializable")]
+    sealed class UnserializablePage
+    {
+        public Action? Callback { get; [UsedImplicitly] set; } = static () => { };
+
+        public int Value { get; [UsedImplicitly] set; }
+    }
+
+    /// <summary>Fields are restored like properties, and a stored value of the wrong type is skipped without losing the rest.</summary>
+    [Fact]
+    public void FieldsRestoreAndWrongTypedValuesAreSkipped()
+    {
+        File.WriteAllText(path, """{ "test.mixed": { "Field": 3, "Number": "not a number" } }""");
+        var page = new MixedPage();
+
+        new EditorSettings(NullLogger.Instance, path).Register(page);
+
+        Assert.Equal(3, page.Field);
+        Assert.Equal(0, page.Number);
+    }
+
+    /// <summary>A page that cannot be serialized is reported and skipped instead of failing registration or saving.</summary>
+    [Fact]
+    public void UnserializablePageDoesNotBreakRegistrationOrSaving()
+    {
+        var settings = new EditorSettings(NullLogger.Instance, path);
+
+        settings.Register(new UnserializablePage());
+        settings.Save();
+
+        Assert.Single(settings.Pages);
+    }
+
     /// <summary>Deletes the file.</summary>
     public void Dispose()
     {

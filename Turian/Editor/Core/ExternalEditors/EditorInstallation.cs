@@ -9,9 +9,11 @@ namespace Turian.Editor.Core;
 /// The argument template a custom installation starts with, using the <see cref="EditorArgumentTemplate"/> tokens;
 /// <c>null</c> for editors that build their own command line.
 /// </param>
+/// <param name="Options">The user's values for the editor's <see cref="ExternalEditorOption"/>s, by key; <c>null</c> for none.</param>
 public sealed record EditorInstallation(
     string EditorId,
     string DisplayName,
     string Executable,
     string? Version = null,
-    string? Arguments = null);
+    string? Arguments = null,
+    IReadOnlyDictionary<string, string>? Options = null);

@@ -20,7 +20,7 @@ public sealed class ExternalEditorLauncher(
     int hinted;
 
     /// <summary>The editor to open things with, or <c>null</c> to use the operating system's default program.</summary>
-    internal ExternalEditorSelection? Selection { get; set; }
+    public ExternalEditorSelection? Selection { get; set; }
 
     /// <summary>Opens <paramref name="context"/> and reports what happened.</summary>
     /// <param name="context">What to open.</param>
@@ -51,16 +51,20 @@ public sealed class ExternalEditorLauncher(
                 .ConfigureAwait(false);
             return true;
         }
-        catch (InvalidOperationException exception)
+        catch (Exception exception) when (exception is InvalidOperationException
+                                              or System.ComponentModel.Win32Exception or IOException
+                                              or UnauthorizedAccessException)
         {
             log.LogDebug(exception, "Opening {Editor} failed", editor.DisplayName);
-            return Fail(exception.Message);
+            return Fail(exception is InvalidOperationException
+                ? exception.Message
+                : $"{editor.DisplayName} could not be started: {exception.Message}");
         }
     }
 
     async Task<bool> OpenWithDefaultAsync(EditorContext context)
     {
-        var target = context.File ?? context.Solution ?? context.ProjectDirectory;
+        var target = context.File ?? context.Target(solutionAware: false);
         try
         {
             await OpenWithSystem(target).ConfigureAwait(false);

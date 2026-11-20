@@ -7,6 +7,7 @@ global using System.Text.Json.Nodes;
 global using Gaya.Host;
 global using Gaya.Packages.Editor;
 global using Gaya.Sdk;
+global using Gaya.Storage;
 global using Guinevere;
 global using MASS4.Bricks;
 global using Microsoft.CodeAnalysis;

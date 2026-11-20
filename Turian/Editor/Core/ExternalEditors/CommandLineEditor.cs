@@ -16,6 +16,12 @@ public abstract class CommandLineEditor : IExternalEditor
     public abstract ExternalEditorCapabilities Capabilities { get; }
 
     /// <inheritdoc />
+    public virtual IReadOnlyList<ExternalEditorOption> Options => [];
+
+    /// <inheritdoc />
+    public virtual bool Recognizes(string executable) => false;
+
+    /// <inheritdoc />
     public abstract IReadOnlyList<EditorInstallation> Discover();
 
     /// <summary>Builds the command that opens <paramref name="context"/> in <paramref name="installation"/>.</summary>

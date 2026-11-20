@@ -8,22 +8,25 @@ namespace Turian.Editor.Core;
 public static partial class EditorArgumentTemplate
 {
     /// <summary>The tokens a template may use.</summary>
-    public static readonly IReadOnlyList<string> Tokens = ["{projectDir}", "{solution}", "{file}", "{line}", "{column}"];
+    public static readonly IReadOnlyList<string> Tokens =
+        ["{target}", "{projectDir}", "{solution}", "{file}", "{line}", "{column}"];
 
     /// <summary>
     /// Splits <paramref name="template"/> on whitespace outside double quotes, then replaces the tokens in each
     /// argument. An argument naming a token that has no value, such as <c>{file}</c> when only the project is
     /// opened, is left out together with the switch just before it (<c>--goto</c> in <c>--goto {file}</c>); the line
-    /// and column fall back to 1.
+    /// and column fall back to 1. <c>{target}</c> is what <see cref="EditorContext.Target"/> chooses for the editor.
     /// </summary>
     /// <param name="template">The template.</param>
     /// <param name="context">The values for the tokens.</param>
+    /// <param name="solutionAware">Whether <c>{target}</c> is the generated solution rather than the project folder.</param>
     /// <returns>The arguments to start the program with.</returns>
-    public static IReadOnlyList<string> Expand(string? template, EditorContext context)
+    public static IReadOnlyList<string> Expand(string? template, EditorContext context, bool solutionAware = false)
     {
         ArgumentNullException.ThrowIfNull(context);
         var values = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
+            ["{target}"] = context.Target(solutionAware),
             ["{projectDir}"] = context.ProjectDirectory,
             ["{solution}"] = context.Solution,
             ["{file}"] = context.File,

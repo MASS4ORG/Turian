@@ -486,6 +486,50 @@ public class EditorSettingsScopeTests : IDisposable
         Assert.False(File.Exists(UserFile));
     }
 
+    /// <summary>A value another process writes to any scope's file applies on the next flush, with no restart.</summary>
+    [Fact]
+    public void ValuesWrittenByAnotherProcessApplyOnFlush()
+    {
+        var settings = Create();
+        var page = new LayeredPage();
+        settings.Register(page);
+        settings.ExternalChangeInterval = TimeSpan.Zero;
+        var raised = 0;
+        settings.Changed += () => raised++;
+
+        new SettingsFile(PersonalFile).Update(PageId, new Dictionary<string, JsonNode?> { ["Editor"] = "external" }, []);
+        settings.Flush();
+
+        Assert.Equal("external", page.Editor);
+        Assert.Equal(SettingsScope.Personal, settings.EffectiveScope(PageId, "Editor"));
+        Assert.True(raised > 0);
+
+        raised = 0;
+        settings.Flush();
+        Assert.Equal(0, raised);
+    }
+
+    /// <summary>A pending edit is written before another process's change is read, so neither is lost.</summary>
+    [Fact]
+    public void PendingEditsSurviveAnExternalChange()
+    {
+        var settings = Create();
+        var page = new LayeredPage();
+        settings.Register(page);
+        settings.ExternalChangeInterval = TimeSpan.Zero;
+
+        page.Editor = "mine";
+        settings.NotifyChanged(PageId);
+        new SettingsFile(UserFile).Update(PageId, new Dictionary<string, JsonNode?> { ["Port"] = 9 }, []);
+        settings.Flush();
+
+        Assert.Equal("mine", page.Editor);
+        Assert.Equal(9, page.Port);
+        var stored = Read(UserFile)[PageId]!.AsObject();
+        Assert.Equal("mine", stored["Editor"]!.GetValue<string>());
+        Assert.Equal(9, stored["Port"]!.GetValue<int>());
+    }
+
     /// <summary>Copying keeps the source.</summary>
     [Fact]
     public void CopyKeepsTheSource()

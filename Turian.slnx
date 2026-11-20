@@ -25,6 +25,7 @@
     <Project Path="Gaya/Gaya.Packages.Editor/Gaya.Packages.Editor.csproj" />
     <Project Path="Gaya/Gaya.Sdk/Gaya.Sdk.csproj" />
     <Project Path="Gaya/Gaya.Attributes/Gaya.Attributes.csproj" />
+    <Project Path="Gaya/Gaya.Storage/Gaya.Storage.csproj" />
     <Project Path="Gaya/Gaya.Host/Gaya.Host.csproj" />
     <Project Path="Gaya/Gaya.Tests/Gaya.Tests.csproj" />
   </Folder>

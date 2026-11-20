@@ -54,6 +54,15 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<UserSettingsCatalog>(), context.Settings, context.Logger));
         context.Services.AddSingleton(_ => new PlatformSettingsBridge(context.Settings));
 
+        context.Services.AddSingleton(sp => new ExternalEditorFieldEditor(
+            sp.GetRequiredService<IExternalEditorRegistry>(), sp.GetRequiredService<ExternalEditorLauncher>(),
+            new FileDialogProgramPicker(sp.GetRequiredService<FileDialogChrome>()),
+            sp.GetRequiredService<SettingsService>(), sp.GetService<IShellLocalization>()));
+        context.Services.AddSingleton(sp => new ExternalEditorBridge(
+            sp.GetRequiredService<ExternalEditorSettings>(), sp.GetRequiredService<ExternalEditorLauncher>(),
+            sp.GetRequiredService<IEditorSettings>(), sp.GetService<ISettingsFieldEditors>(),
+            sp.GetRequiredService<ExternalEditorFieldEditor>(), sp.GetRequiredService<IExternalEditorRegistry>()));
+
         context.Services.AddSingleton(sp => new UserPanelBridge(
             sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands, context.Menus,
             context.Logger));
@@ -208,6 +217,10 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<IEditorSettings>(),
                 sp.GetRequiredService<UnsavedChangesGuard>())));
         context.Chrome.Register(new ChromeDescriptor(
+            "gaya.turian.openCSharpProjectToolbar", ChromeSlot.MenuBar,
+            static sp => new OpenCSharpProjectChrome(
+                sp.GetRequiredService<ICommandDispatcher>(), sp.GetRequiredService<StudioLocalization>())));
+        context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.playToolbar", ChromeSlot.MenuBar,
             static sp => new PlayToolbarChrome(
                 sp.GetRequiredService<ICommandDispatcher>(),
@@ -339,6 +352,8 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<StudioLocalization>(), sp.GetRequiredService<IEditorSettings>()));
         var output = new OutputPanelSettings();
         context.Services.AddSingleton(output);
+        var externalEditor = new ExternalEditorSettings();
+        context.Services.AddSingleton(externalEditor);
 
         context.Settings.Register(language);
         context.Settings.Register(camera);
@@ -350,6 +365,7 @@ public sealed class GayaPlugin : IPlugin
         context.Settings.Register(inspector);
         context.Settings.Register(recent);
         context.Settings.Register(output);
+        context.Settings.Register(externalEditor);
 
     }
 
@@ -432,6 +448,7 @@ public sealed class GayaPlugin : IPlugin
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<PlatformSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();
+        services.GetRequiredService<ExternalEditorBridge>().Start();
 
         // Resolving the bridge is what starts it: it applies the stored theme and follows the menu.
         services.GetRequiredService<LocalizationBridge>();
