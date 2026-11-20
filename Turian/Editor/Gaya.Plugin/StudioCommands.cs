@@ -19,105 +19,79 @@ static class StudioCommands
     /// <param name="context">The registration surface handed to the plugin.</param>
     public static void Register(IPluginContext context)
     {
-        // ── Edit: undo and redo ─────────────────────────────────────────────
-        Add(context, MenuIds.Edit, "0", 0, new CommandDescriptor(
-            "gaya.turian.undo", "Edit: Undo",
-            static sp => sp.GetRequiredService<UndoService>().Undo(),
-            static sp => sp.GetRequiredService<UndoService>().CanUndo)
-        { DynamicLabel = static sp => StepLabel(sp, "Undo", sp.GetRequiredService<UndoService>().UndoLabel) });
-
-        Add(context, MenuIds.Edit, "0", 1, new CommandDescriptor(
-            "gaya.turian.redo", "Edit: Redo",
-            static sp => sp.GetRequiredService<UndoService>().Redo(),
-            static sp => sp.GetRequiredService<UndoService>().CanRedo)
-        { DynamicLabel = static sp => StepLabel(sp, "Redo", sp.GetRequiredService<UndoService>().RedoLabel) });
-
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.undo", KeyboardKey.Z, KeyModifiers.Ctrl));
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Z, KeyModifiers.Ctrl | KeyModifiers.Shift));
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Y, KeyModifiers.Ctrl));
-
-        // ── Edit: the shell's own language ──────────────────────────────────
-        // The chosen language is written back into the Language settings page by the bridge, so both
-        // the menu and the Settings panel drive the same stored value.
-        Add(context, MenuIds.Edit, "1", 0, new CommandDescriptor(
-            "gaya.turian.locale.english", "Edit: Localization: English",
-            static sp => sp.GetRequiredService<StudioLocalization>().SetLocale("en"))
-        { DynamicLabel = Localized("English") }, "Localization");
-
-        Add(context, MenuIds.Edit, "1", 1, new CommandDescriptor(
-            "gaya.turian.locale.ptBR", "Edit: Localization: Português (Brasil)",
-            static sp => sp.GetRequiredService<StudioLocalization>().SetLocale("pt-BR"))
-        { DynamicLabel = Localized("Português (Brasil)") }, "Localization");
-
-        // ── File: project and documents ─────────────────────────────────────
+        // File ─────────────────────────────────────────────
         Add(context, MenuIds.File, "1", 0, new CommandDescriptor(
             "gaya.turian.newProject", "File: New Project…",
             NewProject)
         { DynamicLabel = Localized("New Project…") });
-
         Add(context, MenuIds.File, "1", 1, new CommandDescriptor(
             "gaya.turian.openProject", "File: Open Project…",
             OpenProject)
         { DynamicLabel = Localized("Open…") });
 
-        Add(context, MenuIds.File, "1", 2, new CommandDescriptor(
+        Add(context, MenuIds.File, "2-save", 2, new CommandDescriptor(
             "gaya.turian.save", "File: Save",
             Save,
             static sp => sp.GetRequiredService<AssetWorkspace>().Active is not null)
         { DynamicLabel = Localized("Save") });
-
-        Add(context, MenuIds.File, "1", 3, new CommandDescriptor(
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.save", KeyboardKey.S, KeyModifiers.Ctrl));
+        Add(context, MenuIds.File, "2-save", 3, new CommandDescriptor(
             "gaya.turian.saveAll", "File: Save All",
             static sp => sp.GetRequiredService<AssetWorkspace>().SaveAll(),
             static sp => sp.GetRequiredService<AssetWorkspace>().Documents.Count > 0)
         { DynamicLabel = Localized("Save All") });
-
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.save", KeyboardKey.S, KeyModifiers.Ctrl));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.saveAll", KeyboardKey.S,
             KeyModifiers.Ctrl | KeyModifiers.Shift));
 
-        // ── File: settings (the Settings entry itself is the host's) ────────
-        Add(context, MenuIds.File, "2", 1, new CommandDescriptor(
-            "gaya.turian.keyboardShortcuts", "File: Keyboard Shortcuts…",
-            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.ShortcutsPanelId))
-        { DynamicLabel = Localized("Keyboard Shortcuts…") });
-
-        // A chord, so the studio ships with one: Ctrl+K arms it and Ctrl+S completes it.
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.keyboardShortcuts",
-            new KeyStroke(KeyboardKey.K, KeyModifiers.Ctrl), new KeyStroke(KeyboardKey.S, KeyModifiers.Ctrl)));
-
-        // ── File: exit ──────────────────────────────────────────────────────
         Add(context, MenuIds.File, "4", 0, new CommandDescriptor(
             "gaya.turian.exit", "File: Exit",
             Exit)
         { DynamicLabel = Localized("Exit") });
 
-        // ── Project ─────────────────────────────────────────────
-        Add(context, MenuIds.Project, "2", 0, new CommandDescriptor(
-            "gaya.turian.bricks", "Project: Bricks…",
-            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BricksPanelId),
-            HasProject)
-        { DynamicLabel = Localized("Bricks…") });
+        // Edit ─────────────────────────────────────────────
+        Add(context, MenuIds.Edit, "0", 0, new CommandDescriptor(
+            "gaya.turian.undo", "Edit: Undo",
+            static sp => sp.GetRequiredService<UndoService>().Undo(),
+            static sp => sp.GetRequiredService<UndoService>().CanUndo)
+        { DynamicLabel = static sp => StepLabel(sp, "Undo", sp.GetRequiredService<UndoService>().UndoLabel) });
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.undo", KeyboardKey.Z, KeyModifiers.Ctrl));
+        Add(context, MenuIds.Edit, "0", 1, new CommandDescriptor(
+            "gaya.turian.redo", "Edit: Redo",
+            static sp => sp.GetRequiredService<UndoService>().Redo(),
+            static sp => sp.GetRequiredService<UndoService>().CanRedo)
+        { DynamicLabel = static sp => StepLabel(sp, "Redo", sp.GetRequiredService<UndoService>().RedoLabel) });
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Z, KeyModifiers.Ctrl | KeyModifiers.Shift));
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Y, KeyModifiers.Ctrl));
 
-        Add(context, MenuIds.Project, "3", 0, new CommandDescriptor(
+        Add(context, MenuIds.Edit, "2-settings", 1, new CommandDescriptor(
+            "gaya.turian.keyboardShortcuts", "Edit: Keyboard Shortcuts…",
+            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.ShortcutsPanelId))
+        { DynamicLabel = Localized("Keyboard Shortcuts…") });
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.keyboardShortcuts",
+            new KeyStroke(KeyboardKey.K, KeyModifiers.Ctrl), new KeyStroke(KeyboardKey.S, KeyModifiers.Ctrl)));
+
+        // Project ─────────────────────────────────────────────
+        Add(context, MenuIds.Project, "0-solution", 0, new CommandDescriptor(
+            "gaya.turian.regenerateCSharpSolution", "Project: Regenerate C# Solution",
+            RegenerateCSharpSolution,
+            HasProject)
+        { DynamicLabel = Localized("Regenerate C# Solution") });
+        Add(context, MenuIds.Project, "0-solution", 1, new CommandDescriptor(
             "gaya.turian.recompile", "Assets: Recompile Scripts",
             static sp => sp.GetRequiredService<ProjectSession>().RecompileScripts(),
             HasProject)
         { DynamicLabel = Localized("Recompile") });
-
-        Add(context, MenuIds.Project, "3", 1, new CommandDescriptor(
+        Add(context, MenuIds.Project, "0-solution", 2, new CommandDescriptor(
             "gaya.turian.reimportAssets", "Assets: Reimport All",
             Reimport,
             HasProject)
         { DynamicLabel = Localized("Reimport Assets") });
-
         Add(context, MenuIds.Project, "3", 2, new CommandDescriptor(
             "gaya.turian.play", "Run: Play",
             TogglePlay,
             static sp => sp.GetRequiredService<PlayModeService>().IsActive
                   || sp.GetRequiredService<SceneTreeController>().CurrentSceneRoot is not null)
         { DynamicLabel = static sp => sp.GetRequiredService<PlayModeService>().IsActive ? "Stop" : "Play" });
-
         Add(context, MenuIds.Project, "3", 3, new CommandDescriptor(
             "gaya.turian.playStartupScene", "Run: Play Startup Scene",
             PlayStartupScene,
@@ -143,7 +117,15 @@ static class StudioCommands
             static sp => sp.GetRequiredService<PlayModeService>().State == PlayState.Paused)
         { DynamicLabel = Localized("Step Frame") });
 
-        Add(context, MenuIds.Project, "3", 6, new CommandDescriptor(
+
+        Add(context, MenuIds.Project, "export", 0, new CommandDescriptor(
+                "gaya.turian.buildProfiles", "Run: Build Profiles…",
+                static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BuildProfilesPanelId),
+                HasProject)
+        { DynamicLabel = Localized("Build Profiles…") });
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.buildProfiles", KeyboardKey.B,
+            KeyModifiers.Ctrl | KeyModifiers.Shift));
+        Add(context, MenuIds.Project, "export", 1, new CommandDescriptor(
             "gaya.turian.buildAndRun", "Run: Build and Run",
             ToggleStandalone,
             HasProject)
@@ -151,27 +133,13 @@ static class StudioCommands
             DynamicLabel = static sp =>
             sp.GetRequiredService<BuildManager>().IsPlaying ? "Stop Standalone" : "Build & Run"
         });
-
-        Add(context, MenuIds.Project, "3", 7, new CommandDescriptor(
+        Add(context, MenuIds.Project, "export", 2, new CommandDescriptor(
                 "gaya.turian.export", "Run: Export",
                 Export,
                 HasProject)
         { DynamicLabel = Localized("Export") });
 
-        Add(context, MenuIds.Project, "3", 8, new CommandDescriptor(
-                "gaya.turian.buildProfiles", "Run: Build Profiles…",
-                static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BuildProfilesPanelId),
-                HasProject)
-        { DynamicLabel = Localized("Build Profiles…") });
-
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.buildProfiles", KeyboardKey.B,
-            KeyModifiers.Ctrl | KeyModifiers.Shift));
-
-        AddProjectSettings<PlayerSettings>(context, "player", "Player", 0);
-        AddProjectSettings<InputSettings>(context, "input", "Input", 1);
-        AddProjectSettings<GraphicsSettings>(context, "graphics", "Graphics", 2);
-
-        // ── Help ────────────────────────────────────────────────────────────
+        // Help ─────────────────────────────────────────────
         Add(context, MenuIds.Help, "1", 0, new CommandDescriptor(
             "gaya.turian.about", "Help: About",
             static sp => sp.GetRequiredService<AboutDialogChrome>().Open())
@@ -195,26 +163,12 @@ static class StudioCommands
         context.Menus.Add(new MenuItemDescriptor(menuId, command.Id, group, order, path));
     }
 
-    /// <summary>A Project / Settings entry for one settings kind.</summary>
-    static void AddProjectSettings<T>(IPluginContext context, string id, string label, int order)
-        where T : ProjectSettingsAsset
-    {
-        var command = new CommandDescriptor(
-            $"gaya.turian.projectSettings.{id}", $"Settings: {label}",
-            static sp => OpenProjectSettings(sp, typeof(T)),
-            HasProject)
-        { DynamicLabel = Localized(label) };
-
-        context.Commands.Register(command);
-        context.Menus.Add(new MenuItemDescriptor(MenuIds.Project, command.Id, "2", 2 + order, "Project Settings"));
-    }
-
     /// <summary>
     /// Shows the project's settings asset of one kind in the inspector and the asset browser. A project
     /// that lists none gets one written with the kind's defaults, the way Flax creates a missing
     /// settings asset.
     /// </summary>
-    static void OpenProjectSettings(IServiceProvider services, Type type)
+    internal static void OpenProjectSettings(IServiceProvider services, Type type)
     {
         if (services.GetRequiredService<SettingsService>().Settings is not { } project)
         {
@@ -366,6 +320,38 @@ static class StudioCommands
                 progress.Report(0, settings.AssetsAbsoluteDir);
                 await importer.GenerateMetaFilesAsync(settings.AssetsAbsoluteDir).ConfigureAwait(false);
                 progress.Report(1, "Reimport complete");
+            });
+    }
+
+    /// <summary>
+    /// Rewrites the generated projects and solution an external IDE opens, as a project-locked task so it cannot
+    /// race a compile, and logs where they are.
+    /// </summary>
+    static void RegenerateCSharpSolution(IServiceProvider services)
+    {
+        var settings = services.GetRequiredService<SettingsService>().Settings;
+        if (settings is null)
+        {
+            return;
+        }
+
+        var log = services.GetRequiredService<ILogger>();
+        services.GetRequiredService<BackgroundTaskRunner>().Run(
+            new BackgroundTaskSpec
+            {
+                Label = "Regenerate project files",
+                Kind = BackgroundTaskKind.Build,
+                Locks = EditorLocks.Project,
+                Policy = DuplicatePolicy.Drop,
+            },
+            (progress, _) =>
+            {
+                progress.Report(0, "Generating the projects");
+                var files = ProjectRegeneration.Regenerate(settings, log);
+                log.LogInformation("{State}: {Solution}",
+                    files.Changed ? "Project files regenerated" : "Project files up to date", files.Solution);
+                progress.Report(1, files.Solution);
+                return Task.CompletedTask;
             });
     }
 

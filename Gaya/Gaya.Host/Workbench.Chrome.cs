@@ -9,11 +9,16 @@ public sealed partial class Workbench
 {
     void BuildItems(FlyoutBuilder builder, IReadOnlyList<MenuItemDescriptor> items, int depth)
     {
+        var entries = items.Select(item => (Item: item, Submenu: SubmenuAt(item.Path, depth))).ToArray();
+        var nested = GroupSubmenus(entries);
+        var submenus = new HashSet<string>(StringComparer.Ordinal);
         string? previousGroup = null;
 
-        foreach (var item in items.Where(item => SegmentsFrom(item, depth).Length == 0))
+        // A submenu sits where its first contribution sorts.
+        foreach (var (item, submenu) in entries)
         {
-            if (!app.Commands.TryGet(item.CommandId, out var command))
+            var command = submenu is null ? app.Commands.Find(item.CommandId) : null;
+            if (submenu is null ? command is null : !submenus.Add(submenu))
             {
                 continue;
             }
@@ -25,32 +30,31 @@ public sealed partial class Workbench
 
             previousGroup = item.Group;
 
-            var commandId = item.CommandId;
-            builder.Item(
-                command.MenuLabelFor(app.Services),
-                () => ExecuteCommand(commandId),
-                app.Shortcuts.DisplayFor(commandId),
-                command.CanExecute?.Invoke(app.Services) ?? true);
-        }
+            if (submenu is not null)
+            {
+                builder.Submenu(submenu, sub => BuildItems(sub, [.. nested[submenu]], depth + 1));
+                continue;
+            }
 
-        foreach (var group in items.Where(item => SegmentsFrom(item, depth).Length > 0)
-                     .GroupBy(item => SegmentsFrom(item, depth)[0], StringComparer.Ordinal))
-        {
-            var nested = group.ToList();
-            builder.Submenu(group.Key, sub => BuildItems(sub, nested, depth + 1));
+            AddMenuCommand(builder, command!);
         }
     }
 
-    /// <summary>The part of an item's submenu path still to be walked at this depth.</summary>
-    static string[] SegmentsFrom(MenuItemDescriptor item, int depth)
-    {
-        if (item.Path.Length == 0)
-        {
-            return [];
-        }
+    /// <summary>Groups contributions by submenu while preserving their registry order.</summary>
+    static ILookup<string?, MenuItemDescriptor> GroupSubmenus(
+        IEnumerable<(MenuItemDescriptor Item, string? Submenu)> entries) =>
+        entries.ToLookup(static entry => entry.Submenu, static entry => entry.Item, StringComparer.Ordinal);
 
-        var segments = item.Path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return depth >= segments.Length ? [] : segments[depth..];
+    /// <summary>Adds a command row with its current label, shortcut and enabled state.</summary>
+    void AddMenuCommand(FlyoutBuilder builder, CommandDescriptor command) =>
+        builder.Item(command.MenuLabelFor(app.Services), () => ExecuteCommand(command.Id),
+            app.Shortcuts.DisplayFor(command.Id), command.CanExecute?.Invoke(app.Services) ?? true);
+
+    /// <summary>The submenu title at the current menu level, if any.</summary>
+    static string? SubmenuAt(string path, int depth)
+    {
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return depth < segments.Length ? segments[depth] : null;
     }
 
     /// <summary>
@@ -131,7 +135,7 @@ public sealed partial class Workbench
 
     /// <summary>
     /// Brings a panel to the front, opening it at its declared placement when it was closed. What a
-    /// command such as File / Settings calls to show its panel.
+    /// command such as Edit / Settings calls to show its panel.
     /// </summary>
     /// <param name="panelId">The panel to show.</param>
     public void ShowPanel(string panelId)

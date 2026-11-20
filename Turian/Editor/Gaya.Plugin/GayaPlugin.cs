@@ -47,6 +47,9 @@ public sealed class GayaPlugin : IPlugin
         context.Services.AddSingleton(sp => new UserMenuBridge(
             sp.GetRequiredService<UserMenuCatalog>(), context.Commands, context.Menus, context.Logger));
 
+        context.Services.AddSingleton(sp => new ProjectSettingsMenuBridge(
+            sp.GetRequiredService<SettingsService>(), context.Commands, context.Menus));
+
         context.Services.AddSingleton(sp => new UserSettingsBridge(
             sp.GetRequiredService<UserSettingsCatalog>(), context.Settings, context.Logger));
         context.Services.AddSingleton(_ => new PlatformSettingsBridge(context.Settings));
@@ -162,12 +165,6 @@ public sealed class GayaPlugin : IPlugin
             static sp => new BackgroundTasksPanel(sp.GetRequiredService<BackgroundTaskManager>()))
         { OpenByDefault = false });
 
-        context.Commands.Register(new CommandDescriptor(
-            "gaya.turian.tasks.show", "Window: Background Tasks",
-            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(TasksPanelId))
-        { MenuLabel = "Background Tasks" });
-        context.Menus.Add(new MenuItemDescriptor(MenuIds.View, "gaya.turian.tasks.show", "9"));
-
         context.Panels.Register(new PanelDescriptor(
             ShortcutsPanelId, "Shortcuts", PanelPlacement.Center,
             static sp => new ShortcutsPanel(
@@ -270,6 +267,10 @@ public sealed class GayaPlugin : IPlugin
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.aboutDialog", ChromeSlot.Overlay,
             static sp => sp.GetRequiredService<AboutDialogChrome>()));
+
+        context.Chrome.Register(new ChromeDescriptor(
+            "gaya.turian.notifications", ChromeSlot.Overlay,
+            static sp => new NotificationsChrome(sp.GetRequiredService<EditorNotifications>())));
     }
 
     /// <summary>The keybindings editor's id, which the File menu's entry brings to the front.</summary>
@@ -377,6 +378,7 @@ public sealed class GayaPlugin : IPlugin
         services.GetRequiredService<UndoService>().Flush();
         services.GetRequiredService<AssetAutoSave>().Flush();
         services.GetRequiredService<UserMenuBridge>().Sync();
+        services.GetRequiredService<ProjectSettingsMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<PlatformSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();

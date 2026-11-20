@@ -177,7 +177,7 @@ public static class PluginHost
     }
 
     /// <summary>
-    /// The editor for every page in <see cref="IEditorSettings"/>, with its File entry and shortcut. Registered
+    /// The editor for every page in <see cref="IEditorSettings"/>, with its Edit entry and shortcut. Registered
     /// before any plugin, like the shell commands, so a plugin may rebind or replace it.
     /// </summary>
     static void RegisterSettingsPanel(PanelRegistry panels, CommandRegistry commands, MenuRegistry menus,
@@ -202,11 +202,11 @@ public static class PluginHost
                 }))
         { OpenByDefault = false });
 
-        commands.Register(new CommandDescriptor(ShellCommands.Settings, "File: Settings…",
+        commands.Register(new CommandDescriptor(ShellCommands.Settings, "Edit: Settings…",
             services => services.GetRequiredService<IShellHost>().ShowPanel(ShellPanels.Settings))
         { DynamicLabel = services => services.GetService<IShellLocalization>()?.T("Settings…") ?? "Settings…" });
 
-        menus.Add(new MenuItemDescriptor(MenuIds.File, ShellCommands.Settings, "2"));
+        menus.Add(new MenuItemDescriptor(MenuIds.Edit, ShellCommands.Settings, "2-settings"));
         shortcuts.Add(new KeyBinding(ShellCommands.Settings, KeyboardKey.Comma, KeyModifiers.Ctrl));
     }
 
