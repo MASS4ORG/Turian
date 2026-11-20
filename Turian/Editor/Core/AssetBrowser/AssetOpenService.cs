@@ -11,6 +11,7 @@ public sealed class AssetOpenService(
     AssetWorkspace workspace,
     AssetInspectionService inspections,
     NodeInspectorController inspector,
+    CodeOpener code,
     ILogger log)
 {
     /// <summary>Opens what a browser row points at.</summary>
@@ -45,6 +46,10 @@ public sealed class AssetOpenService(
                 inspector.Select(inspections.Inspect(absolutePath));
                 return AssetActivation.Inspect;
 
+            case AssetActivation.ExternalProgram when IsScript(absolutePath):
+                _ = Task.Run(() => code.OpenAsync(absolutePath));
+                return AssetActivation.ExternalProgram;
+
             case AssetActivation.ExternalProgram:
                 OpenExternally(absolutePath);
                 return AssetActivation.ExternalProgram;
@@ -54,6 +59,8 @@ public sealed class AssetOpenService(
                 return AssetActivation.None;
         }
     }
+
+    static bool IsScript(string path) => string.Equals(Path.GetExtension(path), ".cs", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Hands a file to the program the desktop opens its kind with.</summary>
     /// <param name="absolutePath">Absolute path of the file.</param>

@@ -56,9 +56,12 @@ public sealed class ExternalEditorLauncherTests : IDisposable
         Assert.Equal(ExternalEditorLauncher.SettingsPath, hint.SettingsPath);
     }
 
-    /// <summary>With no file the system handler gets the solution, or the project folder when there is none.</summary>
+    /// <summary>
+    /// With no file the system handler gets the project folder, never the solution: whichever program is registered for
+    /// the solution file could be an editor already showing another project.
+    /// </summary>
     [Fact]
-    public async Task FallbackOpensTheSolutionOrTheProject()
+    public async Task FallbackOpensTheProjectFolderNeverTheSolution()
     {
         var launcher = Create();
 
@@ -66,7 +69,7 @@ public sealed class ExternalEditorLauncherTests : IDisposable
             TestContext.Current.CancellationToken);
         await launcher.OpenAsync(new EditorContext("/project"), TestContext.Current.CancellationToken);
 
-        Assert.Equal(["/project/.Cache/Game.slnx", "/project"], systemOpened);
+        Assert.Equal(["/project", "/project"], systemOpened);
     }
 
     /// <summary>A system handler that cannot open the file is a failure notification, not an exception.</summary>
@@ -138,5 +141,24 @@ public sealed class ExternalEditorLauncherTests : IDisposable
         var failure = Assert.Single(Drain());
         Assert.True(failure.IsError);
         Assert.Equal("Dummy chosen exited with code 2.", failure.Message);
+    }
+
+    /// <summary>A program that cannot be started at all, which is not an invalid operation, is still a notification.</summary>
+    [Theory]
+    [InlineData(typeof(System.ComponentModel.Win32Exception))]
+    [InlineData(typeof(IOException))]
+    [InlineData(typeof(UnauthorizedAccessException))]
+    public async Task EditorThatCannotBeStartedIsReported(Type failureType)
+    {
+        var failure = (Exception)Activator.CreateInstance(failureType, "denied")!;
+        registry.Register(new DummyEditor("chosen") { Failure = failure });
+        var launcher = Create(new ExternalEditorSelection("chosen", Executable()));
+
+        Assert.False(await launcher.OpenAsync(new EditorContext("/project"), TestContext.Current.CancellationToken));
+
+        var notification = Assert.Single(Drain());
+        Assert.True(notification.IsError);
+        Assert.Contains("denied", notification.Message, StringComparison.Ordinal);
+        Assert.Equal(ExternalEditorLauncher.SettingsPath, notification.SettingsPath);
     }
 }

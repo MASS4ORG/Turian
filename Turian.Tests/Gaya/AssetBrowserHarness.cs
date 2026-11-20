@@ -17,6 +17,10 @@ sealed class AssetBrowserHarness : IDisposable
     internal readonly AssetRevealService Reveal = new();
     internal readonly FileDialogChrome Dialog = new();
     internal readonly NodeInspectorController Inspector;
+    internal readonly ExternalEditorRegistry Registry = new(NullLogger.Instance);
+    internal readonly EditorNotifications Notifications = new();
+    internal readonly ExternalEditorLauncher Launcher;
+    internal readonly AssetOpenService Opener;
     readonly BuildManager build;
     readonly SKSurface surface;
     readonly Font font = Font.FromFamilyName("sans-serif", 14);
@@ -47,9 +51,12 @@ sealed class AssetBrowserHarness : IDisposable
         var types = new AssetTypeCatalog();
         var inspections = new AssetInspectionService(Importer, types, settings, loader, NullLogger.Instance);
         var workspace = new AssetWorkspace(assets, settings);
-        var opener = new AssetOpenService(types, workspace, inspections, Inspector, NullLogger.Instance);
+        Launcher = new ExternalEditorLauncher(Registry, Notifications, NullLogger.Instance)
+        { OpenWithSystem = static _ => Task.CompletedTask };
+        Opener = new AssetOpenService(types, workspace, inspections, Inspector,
+            new CodeOpener(settings, Launcher, Notifications, NullLogger.Instance), NullLogger.Instance);
         Preferences.ViewMode = mode;
-        Panel = new AssetBrowserPanel(files, settings, opener, inspections, Inspector, Reveal,
+        Panel = new AssetBrowserPanel(files, settings, Opener, inspections, Inspector, Reveal,
             new AssetCreationCatalog(files, settings, build, NullLogger.Instance), Preferences,
             Substitute.For<IEditorSettings>(), types, null!,
             new AssetFileOperations(files, Undo), new BricksController(null, null, null, NullLogger.Instance),

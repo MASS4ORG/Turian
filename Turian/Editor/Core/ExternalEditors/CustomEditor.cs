@@ -24,6 +24,16 @@ public sealed class CustomEditor : CommandLineEditor
         ExternalEditorCapabilities.OpenProject | ExternalEditorCapabilities.OpenFile
         | ExternalEditorCapabilities.GoToLine;
 
+    /// <summary>The option key that tells Studio the program opens solution files as projects.</summary>
+    public const string SolutionAwareKey = "solutionAware";
+
+    /// <summary>The solution-aware switch: off, the program receives the project folder; on, the generated solution.</summary>
+    public override IReadOnlyList<ExternalEditorOption> Options { get; } =
+    [
+        new ExternalEditorOption(SolutionAwareKey, "Solution-aware", ExternalEditorOptionKind.Toggle, "false",
+            "Turn on for a program that opens a solution file as a project; otherwise it is given the project folder."),
+    ];
+
     /// <inheritdoc />
     public override IReadOnlyList<EditorInstallation> Discover() => [];
 
@@ -40,9 +50,11 @@ public sealed class CustomEditor : CommandLineEditor
         ArgumentNullException.ThrowIfNull(installation);
         ArgumentNullException.ThrowIfNull(context);
         var template = string.IsNullOrWhiteSpace(installation.Arguments) ? DefaultTemplate : installation.Arguments;
-        var arguments = EditorArgumentTemplate.Expand(template, context);
+        var solutionAware = string.Equals(Options[0].ValueIn(installation.Options), bool.TrueString,
+            StringComparison.OrdinalIgnoreCase);
+        var arguments = EditorArgumentTemplate.Expand(template, context, solutionAware);
         // A template that only names a file has nothing to open for the project alone.
         return new EditorCommand(installation.Executable,
-            arguments.Count > 0 ? arguments : [context.ProjectDirectory]);
+            arguments.Count > 0 ? arguments : [context.Target(solutionAware)]);
     }
 }

@@ -19,7 +19,18 @@ static class StudioCommands
     /// <param name="context">The registration surface handed to the plugin.</param>
     public static void Register(IPluginContext context)
     {
-        // File ─────────────────────────────────────────────
+        RegisterFile(context);
+        RegisterEdit(context);
+        RegisterSolution(context);
+        RegisterAssets(context);
+        RegisterPlay(context);
+        RegisterPlayControls(context);
+        RegisterExport(context);
+        RegisterHelp(context);
+    }
+
+    static void RegisterFile(IPluginContext context)
+    {
         Add(context, MenuIds.File, "1", 0, new CommandDescriptor(
             "gaya.turian.newProject", "File: New Project…",
             NewProject)
@@ -47,8 +58,10 @@ static class StudioCommands
             "gaya.turian.exit", "File: Exit",
             Exit)
         { DynamicLabel = Localized("Exit") });
+    }
 
-        // Edit ─────────────────────────────────────────────
+    static void RegisterEdit(IPluginContext context)
+    {
         Add(context, MenuIds.Edit, "0", 0, new CommandDescriptor(
             "gaya.turian.undo", "Edit: Undo",
             static sp => sp.GetRequiredService<UndoService>().Undo(),
@@ -69,23 +82,40 @@ static class StudioCommands
         { DynamicLabel = Localized("Keyboard Shortcuts…") });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.keyboardShortcuts",
             new KeyStroke(KeyboardKey.K, KeyModifiers.Ctrl), new KeyStroke(KeyboardKey.S, KeyModifiers.Ctrl)));
+    }
 
-        // Project ─────────────────────────────────────────────
+    static void RegisterSolution(IPluginContext context)
+    {
         Add(context, MenuIds.Project, "0-solution", 0, new CommandDescriptor(
             "gaya.turian.regenerateCSharpSolution", "Project: Regenerate C# Solution",
             RegenerateCSharpSolution,
             HasProject)
         { DynamicLabel = Localized("Regenerate C# Solution") });
         Add(context, MenuIds.Project, "0-solution", 1, new CommandDescriptor(
+            "gaya.turian.openCSharpProject", "Project: Open C# Project",
+            OpenCSharpProject,
+            HasProject)
+        { DynamicLabel = Localized("Open C# Project") });
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.openCSharpProject", KeyboardKey.O,
+            KeyModifiers.Ctrl | KeyModifiers.Shift));
+    }
+
+    static void RegisterAssets(IPluginContext context)
+    {
+        Add(context, MenuIds.Project, "0-solution", 2, new CommandDescriptor(
             "gaya.turian.recompile", "Assets: Recompile Scripts",
             static sp => sp.GetRequiredService<ProjectSession>().RecompileScripts(),
             HasProject)
         { DynamicLabel = Localized("Recompile") });
-        Add(context, MenuIds.Project, "0-solution", 2, new CommandDescriptor(
+        Add(context, MenuIds.Project, "0-solution", 3, new CommandDescriptor(
             "gaya.turian.reimportAssets", "Assets: Reimport All",
             Reimport,
             HasProject)
         { DynamicLabel = Localized("Reimport Assets") });
+    }
+
+    static void RegisterPlay(IPluginContext context)
+    {
         Add(context, MenuIds.Project, "3", 2, new CommandDescriptor(
             "gaya.turian.play", "Run: Play",
             TogglePlay,
@@ -101,7 +131,10 @@ static class StudioCommands
         context.Shortcuts.Add(new KeyBinding("gaya.turian.play", KeyboardKey.F5));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.playPause", KeyboardKey.F6));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.playStep", KeyboardKey.F10));
+    }
 
+    static void RegisterPlayControls(IPluginContext context)
+    {
         Add(context, MenuIds.Project, "3", 4, new CommandDescriptor(
             "gaya.turian.playPause", "Run: Pause / Resume",
             TogglePause,
@@ -116,8 +149,10 @@ static class StudioCommands
             static sp => sp.GetRequiredService<PlayModeService>().StepFrame(),
             static sp => sp.GetRequiredService<PlayModeService>().State == PlayState.Paused)
         { DynamicLabel = Localized("Step Frame") });
+    }
 
-
+    static void RegisterExport(IPluginContext context)
+    {
         Add(context, MenuIds.Project, "export", 0, new CommandDescriptor(
                 "gaya.turian.buildProfiles", "Run: Build Profiles…",
                 static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BuildProfilesPanelId),
@@ -138,8 +173,10 @@ static class StudioCommands
                 Export,
                 HasProject)
         { DynamicLabel = Localized("Export") });
+    }
 
-        // Help ─────────────────────────────────────────────
+    static void RegisterHelp(IPluginContext context)
+    {
         Add(context, MenuIds.Help, "1", 0, new CommandDescriptor(
             "gaya.turian.about", "Help: About",
             static sp => sp.GetRequiredService<AboutDialogChrome>().Open())
@@ -352,6 +389,29 @@ static class StudioCommands
                     files.Changed ? "Project files regenerated" : "Project files up to date", files.Solution);
                 progress.Report(1, files.Solution);
                 return Task.CompletedTask;
+            });
+    }
+
+    /// <summary>
+    /// Regenerates the C# solution and opens it in the external editor, as a project-locked task so it cannot race a
+    /// compile. A failed regeneration opens nothing and the task ends failed.
+    /// </summary>
+    static void OpenCSharpProject(IServiceProvider services)
+    {
+        var code = services.GetRequiredService<CodeOpener>();
+        services.GetRequiredService<BackgroundTaskRunner>().RunWithResult(
+            new BackgroundTaskSpec
+            {
+                Label = "Open C# project",
+                Kind = BackgroundTaskKind.Build,
+                Locks = EditorLocks.Project,
+                Policy = DuplicatePolicy.Drop,
+            },
+            async (progress, cancellation) =>
+            {
+                progress.Report(0, "Generating the projects");
+                var opened = await code.OpenProjectAsync(cancellation).ConfigureAwait(false);
+                return new BackgroundTaskResult(opened, opened ? string.Empty : "The C# project was not opened");
             });
     }
 

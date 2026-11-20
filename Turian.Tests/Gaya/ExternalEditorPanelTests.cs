@@ -9,7 +9,8 @@ public sealed class ExternalEditorPanelTests : IDisposable
     readonly string root = Directory.CreateTempSubdirectory("turian-editor-panel-").FullName;
     readonly WorkbenchFrame frame = new();
     readonly FakeEditor fake;
-    readonly ExternalEditorRegistry registry = new(NullLogger.Instance);
+    // Only the custom command ships here: the real defaults find whatever editors this machine has installed.
+    readonly ExternalEditorRegistry registry = new(NullLogger.Instance, [new CustomEditor()]);
     readonly ExternalEditorLauncher launcher;
     readonly ExternalEditorSettings page = new();
     readonly SettingsService project = new();
@@ -44,6 +45,8 @@ public sealed class ExternalEditorPanelTests : IDisposable
         [
             new("reuse", "Reuse the open window", ExternalEditorOptionKind.Toggle, "false", "Opens files in the window that is already running."),
             new("flags", "Extra flags", ExternalEditorOptionKind.Text, "--wait"),
+            new("window", "Window", ExternalEditorOptionKind.Choice, "new-unless-open", "Which window to use.",
+                [new("new-unless-open", "Unless open"), new("new", "Always new"), new("reuse", "Reuse")]),
         ];
 
         public bool Recognizes(string path) => Path.GetFileName(path).StartsWith("fake", StringComparison.OrdinalIgnoreCase);
@@ -197,6 +200,24 @@ public sealed class ExternalEditorPanelTests : IDisposable
 
         Assert.Equal("true", page.Editor.Options!["reuse"]);
         Assert.Equal("true", launcher.Selection!.Options!["reuse"]);
+    }
+
+    /// <summary>A choice option is a dropdown of its values, and the pick is stored with the choice and reaches the launcher.</summary>
+    [Fact]
+    public void ChoiceOptionStoresThePickedValue()
+    {
+        page.Editor = new ExternalEditorChoice("fake", Executable);
+        frame.Draw();
+        frame.Draw();
+
+        var button = WorkbenchFrame.Descendants(Node($"{Field}/option/window"))
+            .Single(static node => node.Id.EndsWith("/button", StringComparison.Ordinal));
+        var prefix = button.Id[..^"/button".Length];
+        Click(button.Rect.Center);
+        Click(Nodes().Single(node => node.Id == $"{prefix}/list/2").Rect.Center);
+
+        Assert.Equal("reuse", page.Editor.Options!["window"]);
+        Assert.Equal("reuse", launcher.Selection!.Options!["window"]);
     }
 
     /// <summary>Test opens the project through the launcher with the chosen editor.</summary>

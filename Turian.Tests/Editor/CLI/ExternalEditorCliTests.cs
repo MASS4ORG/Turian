@@ -112,6 +112,36 @@ public sealed class ExternalEditorCliTests : IDisposable
         Assert.Empty(new ExternalEditorPreference(project).Holding());
     }
 
+    /// <summary>The window option takes only values the editor offers, and an editor that cannot choose a window has none.</summary>
+    [Fact]
+    public async Task WindowOptionIsCheckedAgainstTheEditorsChoices()
+    {
+        var project = await CreateProject();
+        var executable = Editor();
+
+        Assert.Equal(1, (await Run("set", "zed", project, "--path", executable, "--option", "window=sideways")).Exit);
+        Assert.Equal(1, (await Run("set", "rider", project, "--path", executable, "--option", "window=new")).Exit);
+        Assert.Empty(new ExternalEditorPreference(project).Holding());
+
+        Assert.Equal(0, (await Run("set", "zed", project, "--path", executable, "--option", "window=reuse")).Exit);
+
+        var result = Parse((await Run("get", project, "--json")).Output);
+        Assert.Equal("zed", result.GetProperty("editor").GetString());
+        Assert.Equal("reuse", result.GetProperty("options").GetProperty("window").GetString());
+    }
+
+    /// <summary>The custom editor's solution-aware switch is stored like any option.</summary>
+    [Fact]
+    public async Task CustomSolutionAwareSwitchIsStored()
+    {
+        var project = await CreateProject();
+
+        Assert.Equal(0, (await Run("set", "custom", project, "--path", Editor(), "--option", "solutionAware=true")).Exit);
+
+        var result = Parse((await Run("get", project, "--json")).Output);
+        Assert.Equal("true", result.GetProperty("options").GetProperty("solutionAware").GetString());
+    }
+
     /// <summary>With no path, the editor's first discovered installation is stored.</summary>
     [Fact]
     public async Task SetWithoutAPathUsesTheDiscoveredInstallation()

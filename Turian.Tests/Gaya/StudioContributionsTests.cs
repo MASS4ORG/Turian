@@ -38,14 +38,14 @@ public class StudioContributionsTests
         Assert.All(drawing.WorldLines, line => Assert.Equal(0f, line.A.X % 3));
     }
 
-    sealed record Contributions(
+    internal sealed record Contributions(
         List<CommandDescriptor> Commands,
         List<MenuItemDescriptor> Menus,
         List<KeyBinding> Shortcuts,
         List<PanelDescriptor> Panels,
         List<ChromeDescriptor> Chrome);
 
-    static Contributions Configure()
+    internal static Contributions Configure()
     {
         var found = new Contributions([], [], [], [], []);
         var context = Substitute.For<IPluginContext>();

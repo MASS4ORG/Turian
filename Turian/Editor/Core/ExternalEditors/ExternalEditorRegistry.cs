@@ -2,14 +2,24 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Holds the registered editors. Bricks register through <see cref="ExternalEditorAttribute"/> on their assembly, which
-/// is read whenever the list is asked for, so an editor appears and disappears with its brick's assembly.
+/// is read whenever the list is asked for, so an editor appears and disappears with its brick's assembly. The editors
+/// Studio ships, the custom command and the <see cref="EditorLaunchProfiles"/>, are defaults: an editor registered or
+/// attributed with the same id replaces one.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton, typeof(IExternalEditorRegistry))]
 public sealed class ExternalEditorRegistry(ILogger log) : IExternalEditorRegistry
 {
     readonly Lock gate = new();
-    readonly List<IExternalEditor> registered = [new CustomEditor()];
+    readonly List<IExternalEditor> builtIn =
+        [new CustomEditor(), .. EditorLaunchProfiles.BuiltIn.Select(static profile => new ProfileEditor(profile))];
+    readonly List<IExternalEditor> registered = [];
     readonly Dictionary<Type, IExternalEditor> fromAssemblies = [];
+
+    /// <summary>Creates a registry whose shipped defaults are <paramref name="defaults"/>, so a test controls what is replaced.</summary>
+    /// <param name="log">Where problems are reported.</param>
+    /// <param name="defaults">The editors that stand in until one with the same id is registered or attributed.</param>
+    internal ExternalEditorRegistry(ILogger log, IEnumerable<IExternalEditor> defaults) : this(log) =>
+        builtIn = [.. defaults];
 
     /// <inheritdoc />
     public event Action? Changed;
@@ -21,8 +31,10 @@ public sealed class ExternalEditorRegistry(ILogger log) : IExternalEditorRegistr
         {
             lock (gate)
             {
-                var attributed = LoadedEditors().Where(editor => registered.All(other => !SameId(other, editor.Id)));
-                return [.. registered, .. attributed];
+                var attributed = LoadedEditors().Where(editor => registered.All(other => !SameId(other, editor.Id))).ToList();
+                var defaults = builtIn.Where(editor =>
+                    registered.All(other => !SameId(other, editor.Id)) && attributed.All(other => !SameId(other, editor.Id)));
+                return [.. registered, .. attributed, .. defaults];
             }
         }
     }

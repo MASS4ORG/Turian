@@ -100,7 +100,7 @@ public sealed class ExternalEditorChoiceTests
     [Fact]
     public void EditorsOfferNoOptionsAndRecogniseNothingByDefault()
     {
-        IExternalEditor editor = new CustomEditor();
+        IExternalEditor editor = new DummyEditor();
 
         Assert.Empty(editor.Options);
         Assert.False(editor.Recognizes("/usr/bin/code"));

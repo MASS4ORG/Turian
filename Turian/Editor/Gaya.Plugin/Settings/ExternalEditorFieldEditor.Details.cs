@@ -3,6 +3,8 @@ namespace Gaya.Plugin.Turian;
 /// <summary>The parts below the editor dropdown: the custom command, the warning, the editor's options and Test.</summary>
 sealed partial class ExternalEditorFieldEditor
 {
+    readonly Dictionary<string, int> optionChoices = [];
+
     /// <summary>The executable and argument template of a custom editor.</summary>
     void CustomFields(Gui gui, SettingsFieldContext field, ExternalEditorChoice choice)
     {
@@ -92,9 +94,12 @@ sealed partial class ExternalEditorFieldEditor
         foreach (var option in editor.Options)
         {
             var stored = option.ValueIn(choice.Options);
-            var next = option.Kind == ExternalEditorOptionKind.Toggle
-                ? ToggleOption(gui, field, option, stored)
-                : TextOption(gui, field, option, stored);
+            var next = option.Kind switch
+            {
+                ExternalEditorOptionKind.Toggle => ToggleOption(gui, field, option, stored),
+                ExternalEditorOptionKind.Choice => ChoiceOption(gui, field, option, stored),
+                _ => TextOption(gui, field, option, stored),
+            };
             if (next != stored)
             {
                 field.SetValue(choice with { Options = WithOption(choice.Options, option.Key, next) });
@@ -109,6 +114,36 @@ sealed partial class ExternalEditorFieldEditor
             id: $"{field.Id}/option/{option.Key}")
             ? bool.TrueString.ToLowerInvariant()
             : bool.FalseString.ToLowerInvariant();
+
+    /// <summary>A dropdown of the option's values; like the editor dropdown, a pick is made in the build pass and applied in the render pass.</summary>
+    string ChoiceOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored)
+    {
+        var values = option.Choices ?? [];
+        var id = $"{field.Id}/option/{option.Key}";
+        var current = values.ToList().FindIndex(value => string.Equals(value.Value, stored, StringComparison.OrdinalIgnoreCase));
+        gui.DrawText(T(option.Label), Theme.Text(12f), Theme.Ink, centerInRect: false);
+
+        int next;
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), id).Direction(Axis.Horizontal).ContentAlignY(0.5f).Enter())
+        {
+            // ReSharper disable once ExplicitCallerInfoArgument
+            next = gui.Dropdown([.. values.Select(value => T(value.Label))], current, width: Theme.Scale(controlWidth),
+                height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12), maxVisibleItems: 12, filePath: id);
+        }
+
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            optionChoices.Remove(id);
+            if (next >= 0 && next != current)
+            {
+                optionChoices[id] = next;
+            }
+
+            return stored;
+        }
+
+        return optionChoices.Remove(id, out var chosen) && chosen < values.Count ? values[chosen].Value : stored;
+    }
 
     string TextOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored)
     {
@@ -132,11 +167,11 @@ sealed partial class ExternalEditorFieldEditor
             return;
         }
 
-        var directory = project.Settings?.ProjectAbsoluteDir;
+        var settings = project.Settings;
         if (gui.Button(T("Test"), width: Theme.Scale(60f), height: Theme.Scale(Theme.RowHeight),
-                fontSize: Theme.Text(11), enabled: directory is not null, id: $"{field.Id}/test") && directory is not null)
+                fontSize: Theme.Text(11), enabled: settings is not null, id: $"{field.Id}/test") && settings is not null)
         {
-            _ = Task.Run(() => launcher.OpenAsync(new EditorContext(directory)));
+            _ = Task.Run(() => launcher.OpenAsync(CodeOpener.ContextFor(settings)));
         }
     }
 }

@@ -13,9 +13,12 @@ public interface IExternalEditorRegistry
     /// <param name="editor">The editor to add.</param>
     void Register(IExternalEditor editor);
 
-    /// <summary>Removes the editor with this id.</summary>
+    /// <summary>
+    /// Removes the editor registered with this id. A default Studio ships cannot be removed, only replaced by
+    /// registering an editor with its id, and comes back when that editor is unregistered.
+    /// </summary>
     /// <param name="id">The editor's id.</param>
-    /// <returns><c>true</c> when an editor was removed.</returns>
+    /// <returns><c>true</c> when a registered editor was removed.</returns>
     bool Unregister(string id);
 
     /// <summary>Finds an editor by id, ignoring case.</summary>

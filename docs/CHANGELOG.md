@@ -6,9 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Added: external code editor #403.
 - Added: studio and personal settings #401.
-- Added: external editor contract #396 #404.
+- Added: external code editor #396 #398 #403 #404.
 - Changed: Project Settings menu.
 
 ## [5.2.0] - 2026-11-17

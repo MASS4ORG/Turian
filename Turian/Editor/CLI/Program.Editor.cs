@@ -278,14 +278,22 @@ public static partial class Program
         {
             var split = pair.IndexOf('=', StringComparison.Ordinal);
             var key = split > 0 ? pair[..split] : string.Empty;
-            if (editor.Options.All(option => option.Key != key))
+            if (editor.Options.FirstOrDefault(option => option.Key == key) is not { } known)
             {
                 Log.Logger.LogError("{Editor} has no option '{Option}'. Options: {Known}", editor.DisplayName, pair,
                     string.Join(", ", editor.Options.Select(static option => option.Key)));
                 return null;
             }
 
-            values[key] = pair[(split + 1)..];
+            var value = pair[(split + 1)..];
+            if (!known.Accepts(value))
+            {
+                Log.Logger.LogError("{Editor} option '{Option}' does not take '{Value}'. Use one of: {Values}",
+                    editor.DisplayName, key, value, string.Join(", ", (known.Choices ?? []).Select(static choice => choice.Value)));
+                return null;
+            }
+
+            values[key] = value;
         }
 
         return values;
