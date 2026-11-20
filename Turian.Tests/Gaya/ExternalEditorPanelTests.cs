@@ -261,7 +261,7 @@ public sealed class ExternalEditorPanelTests : IDisposable
     [Fact]
     public void CustomBrowseAndQuickFixReplaceOnlyTheProgram()
     {
-        var gone = Path.Combine(root, "gone", "ed");
+        var gone = Path.Combine(root, new string('x', 160), "ed");
         page.Editor = new ExternalEditorChoice(CustomEditor.EditorId, gone, "{file}");
         frame.Draw();
         frame.Draw();

@@ -54,8 +54,6 @@ sealed partial class ExternalEditorFieldEditor
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{field.Id}/warning").Direction(Axis.Horizontal).Gap(6f)
                    .ContentAlignY(0.5f).Enter())
         {
-            gui.DrawText(WarningText(choice, missing), Theme.Text(11f), Theme.Warning, centerInRect: false);
-
             if (gui.Button(missing ? T("Choose again…") : T("Use system default"), width: Theme.Scale(120f),
                     height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(11), id: $"{field.Id}/fix"))
             {
@@ -68,6 +66,8 @@ sealed partial class ExternalEditorFieldEditor
                     field.SetValue(new ExternalEditorChoice());
                 }
             }
+
+            gui.DrawText(WarningText(choice, missing), Theme.Text(11f), Theme.Warning, centerInRect: false);
         }
     }
 
