@@ -338,11 +338,6 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
         {
             Overridden(gui, page, field.Name);
         }
-
-        if (page.IsLayered)
-        {
-            Overridden(gui, page, field.Name);
-        }
     }
 
     void OptionHeading(Gui gui, SettingsPageDescriptor page, FormField field, string id, string title, bool modified)
