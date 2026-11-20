@@ -11,6 +11,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="SkiaSharp" Version="4.157.0" />
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Cli.Sdk/Turian.Cli.Sdk.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
     </ItemGroup>
