@@ -73,7 +73,7 @@ static class CliPlugins
             try
             {
                 var assembly = Assembly.Load(new AssemblyName(Path.GetFileNameWithoutExtension(path)));
-                RegisterAssembly(registry, assembly, new CliPluginContext(directory, project, logger));
+                RegisterAssembly(registry, assembly, ProjectContext(directory, project, logger));
             }
             catch (Exception ex) when (ex is IOException or BadImageFormatException)
             {
@@ -112,7 +112,7 @@ static class CliPlugins
                 .Where(assembly => names.Contains(assembly.GetName().Name ?? string.Empty));
             foreach (var assembly in assemblies)
             {
-                RegisterAssembly(registry, assembly, new CliPluginContext(brick.RootPath, project, logger));
+                RegisterAssembly(registry, assembly, ProjectContext(brick.RootPath, project, logger));
             }
         }
         catch (Exception ex) when (ex is PackageException or IOException or InvalidOperationException)
@@ -120,6 +120,12 @@ static class CliPlugins
             logger.LogWarning(ex, "CLI plugins from {Brick} could not be loaded", brick.Id);
         }
     }
+
+    static CliPluginContext ProjectContext(string brick, string? project, ILogger logger) =>
+        new(brick, project, logger)
+        {
+            OpenProjectAsync = project is null ? null : token => Program.OpenPluginProjectAsync(project, token)
+        };
 
     internal static string? FindProject(IReadOnlyList<string> args, string currentDirectory)
     {

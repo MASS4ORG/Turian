@@ -16,7 +16,18 @@ public interface ICliPlugin
 /// <param name="BrickRoot">The absolute folder of the owning brick.</param>
 /// <param name="ProjectRoot">The selected project, or null for commands outside a project.</param>
 /// <param name="Logger">The host's diagnostic logger.</param>
-public sealed record CliPluginContext(string BrickRoot, string? ProjectRoot, ILogger Logger);
+public sealed record CliPluginContext(string BrickRoot, string? ProjectRoot, ILogger Logger)
+{
+    /// <summary>Opens the selected project's user-code services on demand, after parsing the command.</summary>
+    public Func<CancellationToken, Task<ICliProject>>? OpenProjectAsync { get; init; }
+}
+
+/// <summary>A headless project scope. Dispose it after using the project's services.</summary>
+public interface ICliProject : IDisposable
+{
+    /// <summary>The project's authored asset loader and compiled engine-module services.</summary>
+    IServiceProvider Services { get; }
+}
 
 /// <summary>A command contributed at the root or under shared command groups.</summary>
 /// <param name="Command">The command with its arguments, options and action.</param>
