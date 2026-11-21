@@ -180,6 +180,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Scaled delta time must be finite.");
         }
 
+#if !TURIAN_NO_CPU_MARKERS
+        using var sample = Profiler.Sample("Scene Tick");
+#endif
         using var asyncContext = Async.EnterContext();
         Async.BeginFrame(scaledDeltaTime, unscaledDeltaTime);
         UnscaledElapsedSeconds += deltaTime;
@@ -208,6 +211,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
         }
 
+#if !TURIAN_NO_CPU_MARKERS
+        using var sample = Profiler.Sample("Scene Step");
+#endif
         using var asyncContext = Async.EnterContext();
         Async.BeginFrame(deltaTime, deltaTime);
         ElapsedSeconds += deltaTime;
@@ -223,6 +229,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
     void BeginFrame(double deltaTime, double unscaledDeltaTime)
     {
+#if !TURIAN_NO_CPU_MARKERS
+        using var sample = Profiler.Sample("Begin Frame");
+#endif
         frameDeltaTime = deltaTime;
         frameUnscaledDeltaTime = unscaledDeltaTime;
         sceneManager.EnsureScenesStarted();
@@ -237,27 +246,45 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         alpha = Math.Clamp(Clock.AccumulatorSeconds / Clock.FixedDeltaTime, 0d, 1d);
         var time = FrameTime();
         var deltaTime = (float)frameDeltaTime;
-        foreach (var system in systems)
+#if !TURIAN_NO_CPU_MARKERS
+        using (Profiler.Sample("Interpolate"))
+#endif
         {
-            system.AfterFixedTicks(alpha);
+            foreach (var system in systems)
+            {
+                system.AfterFixedTicks(alpha);
+            }
+            RunPhase(GameLoopPhase.AfterFixedTicks, time);
         }
-
-        RunPhase(GameLoopPhase.AfterFixedTicks, time);
-        RunUpdate(deltaTime);
-        RunPhase(GameLoopPhase.Update, time);
-        Async.DrainUpdate();
-        RunLateUpdate(deltaTime);
-        RunPhase(GameLoopPhase.LateUpdate, time);
-        Async.DrainLateUpdate();
+#if !TURIAN_NO_CPU_MARKERS
+        using (Profiler.Sample("Update"))
+#endif
+        {
+            RunUpdate(deltaTime);
+            RunPhase(GameLoopPhase.Update, time);
+            Async.DrainUpdate();
+        }
+#if !TURIAN_NO_CPU_MARKERS
+        using (Profiler.Sample("Late Update"))
+#endif
+        {
+            RunLateUpdate(deltaTime);
+            RunPhase(GameLoopPhase.LateUpdate, time);
+            Async.DrainLateUpdate();
+        }
 
         // Destruction requested by the presentation phases (update, late update, their async continuations) leaves
         // here, before the frame is rendered. It cannot wait for the next fixed tick's flush: a paused clock, a zero
         // time scale or a fast frame runs no tick, and the node would be drawn and updated after it was destroyed.
-        FlushDestroyed();
-        RunPhase(GameLoopPhase.EndFrame, time);
-        Lifetimes?.ApplyPendingRestart();
-
-        InputSource?.NewFrame();
+#if !TURIAN_NO_CPU_MARKERS
+        using (Profiler.Sample("End Frame"))
+#endif
+        {
+            FlushDestroyed();
+            RunPhase(GameLoopPhase.EndFrame, time);
+            Lifetimes?.ApplyPendingRestart();
+            InputSource?.NewFrame();
+        }
     }
 
     LoopTime FrameTime() => new(Clock.TickIndex, frameDeltaTime, frameUnscaledDeltaTime, alpha);
@@ -276,6 +303,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
     void RunFixedTick(long tick, double interval)
     {
+#if !TURIAN_NO_CPU_MARKERS
+        using var sample = Profiler.Sample("Fixed Tick");
+#endif
         var world = simulation;
         if (world is not null && !ReferenceEquals(world.Clock, Clock))
         {
@@ -286,6 +316,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         RunFixedUpdate((float)interval);
         foreach (var system in systems)
         {
+#if !TURIAN_NO_CPU_MARKERS
+            using var systemSample = Profiler.IsRecording ? Profiler.Sample(system.GetType().Name) : default;
+#endif
             system.FixedTick(tick, interval);
         }
 

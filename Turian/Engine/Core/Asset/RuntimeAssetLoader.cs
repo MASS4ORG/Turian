@@ -141,6 +141,9 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             return null;
         }
 
+#if !TURIAN_NO_CPU_MARKERS
+        using var sample = Profiler.Sample("Read Text Asset");
+#endif
         using var reader = new StreamReader(provider.GetAssetStream());
         return reader.ReadToEnd();
     }

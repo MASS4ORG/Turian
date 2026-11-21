@@ -131,7 +131,8 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<SceneTreeController>(),
                     sp.GetRequiredService<PlayModeService>(),
                     sp.GetRequiredService<ILogger>(),
-                    sp.GetRequiredService<EditorCameraSettings>()))));
+                    sp.GetRequiredService<EditorCameraSettings>(),
+                    sp.GetService<IPlayFrameProfiler>()))));
 
         context.Panels.Register(new PanelDescriptor(
             AssetsPanelId, "Assets", PanelPlacement.Bottom,
@@ -261,6 +262,7 @@ public sealed class GayaPlugin : IPlugin
     static void RegisterDialogs(IPluginContext context)
     {
         context.Services.AddSingleton<FileDialogChrome>();
+        context.Services.AddSingleton<IEditorSaveDialog>(static sp => sp.GetRequiredService<FileDialogChrome>());
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.fileDialog", ChromeSlot.Overlay,
             static sp => sp.GetRequiredService<FileDialogChrome>()));

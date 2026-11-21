@@ -11,6 +11,10 @@
         <AnalysisLevel>10.0</AnalysisLevel>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(TurianCpuMarkers)' == 'false'">
+        <DefineConstants>$(DefineConstants);TURIAN_NO_CPU_MARKERS</DefineConstants>
+    </PropertyGroup>
+
     <!-- `Directory.Build.local.props` points to local project -->
     <Import Project="$(MSBuildThisFileDirectory)Directory.Build.local.props"
             Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.local.props')"/>

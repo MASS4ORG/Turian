@@ -10,7 +10,7 @@ namespace Gaya.Plugin.Turian;
 /// to do while the frame is being built — opening a project is, since the project switcher already
 /// does exactly that.
 /// </remarks>
-sealed class FileDialogChrome : IChromeItem
+sealed class FileDialogChrome : IChromeItem, IEditorSaveDialog
 {
     const float dialogWidth = 840f;
     const float dialogHeight = 460f;
@@ -24,6 +24,18 @@ sealed class FileDialogChrome : IChromeItem
         Places = request.Places ?? StudioFilePlaces.ForThisSystem(),
         StartPath = request.StartPath ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
     });
+
+    /// <inheritdoc />
+    public void SaveNewFile(string title, string? directory, string suggestedName, Action<string?> completed) =>
+        Show(new FileDialogRequest
+        {
+            Mode = FileDialogMode.SaveFile,
+            Title = title,
+            StartPath = directory,
+            InitialName = suggestedName,
+            Validate = static path => File.Exists(path) ? "Choose a new filename." : null,
+            OnComplete = completed,
+        });
 
     /// <inheritdoc />
     public void Render(Gui gui)

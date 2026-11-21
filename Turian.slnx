@@ -43,6 +43,7 @@
     <Project Path="Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Editor.Rendering.Vulkan/Turian.Editor.Rendering.Vulkan.csproj" />
   </Folder>
   <Project Path=".nuke/Build.csproj" />
+  <Project Path="Guinevere.Chart/Guinevere.Chart.csproj" />
   <Project Path="Turian/Benchmarks/Turian.Benchmarks.csproj" />
   <Project Path="Turian.Tests/Turian.Tests.csproj" />
   <Folder Name="/Tools/">

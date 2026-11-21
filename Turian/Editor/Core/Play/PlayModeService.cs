@@ -23,6 +23,7 @@ public sealed class PlayModeService(
     readonly AssetDatabase assetDatabase = assetDatabase;
     readonly IServiceProvider editorServices = editorServices;
     readonly ILogger logger = logger;
+    readonly IPlayFrameProfiler? frameProfiler = editorServices.GetService<IPlayFrameProfiler>();
 
     readonly Stopwatch clock = new();
     ServiceProvider? playServices;
@@ -391,6 +392,7 @@ public sealed class PlayModeService(
     {
         try
         {
+            using var frame = frameProfiler?.BeginFrame(PlayFrameSource.Simulation) ?? default;
             tick();
         }
         catch (Exception ex)

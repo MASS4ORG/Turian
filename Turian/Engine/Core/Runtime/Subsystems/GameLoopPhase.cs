@@ -150,6 +150,9 @@ static class GameLoopPhaseDispatch
     /// <summary>Runs <paramref name="subsystem"/>'s part of <paramref name="phase"/>, one of the phases it runs in.</summary>
     internal static void Run(ISubsystem subsystem, GameLoopPhase phase, in LoopTime time)
     {
+#if !TURIAN_NO_CPU_MARKERS
+        using var sample = Profiler.IsRecording ? Profiler.Sample(subsystem.GetType().Name) : default;
+#endif
         if (subsystem is IGameLoopSubsystem loop)
         {
             loop.Run(phase, in time);
