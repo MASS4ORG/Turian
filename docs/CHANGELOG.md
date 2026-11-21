@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Added: studio and personal settings #401.
 - Added: external code editor #396 #398 #403 #404.
+- Added: DataAsset validation on save, variant override editing, and the `validate` CLI command #148.
 - Changed: Project Settings menu.
 
 ## [5.2.0] - 2026-11-17

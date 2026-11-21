@@ -40,6 +40,29 @@ public sealed class DataAssetVariantTests : IDisposable
         Assert.Null(flat["__Variant"]);
     }
 
+    /// <summary>Saved changes retain the link, previous overrides and untouched inherited members.</summary>
+    [Fact]
+    public void EditingAddsOnlyChangedMembersToOverrides()
+    {
+        var variant = DataAssetVariants.Create(baseId, baseJson, variantId);
+        var before = DataAssetVariants.Flatten(variant, _ => baseJson);
+        var after = JsonNode.Parse(before)!.AsObject();
+        after["Stats"]!["Health"] = 11;
+        var updated = DataAssetVariants.UpdateOverrides(variant, before, after.ToJsonString());
+
+        var editedAgain = JsonNode.Parse(after.ToJsonString())!.AsObject();
+        editedAgain["Tags"] = new JsonArray("edited");
+        updated = DataAssetVariants.UpdateOverrides(updated, after.ToJsonString(), editedAgain.ToJsonString());
+
+        var nextBase = JsonNode.Parse(baseJson)!.AsObject();
+        nextBase["Stats"]!["Mana"] = 6;
+        var resolved = JsonNode.Parse(DataAssetVariants.Flatten(updated, _ => nextBase.ToJsonString()))!;
+        Assert.Equal(11, (int)resolved["Stats"]!["Health"]!);
+        Assert.Equal(6, (int)resolved["Stats"]!["Mana"]!);
+        Assert.Equal("edited", (string?)resolved["Tags"]![0]);
+        Assert.Equal(variantId.ToString(), (string?)resolved["Id"]);
+    }
+
     /// <summary>Files that are not variants pass through untouched, and variants of variants resolve down the chain.</summary>
     [Fact]
     public void ChainsResolveAndPlainFilesPassThrough()
