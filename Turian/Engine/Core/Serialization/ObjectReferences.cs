@@ -253,6 +253,14 @@ public static partial class ObjectReferences
         Assign(data, pending, id => CachedData(loader, id));
     }
 
+    /// <summary>Resolves references from a preloaded, source-backed set of DataAssets.</summary>
+    public static int ResolveDataAsset(DataAsset data, Func<Guid, DataAsset?> find)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(find);
+        return ResolveOwner(data, find);
+    }
+
     /// <summary>
     /// Writes a reference member as <c>{"$ref": id}</c> (or an array of them), keeping pending ids for targets that
     /// are not loaded. Returns false, writing nothing, when the member is not a reference member.

@@ -35,6 +35,7 @@ public static partial class Program
             NewIdentityCommand(projectArg),
             EditorCommand(projectArg),
             TestCommand(projectArg),
+            ValidateCommand(projectArg),
             ExportCommand(projectArg, configOption),
             DeployCommand(projectArg, configOption),
             DevicesCommand(projectArg),

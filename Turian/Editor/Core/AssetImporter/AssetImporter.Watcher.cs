@@ -16,6 +16,19 @@ public sealed partial class AssetImporter
         }
     }
 
+    internal string? ReadDataAssetSource(Guid id)
+    {
+        if (assetDatabase.TryGetAsset(id, out var record) && record is not null)
+        {
+            var path = Path.GetFullPath(record.SourceRelativePath, record.ProjectRootPath);
+            if (GenericAssetImporter.IsDataAssetPath(path) && File.Exists(path))
+            {
+                return File.ReadAllText(path);
+            }
+        }
+        return DataAssetVariants.ReadFromDatabase(assetDatabase, id);
+    }
+
     void EnsureAssetImported(string filePath, bool overwriteExisting)
     {
         if (!CanImportSource(filePath))

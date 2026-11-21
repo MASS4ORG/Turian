@@ -82,6 +82,73 @@ public static class DataAssetVariants
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 
+    /// <summary>Applies edits from two serialized payloads to an existing variant's overrides.</summary>
+    public static string UpdateOverrides(string variantJson, string originalPayload, string editedPayload)
+    {
+        var variant = JsonNode.Parse(variantJson)!.AsObject();
+        var link = variant[Property] as JsonObject
+                   ?? throw new InvalidOperationException("The DataAsset is not a variant.");
+        CheckLink(link);
+        var before = JsonNode.Parse(originalPayload)!.AsObject();
+        var after = JsonNode.Parse(editedPayload)!.AsObject();
+        if (!JsonNode.DeepEquals(variant["Id"], before["Id"]))
+        {
+            throw new InvalidOperationException("The DataAsset variant changed on disk.");
+        }
+        foreach (var reserved in ReservedOverrideProperties)
+        {
+            if (!JsonNode.DeepEquals(before[reserved], after[reserved]))
+            {
+                throw new InvalidOperationException($"A data asset variant cannot override '{reserved}'.");
+            }
+            before.Remove(reserved);
+            after.Remove(reserved);
+        }
+
+        var overrides = link[overridesProperty] as JsonObject;
+        var updated = overrides ?? new JsonObject();
+        RecordEdits(updated, before, after);
+        if (overrides is null)
+        {
+            link[overridesProperty] = updated;
+        }
+        return variant.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    static void RecordEdits(JsonObject patch, JsonObject before, JsonObject after)
+    {
+        foreach (var (name, previous) in before)
+        {
+            if (!after.ContainsKey(name) && previous is not null)
+            {
+                patch[name] = null;
+            }
+        }
+        foreach (var (name, value) in after)
+        {
+            before.TryGetPropertyValue(name, out var previous);
+            if (JsonNode.DeepEquals(previous, value))
+            {
+                continue;
+            }
+
+            if (previous is JsonObject oldObject && value is JsonObject newObject)
+            {
+                var nested = patch[name] as JsonObject;
+                var updated = nested ?? new JsonObject();
+                RecordEdits(updated, oldObject, newObject);
+                if (nested is null)
+                {
+                    patch[name] = updated;
+                }
+            }
+            else
+            {
+                patch[name] = value?.DeepClone();
+            }
+        }
+    }
+
     static JsonObject Resolve(JsonObject variant, Func<Guid, string?> readBase, List<Guid> chain, Guid? assetId)
     {
         if (variant[Property] is not JsonObject link)

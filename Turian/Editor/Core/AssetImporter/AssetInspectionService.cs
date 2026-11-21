@@ -17,7 +17,12 @@ public sealed record AssetInspection(
     string AbsolutePath,
     object? Target,
     string Title,
-    bool IsPayload);
+    bool IsPayload)
+{
+    internal VariantEdit? Variant { get; set; }
+}
+
+sealed record VariantEdit(string Source, string Baseline, Dictionary<Guid, string?> Bases);
 
 /// <summary>
 /// Resolves what the inspector edits for a file in the asset browser, and writes an edit back. An
@@ -76,12 +81,9 @@ public sealed class AssetInspectionService(
         var owner = importer.ImporterFor(absolutePath);
         var kind = types.Resolve(absolutePath)?.DisplayName ?? "Asset";
 
-        // A data asset is edited through the instance the open scenes share, so an edit shows everywhere at once.
-        if (metadata is DataAssetAsset
-            && Load(() => loader.LoadContentAsync<DataAsset>(metadata.Id).GetAwaiter().GetResult(), absolutePath)
-                is { } shared)
+        if (metadata is DataAssetAsset && Load(() => InspectDataAsset(metadata, absolutePath), absolutePath) is { } data)
         {
-            return new AssetInspection(metadata, absolutePath, shared, shared.GetType().Name, IsPayload: true);
+            return data;
         }
 
         if (Load(() => owner?.LoadAuthoredContent(metadata, absolutePath), absolutePath) is { } content)
@@ -114,7 +116,17 @@ public sealed class AssetInspectionService(
                 switch (inspection.Target)
                 {
                     case DataAsset payload:
-                        Serializer.Save(inspection.AbsolutePath, payload);
+                        var errors = DataAssetValidation.Validate(payload, inspection.AbsolutePath);
+                        if (errors.Count > 0)
+                        {
+                            foreach (var error in errors)
+                            {
+                                log.LogError("{Path}: {Member}: {Message}", error.Path, error.Member, error.Message);
+                            }
+                            return false;
+                        }
+
+                        SaveDataAsset(inspection, payload);
                         break;
                     case Asset content:
                         Serializer.Save(inspection.AbsolutePath, content);
@@ -146,6 +158,64 @@ public sealed class AssetInspectionService(
             log.LogError(ex, "Could not apply the changes to {Path}", inspection.AbsolutePath);
             return false;
         }
+    }
+
+    AssetInspection? InspectDataAsset(Asset metadata, string path)
+    {
+        if (File.Exists(path) && File.ReadAllText(path) is { } source && DataAssetVariants.IsVariant(source))
+        {
+            var bases = new Dictionary<Guid, string?>();
+            var variant = DataAsset.LoadPayload(source, metadata.Id, id =>
+                bases.TryGetValue(id, out var json) ? json : bases[id] = importer.ReadDataAssetSource(id))
+                ?? throw new InvalidDataException("The DataAsset variant could not be loaded.");
+            ObjectReferences.ResolveAsync(variant, loader).GetAwaiter().GetResult();
+            return new AssetInspection(metadata, path, variant, variant.GetType().Name, IsPayload: true)
+            {
+                Variant = new(source, Serializer.Serialize(variant), bases)
+            };
+        }
+
+        var shared = loader.LoadContentAsync<DataAsset>(metadata.Id).GetAwaiter().GetResult();
+        return shared is null ? null : new AssetInspection(metadata, path, shared, shared.GetType().Name, IsPayload: true);
+    }
+
+    void SaveDataAsset(AssetInspection inspection, DataAsset payload)
+    {
+        var path = inspection.AbsolutePath;
+        var edited = Serializer.Serialize(payload);
+        var current = File.Exists(path) ? File.ReadAllText(path) : null;
+        if (inspection.Variant is { } variant)
+        {
+            if (!string.Equals(current, variant.Source, StringComparison.Ordinal)
+                || variant.Bases.Any(pair => !string.Equals(
+                    importer.ReadDataAssetSource(pair.Key), pair.Value, StringComparison.Ordinal)))
+            {
+                throw new InvalidOperationException("Reopen the DataAsset variant because it or one of its bases changed.");
+            }
+
+            var updated = DataAssetVariants.UpdateOverrides(variant.Source, variant.Baseline, edited);
+            var reopened = DataAsset.LoadPayload(updated, payload.Id, id => variant.Bases.GetValueOrDefault(id));
+            if (reopened is null)
+            {
+                throw new InvalidDataException("The edited DataAsset variant could not be reopened.");
+            }
+            ObjectReferences.ResolveAsync(reopened, loader).GetAwaiter().GetResult();
+            if (!JsonNode.DeepEquals(JsonNode.Parse(edited), JsonNode.Parse(Serializer.Serialize(reopened))))
+            {
+                throw new InvalidOperationException("The DataAsset variant overrides cannot preserve the edited values.");
+            }
+
+            AtomicFile.WriteAllText(path, updated);
+            inspection.Variant = variant with { Source = updated, Baseline = edited };
+            return;
+        }
+
+        if (current is not null && DataAssetVariants.IsVariant(current))
+        {
+            throw new InvalidOperationException("Open the DataAsset variant to edit its overrides.");
+        }
+
+        AtomicFile.WriteAllText(path, edited);
     }
 
     T? Load<T>(Func<T?> load, string path)

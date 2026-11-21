@@ -47,7 +47,9 @@ public static partial class Program
     /// and leave unavailable component types as placeholders.
     /// </param>
     /// <returns>The preparation lifetime, or null when no preparation was requested.</returns>
-    internal static async Task<BuildManager?> PrepareProjectAsync(BuildAppSettings settings, bool reimport, bool loadUserCode)
+    /// <param name="requireUserCode">Whether a failure to compile user code fails the command.</param>
+    internal static async Task<BuildManager?> PrepareProjectAsync(BuildAppSettings settings, bool reimport,
+        bool loadUserCode, bool requireUserCode = false)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (!reimport && !loadUserCode)
@@ -73,6 +75,10 @@ public static partial class Program
                 if (status.State == BuildTaskState.Succeeded)
                 {
                     Log.Logger.LogInformation("User code loaded: {Message}", status.Message);
+                }
+                else if (requireUserCode)
+                {
+                    throw new InvalidOperationException($"User code did not load ({status.State}): {status.Message}");
                 }
                 else
                 {

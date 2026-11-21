@@ -74,13 +74,16 @@ public class DataAsset : IdObject
     public static DataAsset? LoadContent(string absolutePath, AssetDatabase? database)
         => LoadContent(absolutePath, null, id => DataAssetVariants.ReadFromDatabase(database, id));
 
+    /// <summary>Reads authored JSON and resolves inherited values through the supplied source reader.</summary>
+    public static DataAsset? LoadPayload(string json, Guid? expectedAssetId, Func<Guid, string?> readBase) =>
+        DeserializePayload(DataAssetVariants.Flatten(json, readBase, expectedAssetId));
+
     internal static DataAsset? LoadContent(string absolutePath, Guid? expectedAssetId,
         Func<Guid, string?> readBase)
     {
         if (File.Exists(absolutePath))
         {
-            return DeserializePayload(
-                DataAssetVariants.Flatten(File.ReadAllText(absolutePath), readBase, expectedAssetId));
+            return LoadPayload(File.ReadAllText(absolutePath), expectedAssetId, readBase);
         }
 
         throw new FileNotFoundException($"DataAsset load failed {absolutePath}");
