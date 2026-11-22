@@ -15,7 +15,7 @@ sealed partial class OutputPanel
         var titleBar = theme.Scale(24f);
 
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, $"{context.PanelId}/tabMenu")
-                   .ExpandHeight().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .ExpandHeight().AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -39,11 +39,8 @@ sealed partial class OutputPanel
 
         gui.Popup(ref headerMenuOpen,
             () => HeaderPreferences(gui, settings, context.Services.GetRequiredService<IEditorSettings>(), localization),
-            width: theme.Scale(headerMenuWidth),
-            height: contentHeight,
-            title: localization.T("Output"),
-            position: headerMenuPosition,
-            titleBarHeight: titleBar);
+            title: localization.T("Output"), position: headerMenuPosition)
+            .Width(theme.Scale(headerMenuWidth)).Height(contentHeight + titleBar);
     }
 
     /// <summary>
@@ -55,28 +52,27 @@ sealed partial class OutputPanel
         StudioLocalization localization)
     {
         var theme = ThemeTokens.Current;
-        var box = theme.Scale(13f);
         var entryHeight = theme.Scale(theme.RowHeight);
         var size = theme.Text(11f);
         var changed = false;
 
         using (gui.Node().Direction(Axis.Vertical).Gap(theme.Scale(2f)).Enter())
         {
-            changed |= Toggle(gui, "showTimestamp", localization.T("Show Timestamp"), box, size, entryHeight,
+            changed |= Toggle(gui, "showTimestamp", localization.T("Show Timestamp"), entryHeight,
                 () => settings.ShowTimestamp, value => settings.ShowTimestamp = value);
-            changed |= Toggle(gui, "monospace", localization.T("Monospace"), box, size, entryHeight,
+            changed |= Toggle(gui, "monospace", localization.T("Monospace"), entryHeight,
                 () => settings.Monospace, value => settings.Monospace = value);
-            changed |= Toggle(gui, "showStudio", localization.T("Studio"), box, size, entryHeight,
+            changed |= Toggle(gui, "showStudio", localization.T("Studio"), entryHeight,
                 () => settings.ShowStudio, value => settings.ShowStudio = value);
-            changed |= Toggle(gui, "clearOnPlay", localization.T("Clear on Play"), box, size, entryHeight,
+            changed |= Toggle(gui, "clearOnPlay", localization.T("Clear on Play"), entryHeight,
                 () => settings.ClearOnPlay, value => settings.ClearOnPlay = value);
-            changed |= Toggle(gui, "clearOnBuild", localization.T("Clear on Build"), box, size, entryHeight,
+            changed |= Toggle(gui, "clearOnBuild", localization.T("Clear on Build"), entryHeight,
                 () => settings.ClearOnBuild, value => settings.ClearOnBuild = value);
-            changed |= Toggle(gui, "clearOnRecompile", localization.T("Clear on Recompile"), box, size, entryHeight,
+            changed |= Toggle(gui, "clearOnRecompile", localization.T("Clear on Recompile"), entryHeight,
                 () => settings.ClearOnRecompile, value => settings.ClearOnRecompile = value);
 
             using (gui.Node(-1, entryHeight + theme.Scale(6f), "gaya.turian.output/tabMenu/entry")
-                       .Direction(Axis.Horizontal).Gap(theme.Scale(6f)).ContentAlignY(0.5f).Enter())
+                       .Direction(Axis.Horizontal).Gap(theme.Scale(6f)).AlignContentY(0.5f).Enter())
             {
                 gui.DrawText(localization.T("Entry lines"), size, theme.InkDim);
                 if (StudioControls.SmallTextButton(gui, "−", "gaya.turian.output/tabMenu/minus", theme.Scale(20f)))
@@ -99,14 +95,14 @@ sealed partial class OutputPanel
     }
 
     /// <summary>Draws one checkbox for a settings member and reports whether the click changed it.</summary>
-    static bool Toggle(Gui gui, string id, string label, float box, float size, float height,
+    static bool Toggle(Gui gui, string id, string label, float height,
         Func<bool> get, Action<bool> set)
     {
         using (gui.Node(-1, height, $"output/preferences/{id}").ExpandWidth().Direction(Axis.Horizontal)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             var value = get();
-            gui.Checkbox(ref value, label, size: box, fontSize: size, spacing: 6f);
+            gui.Checkbox(ref value, label);
             if (value == get())
             {
                 return false;

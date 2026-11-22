@@ -1,32 +1,9 @@
 namespace Gaya.Plugin.Turian;
 
-/// <summary>
-/// The palettes the studio hands to Guinevere's compound controls. They carry their own colors and
-/// metrics rather than reading <see cref="ThemeTokens"/>, so every tree and tab strip in the studio
-/// is themed from one place instead of each panel repeating the projection.
-/// </summary>
+/// <summary>Shared controls for Turian Studio panels.</summary>
 static class StudioControls
 {
     static ThemeTokens Theme => ThemeTokens.Current;
-
-    /// <summary>The tree palette shared by the scene tree, the asset browser and the settings list.</summary>
-    public static TreeViewTheme Tree() => new()
-    {
-        RowHeight = Theme.Scale(Theme.RowHeight),
-        IndentWidth = Theme.Scale(14f),
-        FontSize = Theme.Text(Theme.FontSize),
-        ExpanderWidth = Theme.Scale(10f),
-        IconSize = Theme.Scale(12f),
-    };
-
-    /// <summary>The tab-strip palette for the document tabs.</summary>
-    /// <param name="height">Strip height, which the chrome also reports to the workbench.</param>
-    public static TabStripTheme Tabs(float height) => new()
-    {
-        Height = height,
-        FontSize = Theme.Text(Theme.FontSize),
-        IconSize = Theme.Scale(12f),
-    };
 
     /// <summary>A short labelled button sized to a row. Blocks input, so a click never reaches behind it.</summary>
     /// <param name="gui">The GUI for this frame.</param>
@@ -41,7 +18,7 @@ static class StudioControls
 
         var height = Theme.Scale(Theme.RowHeight);
 
-        using (gui.Node(width, height, id).BlockInput().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        using (gui.Node(width, height, id).BlockInput().AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();

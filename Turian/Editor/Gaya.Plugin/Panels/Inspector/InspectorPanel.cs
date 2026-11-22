@@ -298,8 +298,8 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     /// <summary>A labelled button, dimmed and inert while it has nothing to do.</summary>
     static bool TextButton(Gui gui, string label, string id, bool enabled)
     {
-        using (gui.Node(Theme.Scale(70f), Theme.Scale(20f), id).BlockInput().ContentAlignX(0.5f)
-                   .ContentAlignY(0.5f).Enter())
+        using (gui.Node(Theme.Scale(70f), Theme.Scale(20f), id).BlockInput().AlignContentX(0.5f)
+                   .AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = enabled && interactable.OnHover();
@@ -372,8 +372,8 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     /// </summary>
     void RenderNodeLink(Gui gui, Node node)
     {
-        using (gui.Node(Theme.Scale(20f), Theme.Scale(20f), "inspector/header/link").ContentAlignX(0.5f)
-                   .ContentAlignY(0.5f).Enter())
+        using (gui.Node(Theme.Scale(20f), Theme.Scale(20f), "inspector/header/link").AlignContentX(0.5f)
+                   .AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -410,9 +410,9 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     static void RenderName(Gui gui, FormField name)
     {
         var current = name.HasMixedValue ? string.Empty : name.GetValue() as string ?? string.Empty;
-        var edited = gui.TextInput(current, width: 0, height: Theme.Scale(20f), fontSize: Theme.Text(13),
-            padding: 4,
-            id: "inspector/header/name", placeholder: name.HasMixedValue ? "—" : "");
+        var edited = current;
+        gui.TextInput(ref edited, id: "inspector/header/name",
+            placeholder: name.HasMixedValue ? "—" : "").ExpandWidth().Height(Theme.Scale(20f)).Padding(4);
         if (gui.Pass == Pass.Pass2Render && !string.Equals(edited, current, StringComparison.Ordinal))
         {
             name.SetValue(edited);
@@ -425,7 +425,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
 
         using (gui.Node(-1, Theme.Scale(22f), $"inspector/section{index}").ExpandWidth()
                    .Direction(Axis.Horizontal)
-                   .Padding(6, 0).Gap(4f).ContentAlignY(0.5f).Enter())
+                   .Padding(6, 0).Gap(4f).AlignContentY(0.5f).Enter())
         {
             if (gui.Pass == Pass.Pass2Render)
             {
@@ -443,7 +443,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             }
 
             using (gui.Node(10, Theme.Scale(22f), $"inspector/section{index}/arrow")
-                       .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                       .AlignContentX(0.5f).AlignContentY(0.5f).Enter())
             {
                 FormControls.FoldArrow(gui, isOpen);
             }
@@ -536,7 +536,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             : "Missing Prefab";
 
         using (gui.Node(-1, Theme.Scale(26f), "inspector/prefab").ExpandWidth().Direction(Axis.Horizontal)
-                   .Padding(6, 3).Gap(6f).ContentAlignY(0.5f).Enter())
+                   .Padding(6, 3).Gap(6f).AlignContentY(0.5f).Enter())
         {
             if (gui.Pass == Pass.Pass2Render)
             {
@@ -681,8 +681,8 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         using (gui.Node(Theme.Scale(16f), Theme.Scale(16f), id).BlockInput().Enter())
         {
             var current = !field.HasMixedValue && field.GetValue() is true;
-            var next = gui.Checkbox(current, size: Theme.Scale(14f), mixed: field.HasMixedValue,
-                enabled: !field.IsReadOnly);
+            var next = current;
+            gui.Checkbox(ref next, mixed: field.HasMixedValue, enabled: !field.IsReadOnly);
 
             if (gui.Pass == Pass.Pass2Render && next != current)
             {
@@ -694,7 +694,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     void RenderAddComponent(Gui gui)
     {
         using (gui.Node(-1, Theme.Scale(26f), "inspector/addComponent").ExpandWidth()
-                   .Padding(24, 3).ContentAlignY(0.5f).Enter())
+                   .Padding(24, 3).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();

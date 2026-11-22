@@ -49,8 +49,8 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
         {
             using (gui.Node(-1, height, "shortcuts/header/filter").Expand().Enter())
             {
-                filter = gui.TextInput(filter, width: 0, height: height, placeholder: "Search commands",
-                    fontSize: Theme.Text(12), padding: 5, id: "shortcuts/filter");
+                gui.TextInput(ref filter, placeholder: "Search commands",
+                    id: "shortcuts/filter").ExpandWidth().Height(height).Padding(5);
             }
 
             if (StudioControls.SmallTextButton(gui, "Reset All", "shortcuts/resetAll", Theme.Scale(80f)))
@@ -84,7 +84,7 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
     static void GroupHeader(Gui gui, string label)
     {
         using (gui.Node(-1, Theme.Scale(rowHeight), $"shortcuts/group/{label}").ExpandWidth()
-                   .ContentAlignY(0.5f).Margin(0f, Theme.Scale(6f), 0f, 0f).Enter())
+                   .AlignContentY(0.5f).Margin(0f, Theme.Scale(6f), 0f, 0f).Enter())
         {
             gui.DrawText(label.ToUpperInvariant(), Theme.Text(10f), Theme.InkDim, centerInRect: false);
         }
@@ -97,14 +97,14 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
         var clashes = shortcuts.Conflicts.Any(conflict => conflict.CommandIds.Contains(entry.CommandId));
 
         using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             if (gui.Pass == Pass.Pass2Render && gui.GetInteractable().OnHover())
             {
                 gui.DrawBackgroundRect(Theme.Hover, 3f);
             }
 
-            using (gui.Node(-1, height, $"{id}/label").Expand().ContentAlignY(0.5f).Enter())
+            using (gui.Node(-1, height, $"{id}/label").Expand().AlignContentY(0.5f).Enter())
             {
                 gui.DrawText(Title(entry.CommandId), Theme.Text(12f),
                     clashes ? Theme.Error : Theme.Ink, centerInRect: false);
@@ -128,8 +128,8 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
     {
         var listening = capturing == entry.CommandId;
 
-        using (gui.Node(Theme.Scale(chordWidth), height, id).BlockInput().ContentAlignY(0.5f)
-                   .ContentAlignX(0.5f).Enter())
+        using (gui.Node(Theme.Scale(chordWidth), height, id).BlockInput().AlignContentY(0.5f)
+                   .AlignContentX(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -227,7 +227,7 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
         }
 
         using (gui.Node(-1, Theme.Scale(rowHeight), "shortcuts/conflicts").ExpandWidth()
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             gui.DrawText(
                 $"{conflicts.Count} conflict(s): {string.Join(", ", conflicts.Take(3).Select(Describe))}",

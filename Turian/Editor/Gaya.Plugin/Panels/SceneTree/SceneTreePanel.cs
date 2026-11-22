@@ -106,7 +106,7 @@ sealed class SceneTreePanel : IPanel
             PushSelection();
         }
 
-        gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
+        gui.TreeView(state, rows, OnClick, DragPayload, Rename, OnEmptyClick,
             dropAccept: CanDrop, onDrop: Drop);
 
         if (gui.Pass == Pass.Pass2Render)

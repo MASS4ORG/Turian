@@ -202,19 +202,23 @@ public sealed partial class Workbench
             frameNativeTitlebar = NativeTitlebar || window?.CanMove == false;
         }
 
-        using (gui.AppBar(height: height, windowControls: !frameNativeTitlebar,
+        using (gui.AppBar(windowControls: !frameNativeTitlebar,
                    nativeTitlebar: frameNativeTitlebar, resizable: true, minimumWindowSize: new Vector2(640, 400)))
         {
             using (gui.Node(-1, height, "menubar").Direction(Axis.Horizontal).Enter())
             {
-                gui.MenuBar(BuildMenus, height, fontSize: t.Text(13f));
+                gui.CurrentNodeScope.Set([
+                    ControlStyles.Value<ControlFieldHeight, float>(height),
+                    ControlStyles.Value<ControlCompactFontSize, float>(t.Text(13f)),
+                ]);
+                gui.MenuBar(BuildMenus).Height(height);
             }
 
             gui.Node().ExpandWidth();
             foreach (var item in ChromeFor(ChromeSlot.MenuBar))
             {
                 using (gui.Node(-1, height, $"chrome/MenuBar/{item.Id}")
-                           .Direction(Axis.Horizontal).ContentAlignY(0.5f).Enter())
+                           .Direction(Axis.Horizontal).AlignContentY(0.5f).Enter())
                 {
                     ResolveChrome(item).Render(gui);
                 }

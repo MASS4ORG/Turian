@@ -77,8 +77,8 @@ sealed class BrickVersionDrawer : IPropertyDrawer
 
         var theme = ThemeTokens.Current;
         var selected = choice.Selected;
-        gui.Dropdown(choice.Labels, ref selected, width: 0, height: theme.Scale(theme.RowHeight), placeholder: "Version",
-            fontSize: theme.Text(12), maxVisibleItems: 10, filePath: $"{id}/versions");
+        gui.Dropdown([.. choice.Labels], ref selected, placeholder: "Version", maxVisibleItems: 10, id: $"{id}/versions")
+            .ExpandWidth().Height(theme.Scale(theme.RowHeight));
         choice.Selected = selected;
         return true;
     }

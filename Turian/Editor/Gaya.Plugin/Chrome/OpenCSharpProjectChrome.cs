@@ -8,7 +8,7 @@ sealed class OpenCSharpProjectChrome(ICommandDispatcher commands, StudioLocaliza
         const string commandId = StudioCommands.OpenCSharpProjectId;
         var theme = ThemeTokens.Current;
         var size = theme.Scale(24f);
-        using (gui.Node(size, size, "open-csharp-project").ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        using (gui.Node(size, size, "open-csharp-project").AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var enabled = commands.CanExecute(commandId);
             var interaction = gui.GetInteractable();

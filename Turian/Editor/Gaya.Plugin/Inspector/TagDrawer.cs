@@ -20,10 +20,10 @@ sealed class TagDrawer(LayerFilter layers, UndoService? undo = null) : IProperty
         var options = layers.Settings.Tags.Where(tag => !string.IsNullOrWhiteSpace(tag))
             .Distinct(StringComparer.Ordinal).ToArray();
         var theme = ThemeTokens.Current;
-        var result = gui.MultiDropdown(options, selected, comparer: StringComparer.Ordinal, chips: !mixed,
+        gui.MultiDropdown(options, selected, out var result, comparer: StringComparer.Ordinal, chips: !mixed,
             mixed: mixed, isMixed: tag => owners.Any(tags => tags.Contains(tag) != selected.Contains(tag)),
-            width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
-            placeholder: "none", enabled: !field.IsReadOnly, filePath: $"{id}/tags");
+            placeholder: "none", enabled: !field.IsReadOnly, id: $"{id}/tags")
+            .ExpandWidth().Height(theme.Scale(theme.RowHeight));
         if (result.Changed)
         {
             InspectorSelectionEdits.ApplyTags(field,

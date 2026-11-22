@@ -8,7 +8,6 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
 {
     const float dialogWidth = 460f;
     const float bodyHeight = 72f;
-    const float footerHeight = 44f;
     const float buttonWidth = 150f;
 
     static ThemeTokens Theme => ThemeTokens.Current;
@@ -38,8 +37,8 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        gui.Dialog(ref isOpen, title, () => Body(gui), Theme.Scale(dialogWidth), Theme.Scale(bodyHeight),
-            () => Footer(gui), footerHeight: Theme.Scale(footerHeight));
+        gui.Dialog(ref isOpen, title, () => Body(gui), () => Footer(gui))
+            .Width(Theme.Scale(dialogWidth)).Height(Theme.Scale(bodyHeight) + gui.ControlStyle.FieldHeight * 2.5f + 4f);
 
         if (!isOpen)
         {
@@ -49,7 +48,7 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
 
     void Body(Gui gui)
     {
-        using (gui.Node().Expand().ContentAlignY(0.5f).Enter())
+        using (gui.Node().Expand().AlignContentY(0.5f).Enter())
         {
             gui.DrawText(message, Theme.Text(13f), Theme.Ink, centerInRect: false,
                 wrapWidth: Theme.Scale(dialogWidth - 40f));
@@ -60,7 +59,7 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
     {
         using (gui.Node().ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Scale(8f)).Enter())
         {
-            if (gui.Button(confirmLabel, width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            if (gui.Button(confirmLabel).Width(Theme.Scale(buttonWidth)).Height(Theme.Scale(28f)).Clicked)
             {
                 var callback = confirmed;
                 confirmed = null;
@@ -68,7 +67,7 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
                 callback?.Invoke();
             }
 
-            if (gui.Button(localization.T("Cancel"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            if (gui.Button(localization.T("Cancel")).Width(Theme.Scale(buttonWidth)).Height(Theme.Scale(28f)).Clicked)
             {
                 isOpen = false;
             }

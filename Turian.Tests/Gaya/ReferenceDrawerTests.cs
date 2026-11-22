@@ -39,9 +39,10 @@ public sealed class ReferenceDrawerTests
             }
             drawer.DrawPendingPicker(current);
         });
-        void Click(string id)
+        LayoutNode Find(string id) => Nodes(gui.RootNode!).Single(node => node.Id == id);
+
+        void Click(LayoutNode node)
         {
-            var node = Nodes(gui.RootNode!).Single(node => node.Id == id);
             input.MousePosition.Returns(node.Rect.Center);
             Draw();
             input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
@@ -54,11 +55,11 @@ public sealed class ReferenceDrawerTests
         try
         {
             Draw();
-            Click("first/ref/pick");
-            Click("candidate/" + first.Id);
+            Click(Find("first/ref").Children[1]);
+            Click(Find("candidate/" + first.Id));
             Assert.Same(first, target.First);
-            Click("second/ref/pick");
-            Click("candidate/" + second.Id);
+            Click(Find("second/ref").Children[1]);
+            Click(Find("candidate/" + second.Id));
             Assert.Same(second, target.Second);
         }
         finally { font.Dispose(); }

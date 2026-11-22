@@ -16,7 +16,7 @@ sealed class SceneOrientationWidget
         }
 
         using (gui.Node(-1, 104, "scene/orientationHost").ExpandWidth().Absolute(0, 0)
-                   .Direction(Axis.Vertical).ContentAlignX(1f).ContentAlignY(0f).Padding(12).Enter())
+                   .Direction(Axis.Vertical).AlignContentX(1f).AlignContentY(0f).Padding(12).Enter())
         using (gui.Node(SceneOrientationGizmo.Size, SceneOrientationGizmo.Size, "scene/orientation")
                    .BlockInput().Enter())
         {
@@ -135,7 +135,7 @@ sealed class SceneOrientationWidget
         using (gui.Node(24, 20, "scene/orientation/" + marker.Label)
                    .Absolute(SceneOrientationGizmo.Size / 2f - 12f + marker.Offset.X,
                        SceneOrientationGizmo.Size / 2f - 10f + marker.Offset.Y)
-                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             gui.DrawText(visible && (positive || hit == marker.Direction) ? marker.Label : string.Empty,
                 ThemeTokens.Current.Text(Math.Clamp(marker.Radius * 1.25f, 8f, 11f)), ThemeTokens.Current.Chrome);

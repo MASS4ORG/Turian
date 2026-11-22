@@ -23,25 +23,30 @@ sealed class DocumentTabsChrome(
             return;
         }
 
-        var tabs = workspace.Documents
-            .Where(document => document.Asset is not null)
-            .Select(document => new TabStripItem(
-                document.Asset!.Id.ToString(), document.Title, Modified: document.IsDirty, Tag: document))
-            .ToList();
-
         var active = workspace.Active?.Asset?.Id.ToString();
-        var outcome = gui.TabStrip(tabs, active, StudioControls.Tabs(Height), "documents");
-
-        if (outcome.Activated?.Tag is AssetWrapper activated)
+        var strip = gui.TabStrip(ref active, BuildTabs, id: "documents");
+        strip.Height(Height);
+        if (strip.Changed && workspace.Documents.FirstOrDefault(document =>
+                document.Asset?.Id.ToString() == active) is { } activated)
         {
             workspace.Activate(activated);
         }
 
-        if (outcome.Closed?.Tag is not AssetWrapper closed)
+        void BuildTabs(TabBuilder tabs)
         {
-            return;
+            foreach (var document in workspace.Documents)
+            {
+                if (document.Asset is { } asset)
+                {
+                    tabs.Tab(document.Title, closable: true, key: asset.Id.ToString(),
+                        modified: document.IsDirty, onClose: () => Close(document));
+                }
+            }
         }
+    }
 
+    void Close(AssetWrapper closed)
+    {
         if (!closed.IsDirty)
         {
             workspace.Close(closed);

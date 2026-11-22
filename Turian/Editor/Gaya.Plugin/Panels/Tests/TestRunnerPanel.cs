@@ -46,8 +46,8 @@ sealed class TestRunnerPanel(SettingsService settings, BackgroundTaskRunner task
         var theme = ThemeTokens.Current;
         using (gui.Node(-1, theme.Scale(28f), "tests/actions").ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Enter())
         {
-            filter = gui.TextInput(filter, width: 0, height: theme.Scale(26f), placeholder: "Filter tests",
-                id: "tests/filter");
+            gui.TextInput(ref filter, placeholder: "Filter tests",
+                id: "tests/filter").ExpandWidth().Height(theme.Scale(26f));
             if (!canRun) { return; }
             if (StudioControls.SmallTextButton(gui, "Discover", "tests/discover", theme.Scale(82f)))
             {

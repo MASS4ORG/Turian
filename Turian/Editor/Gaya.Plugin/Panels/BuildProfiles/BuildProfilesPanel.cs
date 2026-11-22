@@ -140,7 +140,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
         var height = Theme.Scale(rowHeight);
 
         using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Padding(6f, 0f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             if (gui.Pass == Pass.Pass2Render)
@@ -160,7 +160,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
                 }
             }
 
-            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).ContentAlignY(0.5f)
+            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).AlignContentY(0.5f)
                        .Enter())
             {
                 gui.ClipContent();
@@ -217,7 +217,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
     void Title(Gui gui, BuildProfileListing profile)
     {
         using (gui.Node(-1, Theme.Scale(26f), "buildProfiles/title").ExpandWidth().Direction(Axis.Horizontal)
-                   .Gap(8f).Padding(6f, 2f).ContentAlignY(0.5f).Enter())
+                   .Gap(8f).Padding(6f, 2f).AlignContentY(0.5f).Enter())
         {
             gui.DrawText(NameOf(profile), Theme.Text(14f), Theme.Ink, centerInRect: false);
             if (profile.IsActive)
@@ -295,7 +295,7 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
     static void Line(Gui gui, string text, GuiColor color)
     {
         using (gui.Node(-1, Theme.Scale(rowHeight - 6f), $"buildProfiles/line/{text}").ExpandWidth()
-                   .ContentAlignY(0.5f).Padding(6f, 0f).Enter())
+                   .AlignContentY(0.5f).Padding(6f, 0f).Enter())
         {
             gui.DrawText(text, Theme.Text(11f), color, centerInRect: false);
         }

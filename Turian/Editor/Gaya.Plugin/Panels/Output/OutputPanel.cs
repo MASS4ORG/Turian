@@ -93,7 +93,7 @@ sealed partial class OutputPanel(
                     Entries(gui);
                 }
 
-                gui.Splitter(ref split, Axis.Vertical, thickness: Theme.Scale(Theme.Gap), min: 0.25f);
+                gui.Splitter(ref split, Axis.Vertical, min: 0.25f).Height(Theme.Scale(Theme.Gap));
 
                 Rect below;
                 using (gui.Node().ExpandWidth().ExpandHeight(1f - split).Enter())
@@ -145,15 +145,14 @@ sealed partial class OutputPanel(
     void Header(Gui gui)
     {
         var height = Theme.Scale(Theme.RowHeight + 4f);
-        var box = Theme.Scale(13f);
 
         using (gui.Node(-1, height, headerId).ExpandWidth()
-                   .Direction(Axis.Horizontal).Gap(10f).ContentAlignY(0.5f).Enter())
+                   .Direction(Axis.Horizontal).Gap(10f).AlignContentY(0.5f).Enter())
         {
-            gui.Checkbox(ref collapse, localization.T("Collapse"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
+            gui.Checkbox(ref collapse, localization.T("Collapse"));
 
-            filter = gui.TextInput(filter, width: 0, height: height, placeholder: localization.T("Filter output"),
-                fontSize: Theme.Text(12), padding: 5, id: filterId);
+            gui.TextInput(ref filter, placeholder: localization.T("Filter output"),
+                id: filterId).ExpandWidth().Height(height).Padding(5);
 
             SeverityToggle(gui, "errors", Icons.LogError, counts.Errors, localization.T("Errors"), ref showErrors);
             SeverityToggle(gui, "warnings", Icons.LogWarning, counts.Warnings, localization.T("Warnings"),
@@ -359,7 +358,7 @@ sealed partial class OutputPanel(
         var font = settings.Monospace ? Mono(size) : null;
         var id = $"{rowPrefix}{row.RawIndex}";
 
-        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
+        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hovered = interactable.OnHover();
@@ -400,7 +399,7 @@ sealed partial class OutputPanel(
     static void CountBadge(Gui gui, int count, float height)
     {
         using (gui.Node(Theme.Scale(22f), Math.Max(Theme.Scale(13f), height - Theme.Scale(3f)))
-                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             if (gui.Pass == Pass.Pass2Render)
             {

@@ -11,7 +11,7 @@
     <ItemGroup>
         <ProjectReference Include="../LocalizationAbstractions/MASS4.Localization.Abstractions.csproj" />
         <ProjectReference Include="$(GuinevereLocalPath)/Attributes/Attributes.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
-        <PackageReference Include="MASS4.Attributes" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Attributes" Version="7.0.0" Condition="'$(GuinevereLocalPath)' == ''" />
     </ItemGroup>
     <ItemGroup>
         <Using Include="MASS4.Attributes" />

@@ -206,8 +206,10 @@ sealed partial class AssetBrowserPanel
 
     void TileRename(Gui gui, AssetEntry entry)
     {
-        state.EditingText = gui.TextInput(state.EditingText, width: 0, height: ThemeTokens.Current.Scale(22),
-            id: "assets/rename/" + entry.AbsolutePath, grabFocus: renameFocusRequested);
+        var editingText = state.EditingText;
+        gui.TextInput(ref editingText, id: "assets/rename/" + entry.AbsolutePath,
+            grabFocus: renameFocusRequested).ExpandWidth().Height(ThemeTokens.Current.Scale(22));
+        state.EditingText = editingText;
         if (gui.Pass != Pass.Pass2Render)
         {
             return;

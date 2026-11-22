@@ -189,7 +189,7 @@ sealed class SceneViewport : IDisposable
 
         var pointer = gui.Input.MousePosition;
         using (gui.Node(24f, 24f, "scene/gizmoCursor").AbsoluteScreen(pointer.X - 12f, pointer.Y - 12f)
-                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             if (showGizmoCursor)
             {

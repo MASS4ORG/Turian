@@ -31,7 +31,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="MASS4.Autoformers" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''"/>
+        <PackageReference Include="MASS4.Autoformers" Version="7.0.0" Condition="'$(GuinevereLocalPath)' == ''"/>
     </ItemGroup>
 
     <!-- External libraries -->

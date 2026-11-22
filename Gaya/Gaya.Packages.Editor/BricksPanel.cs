@@ -175,7 +175,7 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
     void Header(Gui gui, Frame now)
     {
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/header").ExpandWidth().Direction(Axis.Horizontal)
-                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+                   .Gap(Theme.Gap).AlignContentY(0.5f).Enter())
         {
             if (now.HasWorkspace)
             {
@@ -234,7 +234,7 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
         var height = Theme.Scale(rowHeight);
 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight + 4f), "bricks/registries/toolbar").ExpandWidth()
-                   .Direction(Axis.Horizontal).Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+                   .Direction(Axis.Horizontal).Gap(Theme.Gap).AlignContentY(0.5f).Enter())
         {
             if (Button(gui, now, "+", "bricks/registries/add", 28f, "Add a registry to take bricks from."))
             {
@@ -256,11 +256,11 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
     {
         var id = $"bricks/registry/{registry.Name}";
         using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Padding(6f, 0f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             Selectable(gui, controller.SelectedRegistry == registry.Name, () => controller.SelectedRegistry = registry.Name);
 
-            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).ContentAlignY(0.5f).Enter())
+            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).AlignContentY(0.5f).Enter())
             {
                 gui.ClipContent();
                 gui.DrawText(registry.Name, Theme.Text(12f), Theme.Ink, centerInRect: false);
@@ -283,7 +283,7 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
         var height = Theme.Scale(Theme.RowHeight + 4f);
 
         using (gui.Node(-1, height, "bricks/toolbar").ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Gap)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             if (Button(gui, now, "+", "bricks/add", 28f, "Add a brick by name, from a git repository, a folder or a .brick file."))
             {
@@ -292,8 +292,13 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
 
             using (gui.Node(-1, height, "bricks/search").Expand().Enter())
             {
-                Search = gui.TextInput(Search, width: 0, height: height, placeholder: "Search bricks",
-                    fontSize: Theme.Text(12), padding: 5, id: "bricks/search/input");
+                var search = Search;
+                var input = gui.TextInput(ref search, placeholder: "Search bricks", id: "bricks/search/input");
+                input.ExpandWidth().Height(height).Padding(5);
+                if (input.Changed)
+                {
+                    Search = search;
+                }
             }
 
             if (Button(gui, now, "…", "bricks/more", 28f,
@@ -304,7 +309,7 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
         }
 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/filters").ExpandWidth().Direction(Axis.Horizontal)
-                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+                   .Gap(Theme.Gap).AlignContentY(0.5f).Enter())
         {
             foreach (var (value, label, width) in Filters)
             {
@@ -393,8 +398,8 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
         {
             using (gui.Node(-1, height, "bricks/addRow/input").Expand().Enter())
             {
-                addInput = gui.TextInput(addInput, width: 0, height: height, placeholder: addLabel ?? "",
-                    fontSize: Theme.Text(12), padding: 5, id: "bricks/addRow/text");
+                gui.TextInput(ref addInput, placeholder: addLabel ?? "", id: "bricks/addRow/text")
+                    .ExpandWidth().Height(height).Padding(5);
             }
 
             if (Button(gui, now, "Add", "bricks/addRow/add", 50f) && addInput.Trim().Length > 0)

@@ -43,7 +43,6 @@ sealed class FileDialogChrome : IChromeItem, IEditorSaveDialog
         ArgumentNullException.ThrowIfNull(gui);
 
         var theme = ThemeTokens.Current;
-        gui.FileDialog(state, theme.Scale(dialogWidth), theme.Scale(dialogHeight),
-            theme.Text(theme.FontSize + 1f));
+        gui.FileDialog(state).Width(theme.Scale(dialogWidth)).Height(theme.Scale(dialogHeight));
     }
 }

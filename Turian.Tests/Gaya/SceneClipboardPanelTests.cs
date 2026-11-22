@@ -137,7 +137,7 @@ public sealed class SceneClipboardPanelTests
 
         var clipboardItems = Build(panel, "BuildClipboardMenu", first);
         Assert.Equal(["Cut", "Copy", "Paste", "Paste as Child"], Text(clipboardItems));
-        var copy = clipboardItems.Single(static item => item.Text == "Copy");
+        var copy = clipboardItems.Single(static item => item.Content.Label == "Copy");
         Assert.True(copy.Enabled);
         copy.Action!();
         Assert.True(NodeClipboard.HoldsNodes(clipboard.Text));
@@ -159,7 +159,7 @@ public sealed class SceneClipboardPanelTests
     }
 
     static IEnumerable<string> Text(List<FlyoutItem> items) =>
-        items.Select(static item => item.Text).Where(static text => text.Length > 0);
+        items.Select(static item => item.Content.Label ?? "").Where(static text => text.Length > 0);
 
     void Frame(SceneTreePanel panel) => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
 

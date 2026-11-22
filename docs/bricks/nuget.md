@@ -4,8 +4,8 @@ A brick whose prebuilt assemblies need third-party libraries declares them in th
 
 ```json
 "nuget": {
-  "MASS4.Guinevere": "6.2.0",
-  "MASS4.Guinevere.Styling": "6.2.0"
+  "MASS4.Guinevere": "7.0.0",
+  "MASS4.Guinevere.Styling": "7.0.0"
 }
 ```
 

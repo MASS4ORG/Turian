@@ -109,7 +109,7 @@ public sealed class AssetBrowserInteractionTests
         browser.Frame();
         Assert.Equal(Path.Combine(browser.Root, "Folder"), browser.Field<AssetBrowserNavigation>("navigation").Current);
         Assert.Equal(deep.AbsolutePath, browser.State.SelectedId);
-        browser.Click("breadcrumb/0");
+        browser.Click(browser.Find("assets/breadcrumb").Children[0]);
         Assert.Equal(browser.Root, browser.Field<AssetBrowserNavigation>("navigation").Current);
         browser.Click("assets/back");
         Assert.Equal(Path.Combine(browser.Root, "Folder"), browser.Field<AssetBrowserNavigation>("navigation").Current);

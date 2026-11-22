@@ -37,8 +37,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
-        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="7.0.0" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="7.0.0" Condition="'$(GuinevereLocalPath)' == ''" />
     </ItemGroup>
 
     <!-- External libraries -->

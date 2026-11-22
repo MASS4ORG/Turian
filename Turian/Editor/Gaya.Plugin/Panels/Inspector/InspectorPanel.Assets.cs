@@ -68,7 +68,7 @@ sealed partial class InspectorPanel
     {
         var single = frameAssets.Count == 1;
         using (gui.Node(-1, Theme.Scale(24f), "inspector/asset/name").ExpandWidth()
-                   .Padding(6, 2).ContentAlignY(0.5f).Enter())
+                   .Padding(6, 2).AlignContentY(0.5f).Enter())
         {
             if (!single)
             {
@@ -103,7 +103,7 @@ sealed partial class InspectorPanel
     void RenderAssetFields(Gui gui, AssetInspection inspection)
     {
         using (gui.Node(-1, Theme.Scale(22f), "inspector/asset/header").ExpandWidth()
-                   .Padding(6, 0).ContentAlignY(0.5f).Enter())
+                   .Padding(6, 0).AlignContentY(0.5f).Enter())
         {
             if (gui.Pass == Pass.Pass2Render)
             {

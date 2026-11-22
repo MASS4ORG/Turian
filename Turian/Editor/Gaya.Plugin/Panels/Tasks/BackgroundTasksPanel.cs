@@ -55,7 +55,7 @@ sealed class BackgroundTasksPanel(BackgroundTaskManager tasks) : IPanel
     {
         var finished = roots.Count(t => t.IsFinished);
 
-        using (gui.Node(-1, 20).ExpandWidth().Direction(Axis.Horizontal).Gap(8).ContentAlignY(0.5f).Enter())
+        using (gui.Node(-1, 20).ExpandWidth().Direction(Axis.Horizontal).Gap(8).AlignContentY(0.5f).Enter())
         {
             Label(gui, $"{BackgroundTaskTree.ActiveRoots(snapshot)} running, {finished} finished", Theme.InkDim, 11);
 
@@ -73,7 +73,7 @@ sealed class BackgroundTasksPanel(BackgroundTaskManager tasks) : IPanel
 
         using (gui.Node(-1, -1, $"tasks/{root.Id}").ExpandWidth().Direction(Axis.Vertical).Gap(3).Enter())
         {
-            using (gui.Node(-1, 18).ExpandWidth().Direction(Axis.Horizontal).Gap(8).ContentAlignY(0.5f).Enter())
+            using (gui.Node(-1, 18).ExpandWidth().Direction(Axis.Horizontal).Gap(8).AlignContentY(0.5f).Enter())
             {
                 Label(gui, root.Label, StatusInk(rollup.Status));
                 Label(gui, rollup.Status.Text(), Theme.InkDim, 11);
@@ -88,7 +88,7 @@ sealed class BackgroundTasksPanel(BackgroundTaskManager tasks) : IPanel
 
             if (root.IsActive)
             {
-                gui.ProgressBar(rollup.Progress, -1, 5);
+                gui.ProgressBar(rollup.Progress).ExpandWidth().Height(5);
             }
 
             if (root.Note.Length > 0)
@@ -106,13 +106,13 @@ sealed class BackgroundTasksPanel(BackgroundTaskManager tasks) : IPanel
     static void ChildRow(Gui gui, BackgroundTask child)
     {
         using (gui.Node(-1, 16, $"tasks/child/{child.Id}")
-                   .ExpandWidth().Direction(Axis.Horizontal).Gap(8).PaddingLeft(14).ContentAlignY(0.5f).Enter())
+                   .ExpandWidth().Direction(Axis.Horizontal).Gap(8).PaddingLeft(14).AlignContentY(0.5f).Enter())
         {
             var detail = child.UnitsTotal > 0 ? $"{child.Label} ({child.UnitsDone}/{child.UnitsTotal})" : child.Label;
             Label(gui, detail, Theme.InkDim, 11);
             if (child.IsActive)
             {
-                gui.ProgressBar(child.Fraction, 70, 4);
+                gui.ProgressBar(child.Fraction).Width(70).Height(4);
             }
         }
     }

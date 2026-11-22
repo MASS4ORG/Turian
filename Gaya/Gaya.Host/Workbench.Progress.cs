@@ -23,7 +23,7 @@ public sealed partial class Workbench
         gui.RequestFrame();
 
         using (gui.Node(gui.ScreenRect.W, gui.ScreenRect.H, "__uiBlocker")
-                   .AbsoluteScreen(0, 0).Direction(Axis.Vertical).ContentAlignX(0.5f).ContentAlignY(0.5f)
+                   .AbsoluteScreen(0, 0).Direction(Axis.Vertical).AlignContentX(0.5f).AlignContentY(0.5f)
                    .BlockInput().Enter())
         {
             gui.SetZIndex(10_000);
@@ -49,7 +49,7 @@ public sealed partial class Workbench
 
             using (gui.Node(-1, t.Scale(6), "__uiBlocker/progress").ExpandWidth().Enter())
             {
-                gui.ProgressBar(progress.Fraction, -1, t.Scale(6));
+                gui.ProgressBar(progress.Fraction).ExpandWidth().Height(t.Scale(6));
             }
 
             ProgressSummary(gui, progress);

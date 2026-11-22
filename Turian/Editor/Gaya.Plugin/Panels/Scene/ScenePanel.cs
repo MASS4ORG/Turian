@@ -90,7 +90,7 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
         var returnTo = -1;
 
         using (gui.Node(-1, ToolbarHeight, "scene/breadcrumb").ExpandWidth().Direction(Axis.Horizontal)
-                   .Padding(6f, 3f).Gap(4f).ContentAlignY(0.5f).Enter())
+                   .Padding(6f, 3f).Gap(4f).AlignContentY(0.5f).Enter())
         {
             gui.DrawBackgroundRect(Theme.Panel);
 
@@ -117,7 +117,7 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
     static bool Button(Gui gui, string label, string id, bool selected)
     {
         using (gui.Node(Theme.Scale((label.Length * 7f) + 14f), Theme.Scale(20f), id)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();

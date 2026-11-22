@@ -206,12 +206,12 @@ sealed partial class AssetBrowserPanel
 
     void LabelPrompt(Gui gui) => gui.Popup(ref labelPromptOpen, () =>
     {
-        newLabel = gui.TextInput(newLabel, width: 0, placeholder: "Label name", id: "assets/newLabel");
+        gui.TextInput(ref newLabel, placeholder: "Label name", id: "assets/newLabel").ExpandWidth();
         if (StudioControls.SmallTextButton(gui, "Add label", "assets/addLabel", 100))
         {
             SetLabel(labelSelection, newLabel, true);
             labelPromptOpen = false;
         }
-    }, width: 280, height: 90, title: "Asset label");
+    }, title: "Asset label").Width(280).Height(90);
 
 }

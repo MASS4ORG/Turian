@@ -25,10 +25,10 @@ sealed partial class SettingsPanel
     void ScopeMenu(Gui gui, SettingsPageDescriptor page, string member, string id,
         List<(string Label, Func<SettingsChange> Run)> actions)
     {
-        // ReSharper disable once ExplicitCallerInfoArgument
-        var next = gui.Dropdown([.. actions.Select(static action => action.Label)], -1, width: Theme.Scale(104f),
-            height: Theme.Scale(Theme.RowHeight), placeholder: T("Scope…"), fontSize: Theme.Text(11),
-            maxVisibleItems: 8, filePath: $"{id}/scope");
+        var next = -1;
+        gui.Dropdown([.. actions.Select(static action => action.Label)], ref next,
+            placeholder: T("Scope…"), maxVisibleItems: 8, id: $"{id}/scope")
+            .Width(Theme.Scale(104f)).Height(Theme.Scale(Theme.RowHeight));
 
         // A choice is made in the build pass and applied in the render pass, so the settings never change mid-layout.
         if (gui.Pass == Pass.Pass1Build)

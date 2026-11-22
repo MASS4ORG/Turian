@@ -35,9 +35,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     int panelsRevision;
     int savedRevision;
     bool paletteOpen;
-    DockTheme dockTheme;
     int styleSheetsVersion = -1;
     Gui? styledGui;
+    ThemeTokens? styledTheme;
 
     /// <summary>Creates the workbench over an activated plugin set.</summary>
     /// <param name="app">The loaded plugins, services and registries.</param>
@@ -59,8 +59,6 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         }
 
         appearanceBridge = new AppearanceBridge(Appearance, app.Themes, app.Settings);
-        dockTheme = Theme.ToDockTheme();
-        app.Themes.Changed += OnThemeChanged;
         this.layoutStore = layoutStore ?? new WorkbenchLayoutStore(log);
         descriptors = app.Panels.All.ToDictionary(static descriptor => descriptor.Id);
         panelsRevision = app.Panels.Revision;
@@ -106,22 +104,21 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     /// <summary>Translates a piece of chrome text through the shell's language service, when there is one.</summary>
     string T(string text) => Shell?.T(text) ?? text;
 
-    /// <summary>Rebuilds the metrics the dock space reads.</summary>
-    void OnThemeChanged() => dockTheme = Theme.ToDockTheme();
-
     /// <summary>
     /// Installs the active theme's sheets into the GUI over the look's base sheet (Guinevere's default control sheet
     /// for the default look), so styled widgets resolve against them.
     /// </summary>
     void SyncStyleSheets(Gui gui)
     {
-        if (styleSheetsVersion == app.Themes.SheetsVersion && styledGui == gui)
+        var theme = Theme;
+        if (styleSheetsVersion == app.Themes.SheetsVersion && styledGui == gui && styledTheme == theme)
         {
             return;
         }
 
         styleSheetsVersion = app.Themes.SheetsVersion;
         styledGui = gui;
+        styledTheme = theme;
         if (!gui.IconDecoders.Contains(SvgIconDecoder.Instance))
         {
             gui.IconDecoders.Add(SvgIconDecoder.Instance);
@@ -132,6 +129,17 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         {
             gui.StyleSheets.Add(sheet);
         }
+        gui.StyleSheets.Add(StyleSheet.Parse(FormattableString.Invariant($$"""
+            appbar { height = {{Math.Max(24f, theme.Scale(theme.MenuHeight))}}; }
+            tabstrip { height = {{theme.Scale(theme.HeaderHeight)}}; font-size = {{theme.Text(theme.FontSize)}}; }
+            dock-icon { width = {{theme.Scale(12)}}; }
+            splitter.dock.horizontal { width = {{theme.Gap}}; }
+            splitter.dock.vertical { height = {{theme.Gap}}; }
+            treeview { font-size = {{theme.Text(theme.FontSize)}}; }
+            tree-row { height = {{theme.Scale(theme.RowHeight)}}; indent = {{theme.Scale(14)}}; }
+            tree-expander { width = {{theme.Scale(10)}}; }
+            tree-icon { width = {{theme.Scale(12)}}; }
+            """)));
 
         ExcaliburStyles.SetBaseSheet(gui, app.Themes.Look);
     }
@@ -378,7 +386,6 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         SaveLayoutIfChanged();
         app.Settings.Save();
         appearanceBridge.Dispose();
-        app.Themes.Changed -= OnThemeChanged;
 
         foreach (var panel in panelInstances.Values.OfType<IDisposable>())
         {
@@ -459,7 +466,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
                 }
                 else
                 {
-                    gui.DockSpace(Layout, PanelInfo, RenderPanel, dockTheme, RenderTabStripActions);
+                    gui.DockSpace(Layout, PanelInfo, RenderPanel, RenderTabStripActions);
                 }
             }
 

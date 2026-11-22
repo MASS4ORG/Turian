@@ -30,7 +30,7 @@ public sealed partial class BricksPanel
     static bool DropdownChip(Gui gui, string label, string id, float width, bool active)
     {
         using (gui.Node(Theme.Scale(width), Theme.Scale(Theme.RowHeight), id).BlockInput().Direction(Axis.Horizontal)
-                   .Gap(4f).ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .Gap(4f).AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -51,7 +51,7 @@ public sealed partial class BricksPanel
 
     static void Line(Gui gui, string text, Color color)
     {
-        using (gui.Node(-1, Theme.Scale(rowHeight - 6f), $"bricks/line/{text}").ExpandWidth().ContentAlignY(0.5f).Enter())
+        using (gui.Node(-1, Theme.Scale(rowHeight - 6f), $"bricks/line/{text}").ExpandWidth().AlignContentY(0.5f).Enter())
         {
             gui.ClipContent();
             gui.DrawText(text, Theme.Text(11f), color, centerInRect: false);
@@ -60,7 +60,7 @@ public sealed partial class BricksPanel
 
     static void Cell(Gui gui, string id, string text, float width, float height, Color? color = null)
     {
-        using (gui.Node(Theme.Scale(width), height, id).ContentAlignY(0.5f).Enter())
+        using (gui.Node(Theme.Scale(width), height, id).AlignContentY(0.5f).Enter())
         {
             gui.ClipContent();
             gui.DrawText(text, Theme.Text(11f), color ?? Theme.InkDim, centerInRect: false);
@@ -71,7 +71,7 @@ public sealed partial class BricksPanel
     {
         var height = Theme.Scale(Theme.RowHeight);
 
-        using (gui.Node(Theme.Scale(width), height, id).BlockInput().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        using (gui.Node(Theme.Scale(width), height, id).BlockInput().AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -93,7 +93,7 @@ public sealed partial class BricksPanel
 
     static bool SmallTextButton(Gui gui, string label, string id, float width, string? tooltip, bool accent = false)
     {
-        using (gui.Node(width, Theme.Scale(Theme.RowHeight), id).BlockInput().ContentAlignX(0.5f).ContentAlignY(0.5f)
+        using (gui.Node(width, Theme.Scale(Theme.RowHeight), id).BlockInput().AlignContentX(0.5f).AlignContentY(0.5f)
                    .Enter())
         {
             var interactable = gui.GetInteractable();

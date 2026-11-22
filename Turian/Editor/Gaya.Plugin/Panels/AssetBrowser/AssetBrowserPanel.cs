@@ -178,7 +178,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
                 Tree(gui);
             }
 
-            gui.Splitter(ref split, Axis.Horizontal, thickness: 3f, min: 0.15f);
+            gui.Splitter(ref split, Axis.Horizontal, min: 0.15f).Width(3f);
             using (gui.Node().ExpandWidth(1f - split).ExpandHeight().Enter())
             {
                 Grid(gui);
@@ -194,7 +194,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
         }
     }
 
-    void Tree(Gui gui) => gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
+    void Tree(Gui gui) => gui.TreeView(state, rows, OnClick, DragPayload, Rename, OnEmptyClick,
         dropAccept: BrowserPayload, onDrop: OnDrop);
 
     void PrepareTree(string root)
