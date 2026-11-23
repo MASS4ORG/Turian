@@ -60,8 +60,8 @@ sealed class ProjectSwitcherChrome(
         }
 
         var close = false;
-        gui.Popup(ref open, () => close = RenderMenu(gui), width: MenuWidth,
-            height: (frameProjects.Length + 1) * RowHeight + Theme.Scale(22), position: popupPosition);
+        gui.Popup(ref open, () => close = RenderMenu(gui),
+            position: popupPosition).Width(MenuWidth).Height((frameProjects.Length + 1) * RowHeight + Theme.Scale(22));
         if (close)
         {
             open = false;
@@ -72,8 +72,8 @@ sealed class ProjectSwitcherChrome(
     {
         var project = settings.Settings;
         var label = CurrentLabel(project);
-        using (gui.Node(-1, RowHeight, "project-switcher").Width(UnitValue.Fit)
-                   .Direction(Axis.Horizontal).Padding(8, 0).Gap(6).ContentAlignY(0.5f).Enter())
+        using (gui.Node(-1, RowHeight, "project-switcher").Width(Size.FitContent())
+                   .Direction(Axis.Horizontal).Padding(8, 0).Gap(6).AlignContentY(0.5f).Enter())
         {
             var anchor = gui.CurrentNode.Rect;
             DrawCurrentIcon(gui, project);
@@ -156,7 +156,7 @@ sealed class ProjectSwitcherChrome(
             }
 
             using (gui.Node(-1, RowHeight, "project-switcher/open").ExpandWidth()
-                       .Padding(8, 0).ContentAlignY(0.5f).Enter())
+                       .Padding(8, 0).AlignContentY(0.5f).Enter())
             {
                 gui.DrawText("Open Project…", Theme.Text(12), Theme.Ink, centerInRect: false);
                 if (ActivateMenuItem(gui))
@@ -177,7 +177,7 @@ sealed class ProjectSwitcherChrome(
         {
             var row = gui.CurrentNode;
             using (gui.Node(-1, RowHeight, $"project-switcher/{project.Path}/open").ExpandWidth()
-                       .Direction(Axis.Horizontal).Gap(6).Padding(8, 0).ContentAlignY(0.5f).Enter())
+                       .Direction(Axis.Horizontal).Gap(6).Padding(8, 0).AlignContentY(0.5f).Enter())
             {
                 if (project.Icon is { } icon)
                 {
@@ -239,7 +239,7 @@ sealed class ProjectSwitcherChrome(
 
     static bool MenuAction(Gui gui, string icon, string id)
     {
-        using (gui.Node(RowHeight, RowHeight, id).ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        using (gui.Node(RowHeight, RowHeight, id).AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             gui.ThemedIcon(icon, Theme.Text(11), 0.7f);
             return ActivateMenuItem(gui);

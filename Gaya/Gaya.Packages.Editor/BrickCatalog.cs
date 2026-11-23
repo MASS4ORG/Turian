@@ -104,10 +104,15 @@ public sealed record CatalogBrick(string Id, string? DisplayName, string? Descri
                              && SemanticVersion.TryParse(installed, out var have) && SemanticVersion.TryParse(latest, out var newest)
                              && newest > have;
 
-    /// <summary>Whether a workspace of <paramref name="scope"/> can use the brick; true while its scopes are unknown.</summary>
+    /// <summary>Whether a workspace of <paramref name="scope"/> can use the brick under its declared scope.</summary>
     /// <param name="scope">The workspace's scope.</param>
     /// <returns>Whether the brick installs there.</returns>
     public bool Accepts(PackageScope scope) => Manifest is null || Manifest.EffectiveScopes.Contains(scope);
+
+    /// <summary>Whether the workspace can install the brick under its host-specific package policy.</summary>
+    /// <param name="workspace">The target workspace.</param>
+    /// <returns>Whether the brick installs there.</returns>
+    public bool Accepts(IBrickWorkspace workspace) => Manifest is null || workspace.Accepts(Manifest);
 }
 
 /// <summary>

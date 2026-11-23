@@ -26,6 +26,7 @@ sealed class GameViewport : IDisposable
     readonly PlayModeService playMode;
     readonly ILogger log;
     readonly SceneViewSettings viewSettings;
+    readonly IPlayFrameProfiler? frameProfiler;
     readonly FrameStatistics panelStatistics = new();
 
     bool showStatistics;
@@ -53,14 +54,16 @@ sealed class GameViewport : IDisposable
     /// <param name="playMode">The session to display and forward input to.</param>
     /// <param name="log">Where an unusable device is reported.</param>
     /// <param name="cameraSettings">Shared environment preferences used by both Studio viewports.</param>
+    /// <param name="frameProfiler">Optional collector for CPU-side viewport work during Play.</param>
     public GameViewport(
         Vulkan vulkan, AssetDatabase assets, SceneTreeController sceneTree, PlayModeService playMode, ILogger log,
-        EditorCameraSettings? cameraSettings = null)
+        EditorCameraSettings? cameraSettings = null, IPlayFrameProfiler? frameProfiler = null)
     {
         this.vulkan = vulkan;
         this.assets = assets;
         this.sceneTree = sceneTree;
         this.playMode = playMode;
+        this.frameProfiler = frameProfiler;
         this.log = log;
         viewSettings = cameraSettings?.View ?? new SceneViewSettings();
 
@@ -151,11 +154,24 @@ sealed class GameViewport : IDisposable
             : new Vector4(viewSettings.EmptySkyColor, 1f);
 
         overlayRoot = root;
-        RenderGameFrame(root, camera, gui.Time.DeltaTime);
-        service!.CopyPixels(pixels);
+        using var recording = playMode.State == PlayState.Playing
+            ? frameProfiler?.BeginFrame(PlayFrameSource.Viewport) ?? playMode.BeginProfileFrame(PlayFrameSource.Viewport)
+            : default;
+        using var sample = Profiler.Sample("Game Viewport");
+        using (Profiler.Sample("Scene Rendering"))
+        {
+            RenderGameFrame(root, camera, gui.Time.DeltaTime);
+        }
+        using (Profiler.Sample("Pixel Readback"))
+        {
+            service!.CopyPixels(pixels);
+        }
 
-        frame?.Dispose();
-        frame = Snapshot(pixels, service.Width, service.Height);
+        using (Profiler.Sample("Image Copy"))
+        {
+            frame?.Dispose();
+            frame = Snapshot(pixels, service.Width, service.Height);
+        }
         if (frame is not null)
         {
             gui.DrawImage(frame, rect);
@@ -249,7 +265,7 @@ sealed class GameViewport : IDisposable
         {
             if (service is null)
             {
-                service = new SceneViewerService(vulkan, assets, width, height);
+                service = new SceneViewerService(vulkan, assets, width, height) { CaptureGpuSubmissions = true };
                 service.OverlaySource = (w, h, dt) =>
                     overlayRoot is null ? null : UiPresenter()?.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
                 service.WorldUiSource = frameInfo =>

@@ -15,7 +15,7 @@ sealed partial class AssetBrowserPanel
         var titleBar = theme.Scale(24f);
 
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, $"{context.PanelId}/tabMenu")
-                   .ExpandHeight().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .ExpandHeight().AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -45,12 +45,8 @@ sealed partial class AssetBrowserPanel
             {
                 context.Services.GetService<IShellHost>()?.ShowPanel(ShellPanels.Settings);
             }
-        },
-            width: theme.Scale(headerMenuWidth),
-            height: contentHeight,
-            title: "Assets",
-            position: headerMenuPosition,
-            titleBarHeight: titleBar);
+        }, title: "Assets", position: headerMenuPosition)
+            .Width(theme.Scale(headerMenuWidth)).Height(contentHeight + titleBar);
     }
 
     /// <summary>
@@ -59,22 +55,20 @@ sealed partial class AssetBrowserPanel
     static void HeaderPreferences(Gui gui, AssetBrowserSettings settings, IEditorSettings editorSettings)
     {
         var theme = ThemeTokens.Current;
-        var box = theme.Scale(13f);
         var height = theme.Scale(theme.RowHeight);
-        var size = theme.Text(11f);
         var value = settings.ShowFileExtensions;
         using (gui.Node(-1, height).ExpandWidth().Direction(Axis.Horizontal)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
-            gui.Checkbox(ref value, "Show file extensions", size: box, fontSize: size, spacing: 6f);
+            gui.Checkbox(ref value, "Show file extensions");
         }
 
         var favorites = settings.ShowFavoritesInTree;
-        gui.Checkbox(ref favorites, "Favorites in tree", size: box, fontSize: size);
+        gui.Checkbox(ref favorites, "Favorites in tree");
         var mode = settings.ViewMode;
-        gui.EnumDropdown(ref mode, width: theme.Scale(150), height: height, fontSize: size);
+        gui.EnumDropdown(ref mode).Width(theme.Scale(150)).Height(height);
         var zoom = (float)Math.Clamp(settings.GridZoom, 32, 256);
-        gui.Slider(ref zoom, 32, 256, width: theme.Scale(150), height: height, step: 16, showValue: true);
+        gui.Slider(ref zoom, 32, 256, step: 16, showValue: true).Width(theme.Scale(150)).Height(height);
         if (value == settings.ShowFileExtensions && favorites == settings.ShowFavoritesInTree
             && mode == settings.ViewMode && (int)zoom == settings.GridZoom)
         {

@@ -55,9 +55,12 @@ public sealed class GayaApplication(
     /// <summary>Ids of every plugin that was configured, in activation order.</summary>
     public IReadOnlyList<string> LoadedPluginIds { get; } = loadedPluginIds;
 
+    internal LivePluginHost? LivePlugins { get; set; }
+
     /// <inheritdoc />
     public void Dispose()
     {
+        LivePlugins?.Dispose();
         foreach (var plugin in Plugins.Reverse())
         {
             try
@@ -159,8 +162,10 @@ public static class PluginHost
         }
 
         logger.LogInformation("Gaya loaded {Count} plugin(s): {Plugins}", loaded.Count, string.Join(", ", loaded));
-        return new GayaApplication(provider, panels, commands, menus, chrome, shortcuts,
+        var app = new GayaApplication(provider, panels, commands, menus, chrome, shortcuts,
             focus, loaded, [.. instances.Select(static entry => entry.Plugin)], settings, themes, logger);
+        app.LivePlugins = new LivePluginHost(app, provider.GetRequiredService<StudioBricks>(), logger);
+        return app;
     }
 
     /// <summary>

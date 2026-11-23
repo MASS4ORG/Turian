@@ -9,29 +9,28 @@ sealed partial class ExternalEditorFieldEditor
     void CustomFields(Gui gui, SettingsFieldContext field, ExternalEditorChoice choice)
     {
         using (gui.Node(-1, InputHeight, $"{field.Id}/program").Direction(Axis.Horizontal).Gap(4f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
-            var program = gui.TextInput(choice.Executable, width: Theme.Scale(controlWidth), height: InputHeight,
-                placeholder: T("Path to the program"), fontSize: Theme.Text(12), padding: inputPadding,
-                id: $"{field.Id}/program/text");
+            var program = choice.Executable;
+            gui.TextInput(ref program, placeholder: T("Path to the program"),
+                id: $"{field.Id}/program/text").Width(Theme.Scale(controlWidth)).Height(InputHeight).Padding(inputPadding);
             if (program != choice.Executable)
             {
                 field.SetValue(choice with { Executable = program });
             }
 
-            if (gui.Button(T("Browse…"), width: Theme.Scale(70f), height: Theme.Scale(Theme.RowHeight),
-                    fontSize: Theme.Text(11), id: $"{field.Id}/program/browse"))
+            if (gui.Button(T("Browse…"), id: $"{field.Id}/program/browse").Width(Theme.Scale(70f)).Height(Theme.Scale(Theme.RowHeight)).Clicked)
             {
                 Browse(field, keepEditor: true);
             }
         }
 
         using (gui.Node(-1, InputHeight, $"{field.Id}/arguments").Direction(Axis.Horizontal)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
-            var template = gui.TextInput(choice.Arguments, width: Theme.Scale(controlWidth), height: InputHeight,
-                placeholder: CustomEditor.DefaultTemplate, fontSize: Theme.Text(12), padding: inputPadding,
-                id: $"{field.Id}/arguments/text");
+            var template = choice.Arguments;
+            gui.TextInput(ref template, placeholder: CustomEditor.DefaultTemplate,
+                id: $"{field.Id}/arguments/text").Width(Theme.Scale(controlWidth)).Height(InputHeight).Padding(inputPadding);
             if (template != choice.Arguments)
             {
                 field.SetValue(choice with { Arguments = template });
@@ -52,10 +51,9 @@ sealed partial class ExternalEditorFieldEditor
 
         var missing = status == ExternalEditorStatus.ExecutableMissing;
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{field.Id}/warning").Direction(Axis.Horizontal).Gap(6f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
-            if (gui.Button(missing ? T("Choose again…") : T("Use system default"), width: Theme.Scale(120f),
-                    height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(11), id: $"{field.Id}/fix"))
+            if (gui.Button(missing ? T("Choose again…") : T("Use system default"), id: $"{field.Id}/fix").Width(Theme.Scale(120f)).Height(Theme.Scale(Theme.RowHeight)).Clicked)
             {
                 if (missing)
                 {
@@ -109,11 +107,12 @@ sealed partial class ExternalEditorFieldEditor
         }
     }
 
-    string ToggleOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored) =>
-        gui.Checkbox(string.Equals(stored, bool.TrueString, StringComparison.OrdinalIgnoreCase), T(option.Label),
-            id: $"{field.Id}/option/{option.Key}")
-            ? bool.TrueString.ToLowerInvariant()
-            : bool.FalseString.ToLowerInvariant();
+    string ToggleOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored)
+    {
+        var enabled = string.Equals(stored, bool.TrueString, StringComparison.OrdinalIgnoreCase);
+        gui.Checkbox(ref enabled, T(option.Label), id: $"{field.Id}/option/{option.Key}");
+        return enabled ? "true" : "false";
+    }
 
     /// <summary>A dropdown of the option's values; like the editor dropdown, a pick is made in the build pass and applied in the render pass.</summary>
     string ChoiceOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored)
@@ -124,11 +123,11 @@ sealed partial class ExternalEditorFieldEditor
         gui.DrawText(T(option.Label), Theme.Text(12f), Theme.Ink, centerInRect: false);
 
         int next;
-        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), id).Direction(Axis.Horizontal).ContentAlignY(0.5f).Enter())
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), id).Direction(Axis.Horizontal).AlignContentY(0.5f).Enter())
         {
-            // ReSharper disable once ExplicitCallerInfoArgument
-            next = gui.Dropdown([.. values.Select(value => T(value.Label))], current, width: Theme.Scale(controlWidth),
-                height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12), maxVisibleItems: 12, filePath: id);
+            next = current;
+            gui.Dropdown([.. values.Select(value => T(value.Label))], ref next,
+                maxVisibleItems: 12, id: id).Width(Theme.Scale(controlWidth)).Height(Theme.Scale(Theme.RowHeight));
         }
 
         if (gui.Pass == Pass.Pass1Build)
@@ -148,8 +147,8 @@ sealed partial class ExternalEditorFieldEditor
     string TextOption(Gui gui, SettingsFieldContext field, ExternalEditorOption option, string stored)
     {
         gui.DrawText(T(option.Label), Theme.Text(12f), Theme.Ink, centerInRect: false);
-        return gui.TextInput(stored, width: Theme.Scale(controlWidth), height: InputHeight, fontSize: Theme.Text(12),
-            padding: inputPadding, id: $"{field.Id}/option/{option.Key}");
+        gui.TextInput(ref stored, id: $"{field.Id}/option/{option.Key}").Width(Theme.Scale(controlWidth)).Height(InputHeight).Padding(inputPadding);
+        return stored;
     }
 
     static Dictionary<string, string> WithOption(IReadOnlyDictionary<string, string>? options, string key, string value)
@@ -168,8 +167,8 @@ sealed partial class ExternalEditorFieldEditor
         }
 
         var settings = project.Settings;
-        if (gui.Button(T("Test"), width: Theme.Scale(60f), height: Theme.Scale(Theme.RowHeight),
-                fontSize: Theme.Text(11), enabled: settings is not null, id: $"{field.Id}/test") && settings is not null)
+        if (gui.Button(T("Test"), enabled: settings is not null,
+            id: $"{field.Id}/test").Width(Theme.Scale(60f)).Height(Theme.Scale(Theme.RowHeight)).Clicked && settings is not null)
         {
             _ = Task.Run(() => launcher.OpenAsync(CodeOpener.ContextFor(settings)));
         }

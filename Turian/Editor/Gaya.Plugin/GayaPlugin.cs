@@ -41,6 +41,7 @@ public sealed class GayaPlugin : IPlugin
         context.Services.AddSingleton<LocaleService>();
         context.Services.AddSingleton(sp => new ProjectSession(sp, context.Logger));
         context.Services.AddSingleton<IBrickApplier>(sp => sp.GetRequiredService<ProjectSession>());
+        context.Services.AddSingleton<IProjectEditorBricks>(sp => sp.GetRequiredService<ProjectSession>());
 
         // The registries outlive Configure, so the bridge can keep republishing into them as the user
         // assembly is swapped by a recompile.
@@ -261,6 +262,7 @@ public sealed class GayaPlugin : IPlugin
     static void RegisterDialogs(IPluginContext context)
     {
         context.Services.AddSingleton<FileDialogChrome>();
+        context.Services.AddSingleton<IEditorSaveDialog>(static sp => sp.GetRequiredService<FileDialogChrome>());
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.fileDialog", ChromeSlot.Overlay,
             static sp => sp.GetRequiredService<FileDialogChrome>()));

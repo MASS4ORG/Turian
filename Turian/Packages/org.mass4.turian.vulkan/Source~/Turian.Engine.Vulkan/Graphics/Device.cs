@@ -158,6 +158,7 @@ public unsafe partial class Device : IDisposable
     DebugUtilsMessengerEXT debugMessenger;
     bool disposed;
     Queue graphicsQueue;
+    internal uint GraphicsQueueFamilyIndex { get; private set; }
     Queue presentQueue;
     CommandPool commandPool;
 
@@ -237,7 +238,15 @@ public unsafe partial class Device : IDisposable
         MemoryPropertyFlags properties,
         ref Silk.NET.Vulkan.Buffer buffer,
         ref DeviceMemory bufferMemory
-    )
+    ) => CreateBuffer(size, usage, properties, ref buffer, ref bufferMemory, out _);
+
+    internal void CreateBuffer(
+        ulong size,
+        BufferUsageFlags usage,
+        MemoryPropertyFlags properties,
+        ref Silk.NET.Vulkan.Buffer buffer,
+        ref DeviceMemory bufferMemory,
+        out ulong allocationSize)
     {
         BufferCreateInfo bufferInfo = new()
         {
@@ -275,6 +284,7 @@ public unsafe partial class Device : IDisposable
         }
 
         _ = vk.BindBufferMemory(device, buffer, bufferMemory, 0);
+        allocationSize = memRequirements.Size;
     }
 
     /// <summary>

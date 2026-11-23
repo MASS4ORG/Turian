@@ -22,7 +22,7 @@ sealed class WrappedTextDrawer : IPropertyDrawer
         var row = theme.Scale(theme.RowHeight);
         using (gui.Node(-1, -1, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Enter())
         {
-            using (gui.Node(theme.Scale(96f), row, $"{id}/label").ContentAlignY(0.5f).Enter())
+            using (gui.Node(theme.Scale(96f), row, $"{id}/label").AlignContentY(0.5f).Enter())
             {
                 gui.DrawText(field.Label, theme.Text(12), theme.Ink, centerInRect: false);
             }

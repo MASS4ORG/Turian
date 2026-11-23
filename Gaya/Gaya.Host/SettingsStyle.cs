@@ -5,16 +5,6 @@ static class SettingsStyle
 {
     static ThemeTokens Theme => ThemeTokens.Current;
 
-    /// <summary>The category tree's metrics, matching the studio's other trees.</summary>
-    public static TreeViewTheme Tree() => new()
-    {
-        RowHeight = Theme.Scale(Theme.RowHeight),
-        IndentWidth = Theme.Scale(14f),
-        FontSize = Theme.Text(Theme.FontSize),
-        ExpanderWidth = Theme.Scale(10f),
-        IconSize = Theme.Scale(12f),
-    };
-
     /// <summary>
     /// Sets the theme's row height, font size, label width and indent on the current node, under the control
     /// palette the workbench already applies, so the form editors beneath it match the rest of the studio.

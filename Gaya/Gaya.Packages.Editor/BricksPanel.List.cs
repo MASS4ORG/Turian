@@ -41,9 +41,9 @@ public sealed partial class BricksPanel
         }
 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight + 4f), "bricks/pending").ExpandWidth().Direction(Axis.Horizontal)
-                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+                   .Gap(Theme.Gap).AlignContentY(0.5f).Enter())
         {
-            using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/pending/text").Expand().ContentAlignY(0.5f).Enter())
+            using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/pending/text").Expand().AlignContentY(0.5f).Enter())
             {
                 gui.ClipContent();
                 gui.DrawText(Summary(now.Pending), Theme.Text(11f), Theme.Warning, centerInRect: false);
@@ -93,9 +93,9 @@ public sealed partial class BricksPanel
         }
 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight + 4f), "bricks/cleanup").ExpandWidth().Direction(Axis.Horizontal)
-                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+                   .Gap(Theme.Gap).AlignContentY(0.5f).Enter())
         {
-            using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/cleanup/text").Expand().ContentAlignY(0.5f).Enter())
+            using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/cleanup/text").Expand().AlignContentY(0.5f).Enter())
             {
                 gui.ClipContent();
                 gui.DrawText(copies.Count == 0
@@ -142,7 +142,7 @@ public sealed partial class BricksPanel
         var pending = now.Pending.LastOrDefault(c => c.Id == brick.Id);
 
         using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Padding(6f, 0f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             Selectable(gui, controller.Selected == brick.Id, () => controller.Selected = brick.Id);
 
@@ -153,15 +153,15 @@ public sealed partial class BricksPanel
                 BrickChangeKind.Disable => false,
                 _ => enabled,
             };
-            using (gui.Node(Theme.Scale(18f), height, $"{id}/enabled").ContentAlignY(0.5f).Enter())
+            using (gui.Node(Theme.Scale(18f), height, $"{id}/enabled").AlignContentY(0.5f).Enter())
             {
-                if (gui.Checkbox(shown, size: Theme.Scale(14f)) != shown && !now.Busy)
+                if (gui.Checkbox(ref shown, enabled: !now.Busy).Changed)
                 {
                     controller.Toggle(brick);
                 }
             }
 
-            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).ContentAlignY(0.5f).Enter())
+            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).AlignContentY(0.5f).Enter())
             {
                 gui.ClipContent();
                 gui.DrawText(brick.DisplayName is { Length: > 0 } name ? name : brick.Id, Theme.Text(12f),
@@ -169,9 +169,13 @@ public sealed partial class BricksPanel
                 gui.DrawText(brick.Id, Theme.Text(10f), Theme.InkDim, centerInRect: false);
             }
 
-            if (now.WorkspaceScope is { } scope && !brick.Accepts(scope))
+            var editorOnly = brick.Manifest is { } manifest && (manifest.EditorOnly
+                || manifest.EffectiveScopes.Contains(PackageScope.Studio)
+                && !manifest.EffectiveScopes.Contains(PackageScope.Project));
+            if ((now.Workspace is { } workspace && !brick.Accepts(workspace)) || editorOnly)
             {
-                Cell(gui, $"{id}/scope", brick.Accepts(PackageScope.Studio) ? "Studio" : "Project", 48f, height);
+                var label = editorOnly ? "Editor only" : "Project";
+                Cell(gui, $"{id}/scope", label, editorOnly ? 84f : 56f, height);
             }
 
             var (text, color) = VersionCell(brick, pending);

@@ -71,6 +71,9 @@ public sealed class SceneViewerService : IDisposable
         set => standardSystem.CollectStatistics = value;
     }
 
+    /// <summary>Allows the active profiler to inspect GPU submissions from this viewer.</summary>
+    public bool CaptureGpuSubmissions { get; set; }
+
     /// <summary>Statistics from the latest completed instrumented render call.</summary>
     public RenderFrameStats FrameStats { get; private set; }
 
@@ -169,17 +172,23 @@ public sealed class SceneViewerService : IDisposable
 
         if (OverlaySource is not null)
         {
+#if !TURIAN_NO_CPU_MARKERS
+            using var sample = Profiler.Sample("Overlay UI");
+#endif
             OverlayTexture = OverlaySource(frameTarget.Width, frameTarget.Height, (float)deltaTime);
         }
 
         worldUiSystem.Quads.Clear();
         if (WorldUiSource is not null)
         {
+#if !TURIAN_NO_CPU_MARKERS
+            using var sample = Profiler.Sample("World UI");
+#endif
             worldUiSystem.Quads.AddRange(WorldUiSource(
                 new WorldUiFrame(activeCamera, frameTarget.Width, frameTarget.Height, (float)deltaTime)));
         }
 
-        var cmd = frameTarget.BeginFrame();
+        var cmd = frameTarget.BeginFrame(CaptureGpuSubmissions);
         if (cmd is null)
         {
             return;
@@ -203,24 +212,33 @@ public sealed class SceneViewerService : IDisposable
             new Vector4(activeCamera.Front, 0));
         // Gathering fills the light slots, so it runs before the upload or lights reach the GPU a frame late.
         measurement.BeginPreparation();
-        standardSystem.Prepare(frameInfo, ubo);
-        worldGraphicsSystem.Prepare(frameInfo, ubo);
-        uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
-        standardSystem.RecordBeforeRenderPass(frameInfo);
+#if !TURIAN_NO_CPU_MARKERS
+        using (Profiler.Sample("Render Preparation"))
+#endif
+        {
+            standardSystem.Prepare(frameInfo, ubo);
+            worldGraphicsSystem.Prepare(frameInfo, ubo);
+            uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
+            standardSystem.RecordBeforeRenderPass(frameInfo);
+        }
 
         measurement.BeginSubmission();
+#if !TURIAN_NO_CPU_MARKERS
+        using (Profiler.Sample("Record and Submit"))
+#endif
+        {
+            frameTarget.BeginRenderPass(cmd.Value, ClearColor);
 
-        frameTarget.BeginRenderPass(cmd.Value, ClearColor);
+            standardSystem.Render(frameInfo, ref ubo);
+            meshSystem.Render(frameInfo, ref ubo);
+            gizmoSystem.Render(frameInfo, ref ubo);
+            worldGraphicsSystem.Render(frameInfo, ref ubo);
+            worldUiSystem.Render(frameInfo, ref ubo);
+            overlayUiSystem.Render(frameInfo, ref ubo);
 
-        standardSystem.Render(frameInfo, ref ubo);
-        meshSystem.Render(frameInfo, ref ubo);
-        gizmoSystem.Render(frameInfo, ref ubo);
-        worldGraphicsSystem.Render(frameInfo, ref ubo);
-        worldUiSystem.Render(frameInfo, ref ubo);
-        overlayUiSystem.Render(frameInfo, ref ubo);
-
-        frameTarget.EndRenderPass(cmd.Value);
-        frameTarget.EndFrame();
+            frameTarget.EndRenderPass(cmd.Value);
+            frameTarget.EndFrame();
+        }
         FrameStats = measurement.Complete(standardSystem.FrameStats);
     }
 

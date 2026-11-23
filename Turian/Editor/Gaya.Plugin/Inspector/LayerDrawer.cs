@@ -50,11 +50,10 @@ sealed class LayerDrawer(LayerFilter layers, UndoService? undo = null) : IProper
         var selected = options.Where(masks[0].Contains).ToArray();
         var labels = slots.ToDictionary(slot => slot.Index, slot => $"{slot.Index}: {slot.Name}");
         var theme = ThemeTokens.Current;
-        var result = gui.MultiDropdown(options, selected, display: index => labels[index],
-            mixed: field.HasMixedValue,
-            isMixed: index => masks.Any(mask => mask.Contains(index) != masks[0].Contains(index)),
-            width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
-            placeholder: "none", enabled: !field.IsReadOnly, filePath: $"{id}/layer-mask");
+        gui.MultiDropdown(options, selected, out var result, display: index => labels[index],
+            mixed: field.HasMixedValue, isMixed: index => masks.Any(mask => mask.Contains(index) != masks[0].Contains(index)),
+            placeholder: "none", enabled: !field.IsReadOnly, id: $"{id}/layer-mask")
+            .ExpandWidth().Height(theme.Scale(theme.RowHeight));
         if (result.Changed)
         {
             InspectorSelectionEdits.ApplyLayerMask(field,
@@ -70,8 +69,9 @@ sealed class LayerDrawer(LayerFilter layers, UndoService? undo = null) : IProper
             current = selection;
         }
 
-        var next = gui.Dropdown(labels, current, width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
-            placeholder: "—", enabled: enabled, filePath: $"{id}/layer");
+        var next = current;
+        gui.Dropdown([.. labels], ref next,
+            placeholder: "—", enabled: enabled, id: $"{id}/layer").ExpandWidth().Height(theme.Scale(theme.RowHeight));
         if (gui.Pass == Pass.Pass1Build)
         {
             frameSelections[id] = next;

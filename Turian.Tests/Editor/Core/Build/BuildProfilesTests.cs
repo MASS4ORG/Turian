@@ -105,6 +105,25 @@ public sealed class BuildProfilesTests : IDisposable
     static ResolvedPackage Brick(string id, params string[] platforms) =>
         new(id, new PackageManifest { Name = id, Platforms = [.. platforms] }, "/", PackageOrigin.Builtin, "", null, null, 1, false);
 
+    /// <summary>Studio-only bricks and their exclusive dependencies do not ship, while shared dependencies do.</summary>
+    [Fact]
+    public void StudioBricksDoNotShip()
+    {
+        var tool = Brick("a.tool");
+        tool.Manifest.Scopes = [PackageScope.Studio];
+        tool.Manifest.Dependencies["a.private"] = "*";
+        tool.Manifest.Dependencies["a.shared"] = "*";
+        var runtime = Brick("a.runtime");
+        runtime.Manifest.Scopes = [PackageScope.Project, PackageScope.Studio];
+        runtime.Manifest.Dependencies["a.shared"] = "*";
+        var privateDependency = Brick("a.private") with { Depth = 2 };
+        var shared = Brick("a.shared") with { Depth = 2 };
+
+        var shipped = BuildProfiles.ShippingBricks([privateDependency, shared, tool, runtime], BuildTarget.Client);
+
+        Assert.Equal(["a.shared", "a.runtime"], shipped.Select(static b => b.Id));
+    }
+
     /// <summary>A brick without a platform list ships everywhere; one with a list ships only on those platforms.</summary>
     [Fact]
     public void PlatformAllowListFailsExportNamingTheBricks()

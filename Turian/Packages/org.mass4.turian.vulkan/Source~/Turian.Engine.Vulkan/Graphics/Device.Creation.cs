@@ -207,7 +207,8 @@ public unsafe partial class Device
             throw new VulkanException("Vulkan: failed to create logical device: {0}", resultVulkan);
         }
 
-        vk.GetDeviceQueue(logicalDevice, indices.GraphicsFamily!.Value, 0, out graphicsQueue);
+        GraphicsQueueFamilyIndex = indices.GraphicsFamily!.Value;
+        vk.GetDeviceQueue(logicalDevice, GraphicsQueueFamilyIndex, 0, out graphicsQueue);
         vk.GetDeviceQueue(logicalDevice, indices.PresentFamily!.Value, 0, out presentQueue);
 
         _ = SilkMarshal.Free((nint)createInfo.PpEnabledExtensionNames);

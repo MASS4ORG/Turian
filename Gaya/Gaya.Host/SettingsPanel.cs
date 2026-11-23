@@ -122,7 +122,7 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
         var selected = scope == target;
 
         using (gui.Node(Theme.Scale(96f), height, $"settings/scope/{target}")
-                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -156,10 +156,10 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
     {
         var rowHeight = Theme.Scale(Theme.RowHeight + 4f);
 
-        filter = gui.TextInput(filter, width: 0, height: rowHeight, placeholder: T("Search settings"),
-            fontSize: Theme.Text(12), padding: 5, id: "settings/filter");
+        gui.TextInput(ref filter, placeholder: T("Search settings"),
+            id: "settings/filter").ExpandWidth().Height(rowHeight).Padding(5);
 
-        using (gui.Node(-1, rowHeight, "settings/openJson").ExpandWidth().ContentAlignY(0.5f).Enter())
+        using (gui.Node(-1, rowHeight, "settings/openJson").ExpandWidth().AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -178,7 +178,7 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
             }
         }
 
-        gui.TreeView(categories, Rows(pages), SettingsStyle.Tree(), OnCategoryClick);
+        gui.TreeView(categories, Rows(pages), OnCategoryClick);
     }
 
     /// <summary>Lists each top-level category once; nested sections are rendered with their options.</summary>
@@ -242,7 +242,7 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
     void Heading(Gui gui, string path, string title, int depth)
     {
         using (gui.Node(-1, Theme.Scale(depth == 0 ? 32f : 28f), "settings/heading/" + path)
-                   .ExpandWidth().Margin(0, depth == 0 ? 0 : 8f).ContentAlignY(0.5f).Enter())
+                   .ExpandWidth().Margin(0, depth == 0 ? 0 : 8f).AlignContentY(0.5f).Enter())
         {
             gui.DrawText(T(title), Theme.Text(Math.Max(13f, 20f - depth * 3f)), Theme.Ink, centerInRect: false);
         }
@@ -343,7 +343,7 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
     void OptionHeading(Gui gui, SettingsPageDescriptor page, FormField field, string id, string title, bool modified)
     {
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{id}/title").ExpandWidth()
-                   .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
+                   .Direction(Axis.Horizontal).Gap(6f).AlignContentY(0.5f).Enter())
         {
             gui.DrawText(T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
             if (modified && RevertButton(gui, $"{id}/revert"))
@@ -387,9 +387,9 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
         var names = available.Select(theme => theme.Name).ToArray();
         var current = available.ToList().FindIndex(theme => string.Equals(theme.Id, committed,
             StringComparison.OrdinalIgnoreCase));
-        // ReSharper disable once ExplicitCallerInfoArgument
-        var next = gui.Dropdown(names, current, width: 0, height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12),
-            filePath: $"{id}/theme");
+        var next = current;
+        gui.Dropdown([.. names], ref next,
+            id: $"{id}/theme").ExpandWidth().Height(Theme.Scale(Theme.RowHeight));
         if (gui.Pass == Pass.Pass1Build)
         {
             if (next >= 0 && next != current)
@@ -421,7 +421,7 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
     bool BrowseButton(Gui gui, string id)
     {
         using (gui.Node(Theme.Scale(76f), Theme.Scale(Theme.RowHeight), id).BlockInput()
-                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -443,7 +443,7 @@ sealed partial class SettingsPanel(IEditorSettings settings, ILogger log, IShell
     {
         var size = Theme.Scale(Theme.RowHeight);
 
-        using (gui.Node(size, size, id).BlockInput().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        using (gui.Node(size, size, id).BlockInput().AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();

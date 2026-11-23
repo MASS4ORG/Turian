@@ -63,7 +63,7 @@ public sealed class OutputPanelInteractionTests
             var menu = new FlyoutBuilder();
             typeof(OutputPanel).GetMethod("BuildContextMenu", instanceFields)!.Invoke(panel, [menu, gui]);
             var items = (List<FlyoutItem>)typeof(FlyoutBuilder).GetField("Items", instanceFields)!.GetValue(menu)!;
-            Assert.Equal(["Open", "Copy", "Copy Line", "Copy All"], items.Select(item => item.Text));
+            Assert.Equal(["Open", "Copy", "Copy Line", "Copy All"], items.Select(item => item.Content.Label));
             Assert.False(items[0].Enabled);
             items[1].Action!();
             Assert.Equal("/missing/Game.cs(7): first\nsecond line", input.GetClipboardText());

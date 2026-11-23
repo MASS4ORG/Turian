@@ -21,7 +21,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
     public void Render(Gui gui)
     {
         using (gui.Node(-1, Height, "scene/toolbar").ExpandWidth().Direction(Axis.Horizontal)
-                   .Padding(4f, 3f).Gap(3f).ContentAlignY(0.5f).Enter())
+                   .Padding(4f, 3f).Gap(3f).AlignContentY(0.5f).Enter())
         {
             if (gui.Pass == Pass.Pass2Render)
             {
@@ -125,7 +125,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         string? trailingIcon = null)
     {
         using (gui.Node(Theme.Scale(width), Theme.Scale(22f), "scene/toolbar/" + id).BlockInput()
-                   .Direction(Axis.Horizontal).Gap(Theme.Scale(3f)).ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .Direction(Axis.Horizontal).Gap(Theme.Scale(3f)).AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var inputPass = gui.Pass == Pass.Pass2Render;
             var hot = inputPass && gui.GetInteractable().OnHover();
@@ -188,8 +188,8 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
                 value => SetSnapEnabled(value))
             .Separator()
             .Item("Snap options…", () => OpenOptions(gui, camera: false))
-            .Item("Reset snap intervals", ResetSnapping), fontSize: Theme.Text(12));
-        gui.CascadeMenu(ref viewMenu, viewAt, menu => BuildViewMenu(menu, gui), fontSize: Theme.Text(12));
+            .Item("Reset snap intervals", ResetSnapping));
+        gui.CascadeMenu(ref viewMenu, viewAt, menu => BuildViewMenu(menu, gui));
     }
 
     void BuildViewMenu(FlyoutBuilder menu, Gui gui)
@@ -348,7 +348,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
     void Field(Gui gui, string label, string id, float value, Action<float> change)
     {
         using (gui.Node(-1, Theme.Scale(24f), "scene/options/" + id).ExpandWidth()
-                   .Direction(Axis.Horizontal).ContentAlignY(0.5f).Enter())
+                   .Direction(Axis.Horizontal).AlignContentY(0.5f).Enter())
         {
             using (gui.Node().ExpandWidth().Enter())
             {
@@ -359,8 +359,8 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             string edited;
             using (gui.Node(Theme.Scale(80f), Theme.Scale(22f), "scene/options/value/" + id).Enter())
             {
-                edited = gui.TextInput(text, width: Theme.Scale(80f), height: Theme.Scale(22f), fontSize: Theme.Text(11),
-                    padding: 4, id: "scene/options/input/" + id, alignX: 1f);
+                edited = text;
+                gui.TextInput(ref edited, id: "scene/options/input/" + id).Width(Theme.Scale(80f)).Height(Theme.Scale(22f)).Padding(4).AlignContentX(1f);
             }
 
             if (gui.Pass == Pass.Pass2Render && edited != text

@@ -109,8 +109,8 @@ sealed partial class BuildProfilesPanel
         {
             current = selection;
         }
-        var next = gui.Dropdown(labels, current, width: 0, height: Theme.Scale(Theme.RowHeight),
-            fontSize: Theme.Text(12f), filePath: id);
+        var next = current;
+        gui.Dropdown([.. labels], ref next, id: id).ExpandWidth().Height(Theme.Scale(Theme.RowHeight));
         if (gui.Pass == Pass.Pass1Build && next != current) { frameSelections[id] = next; }
         if (gui.Pass == Pass.Pass2Render) { frameSelections.Remove(id); }
         return next;

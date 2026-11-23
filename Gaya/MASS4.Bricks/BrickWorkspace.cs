@@ -12,6 +12,11 @@ public interface IBrickWorkspace
     /// <summary>Which bricks the workspace accepts.</summary>
     PackageScope Scope { get; }
 
+    /// <summary>Whether this workspace's resolver can use the package manifest.</summary>
+    /// <param name="manifest">The package manifest.</param>
+    /// <returns>Whether the workspace accepts the package.</returns>
+    bool Accepts(PackageManifest manifest) => manifest.EffectiveScopes.Contains(Scope);
+
     /// <summary>Category prefixes only hosts may use, such as <c>gaya</c>; passed when reading manifests.</summary>
     IReadOnlyCollection<string> ReservedCategoryPrefixes { get; }
 

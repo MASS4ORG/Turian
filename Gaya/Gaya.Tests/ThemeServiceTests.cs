@@ -318,7 +318,6 @@ public sealed class ThemeServiceTests : IDisposable
         Assert.Equal(tokens.Ink, sheets.GetTokenColor("text"));
         Assert.Equal(tokens.FocusRing, sheets.GetTokenColor("focus-ring"));
         Assert.Equal(tokens.Selection, sheets.GetTokenColor("text-selection"));
-        Assert.Equal(tokens.Scale(tokens.HeaderHeight), tokens.ToDockTheme().TabHeight);
     }
 
     ThemeService Service(ILogger? logger = null)

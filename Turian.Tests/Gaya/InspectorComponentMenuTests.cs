@@ -74,7 +74,7 @@ public sealed class InspectorComponentMenuTests
 
     /// <summary>The item labels, leaving out the separators.</summary>
     static IEnumerable<string> Text(List<FlyoutItem> items) =>
-        items.Select(static item => item.Text).Where(static text => text.Length > 0);
+        items.Select(static item => item.Content.Label ?? "").Where(static text => text.Length > 0);
 
     /// <summary>A panel whose menus can be built without a scene behind it.</summary>
     static InspectorPanel Panel()

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace Gaya.Packages.Editor;
 
 /// <summary>Whose bricks the Bricks panel manages.</summary>
@@ -50,6 +52,7 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
     // Actions change the same manifest, lock file and brick folders and each ends by publishing what it resolved, so
     // they take turns: one that overlapped another could resolve a half-written workspace and publish it last.
     readonly SemaphoreSlim turn = new(1, 1);
+    readonly ConcurrentDictionary<IBrickWorkspace, WorkspaceSnapshot> snapshots = new(ReferenceEqualityComparer.Instance);
     int pending;
     int refreshes;
     IReadOnlyList<ResolvedPackage> installed = [];
@@ -77,7 +80,7 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
     /// <summary>What the panel lists.</summary>
     public BricksTab Tab { get; set; }
 
-    /// <summary>Whose bricks are managed; changing it rereads the list.</summary>
+    /// <summary>Whose bricks are managed; a cached view is reused when available.</summary>
     public BrickScope Scope
     {
         get;
@@ -91,7 +94,15 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
             field = value;
             Selected = null;
             SelectedRegistry = null;
-            Refresh();
+            TrimSnapshots();
+            if (Workspace is { } workspace && snapshots.TryGetValue(workspace, out var snapshot))
+            {
+                Show(snapshot, workspace);
+            }
+            else
+            {
+                Refresh();
+            }
         }
     }
 
@@ -120,7 +131,7 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         ArgumentNullException.ThrowIfNull(brick);
         foreach (var scope in (BrickScope[])[Scope, BrickScope.Studio, BrickScope.Project])
         {
-            if (WorkspaceOf(scope) is { } workspace && brick.Accepts(workspace.Scope))
+            if (WorkspaceOf(scope) is { } workspace && brick.Accepts(workspace))
             {
                 return scope;
             }
@@ -160,6 +171,10 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
     public event Action<string>? Problem;
 
     string? lastResolveError;
+
+    sealed record WorkspaceSnapshot(IReadOnlyList<ResolvedPackage> Installed, IReadOnlyList<BrickRow> Rows,
+        IReadOnlyList<CatalogBrick> Catalog, IReadOnlyList<ScopedRegistry> Registries, string? Error,
+        IReadOnlyList<RegistryListing> RegistryListings);
 
     /// <summary>Logs a failure and tells the views about it.</summary>
     void Report(string message, string? label = null)
@@ -292,6 +307,7 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
     /// <summary>Reads the workspace's bricks again.</summary>
     public void Refresh()
     {
+        TrimSnapshots();
         if (Workspace is not { } workspace)
         {
             Publish([], null);
@@ -559,6 +575,8 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
             Problem?.Invoke($"{label} failed; the log has the details.");
         }
 
+        _ = snapshots.TryRemove(workspace, out _);
+
         // The panel moved on to another workspace while this ran: what it resolved is not the panel's to show.
         if (!ReferenceEquals(Workspace, workspace))
         {
@@ -592,8 +610,40 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
             Selected = null;
         }
 
+        if (workspace is not null)
+        {
+            snapshots[workspace] = new WorkspaceSnapshot(installed, Rows, Catalog, Registries, Error, registryListings);
+        }
+
         Revision++;
         Changed?.Invoke();
+    }
+
+    void Show(WorkspaceSnapshot snapshot, IBrickWorkspace workspace)
+    {
+        installed = snapshot.Installed;
+        Rows = snapshot.Rows;
+        Catalog = snapshot.Catalog;
+        Registries = snapshot.Registries;
+        Error = snapshot.Error;
+        registryListings = snapshot.RegistryListings;
+        registryRoot = workspace.Root;
+        Selected = null;
+        SelectedRegistry = null;
+        Revision++;
+        Changed?.Invoke();
+    }
+
+    void TrimSnapshots()
+    {
+        var currentProject = WorkspaceOf(BrickScope.Project);
+        foreach (var cached in snapshots.Keys)
+        {
+            if (!ReferenceEquals(cached, studio) && !ReferenceEquals(cached, currentProject))
+            {
+                _ = snapshots.TryRemove(cached, out _);
+            }
+        }
     }
 
     void Enqueue()

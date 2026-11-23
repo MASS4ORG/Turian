@@ -12,7 +12,7 @@ sealed partial class OutputPanel
     {
         var height = Theme.Scale(Theme.RowHeight + 4f);
         using (gui.Node(-1, height, $"{toggleId}/{key}").Direction(Axis.Horizontal).Gap(4f).Padding(6f, 0f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();

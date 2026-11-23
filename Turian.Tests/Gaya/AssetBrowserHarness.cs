@@ -93,9 +93,11 @@ sealed class AssetBrowserHarness : IDisposable
         return surface.Snapshot();
     }
 
-    internal void Click(string id, GMouseButton button = GMouseButton.Left)
+    internal void Click(string id, GMouseButton button = GMouseButton.Left) => Click(Find(id), button);
+
+    internal void Click(LayoutNode node, GMouseButton button = GMouseButton.Left)
     {
-        Input.MousePosition.Returns(Find(id).Rect.Center);
+        Input.MousePosition.Returns(node.Rect.Center);
         Frame();
         Input.IsMouseButtonPressed(button).Returns(true);
         Input.IsMouseButtonDown(button).Returns(true);

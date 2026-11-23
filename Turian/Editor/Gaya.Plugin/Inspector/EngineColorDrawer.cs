@@ -78,8 +78,8 @@ sealed class EngineColorDrawer : IPropertyDrawer
 
         var color = ToPicker(field.GetValue());
         var alpha = field.ValueType != typeof(Vector3);
-        if (gui.ColorField(ref color, ColorPickerOptions.For(gui) with { Alpha = alpha }, width: 0, height: theme.Scale(theme.RowHeight), enabled: !field.IsReadOnly,
-                id: $"{id}/color"))
+        if (gui.ColorField(ref color, ColorPickerOptions.For(gui) with { Alpha = alpha },
+            enabled: !field.IsReadOnly, id: $"{id}/color").ExpandWidth().Height(theme.Scale(theme.RowHeight)).Changed)
         {
             _ = field.SetValue(FromPicker(color, field.ValueType));
         }

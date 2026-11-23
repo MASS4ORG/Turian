@@ -22,17 +22,14 @@ sealed partial class InspectorPanel
 
         gui.Popup(ref headerMenuOpen,
             () => HeaderPreferences(gui, settings, context.Services.GetRequiredService<IEditorSettings>()),
-            width: theme.Scale(headerMenuWidth),
-            height: theme.Scale(theme.RowHeight + 8f),
-            title: "Inspector",
-            position: headerMenuPosition,
-            titleBarHeight: theme.Scale(24f));
+            title: "Inspector", position: headerMenuPosition)
+            .Width(theme.Scale(headerMenuWidth)).Height(theme.Scale(theme.RowHeight + 8f) + gui.ControlStyle.FieldHeight - 2f);
     }
 
     void HeaderLockButton(Gui gui, ThemeTokens theme, string panelId)
     {
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, $"{panelId}/lock")
-                   .ExpandHeight().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .ExpandHeight().AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -55,7 +52,7 @@ sealed partial class InspectorPanel
     void HeaderSettingsButton(Gui gui, ThemeTokens theme, string panelId)
     {
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, $"{panelId}/settings")
-                   .ExpandHeight().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .ExpandHeight().AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
@@ -83,10 +80,9 @@ sealed partial class InspectorPanel
         var value = settings.AutoExpandComponents;
 
         using (gui.Node(-1, theme.Scale(theme.RowHeight), "inspector/preferences").ExpandWidth().Direction(Axis.Horizontal)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
-            gui.Checkbox(ref value, "Auto-Expand Components", size: theme.Scale(13f),
-                fontSize: theme.Text(11f), spacing: 6f);
+            gui.Checkbox(ref value, "Auto-Expand Components");
 
             if (value != settings.AutoExpandComponents)
             {

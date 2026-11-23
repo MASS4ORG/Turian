@@ -8,7 +8,6 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
 {
     const float dialogWidth = 440f;
     const float bodyHeight = 72f;
-    const float footerHeight = 44f;
     const float buttonWidth = 110f;
 
     static ThemeTokens Theme => ThemeTokens.Current;
@@ -35,9 +34,8 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        gui.Dialog(ref isOpen, localization.T("Unsaved Changes"), () => Body(gui),
-            Theme.Scale(dialogWidth), Theme.Scale(bodyHeight), () => Footer(gui),
-            footerHeight: Theme.Scale(footerHeight));
+        gui.Dialog(ref isOpen, localization.T("Unsaved Changes"), () => Body(gui), () => Footer(gui))
+            .Width(Theme.Scale(dialogWidth)).Height(Theme.Scale(bodyHeight) + gui.ControlStyle.FieldHeight * 2.5f + 4f);
 
         if (!isOpen)
         {
@@ -47,7 +45,7 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
 
     void Body(Gui gui)
     {
-        using (gui.Node().Expand().ContentAlignY(0.5f).Enter())
+        using (gui.Node().Expand().AlignContentY(0.5f).Enter())
         {
             gui.DrawText(message, Theme.Text(13f), Theme.Ink, centerInRect: false);
         }
@@ -57,17 +55,17 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
     {
         using (gui.Node().ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Scale(8f)).Enter())
         {
-            if (gui.Button(localization.T("Save"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            if (gui.Button(localization.T("Save")).Width(Theme.Scale(buttonWidth)).Height(Theme.Scale(28f)).Clicked)
             {
                 Decide(UnsavedChanges.Save);
             }
 
-            if (gui.Button(localization.T("Don't Save"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            if (gui.Button(localization.T("Don't Save")).Width(Theme.Scale(buttonWidth)).Height(Theme.Scale(28f)).Clicked)
             {
                 Decide(UnsavedChanges.Discard);
             }
 
-            if (gui.Button(localization.T("Cancel"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            if (gui.Button(localization.T("Cancel")).Width(Theme.Scale(buttonWidth)).Height(Theme.Scale(28f)).Clicked)
             {
                 isOpen = false;
             }

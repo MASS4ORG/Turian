@@ -45,6 +45,8 @@ public unsafe class Buffer : IDisposable
     void* mapped = null;
     Silk.NET.Vulkan.Buffer buffer;
     DeviceMemory memory;
+    readonly ulong allocationSize;
+    int disposed;
 
     /// <summary>
     /// Creates a new Vulkan buffer.
@@ -78,8 +80,10 @@ public unsafe class Buffer : IDisposable
             usageFlags,
             memoryPropertyFlags,
             ref buffer,
-            ref memory
+            ref memory,
+            out allocationSize
         );
+        vulkan.Device.AddBufferAllocation(allocationSize);
     }
 
     /// <summary>
@@ -317,9 +321,15 @@ public unsafe class Buffer : IDisposable
     /// </summary>
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+        {
+            return;
+        }
+
         UnMap();
         vulkan.Vk.DestroyBuffer(vulkan.Device.VkDevice, buffer, null);
         vulkan.Vk.FreeMemory(vulkan.Device.VkDevice, memory, null);
+        vulkan.Device.RemoveBufferAllocation(allocationSize);
         GC.SuppressFinalize(this);
     }
 

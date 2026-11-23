@@ -207,6 +207,42 @@ public sealed class BricksControllerRaceTests : IDisposable
         Assert.Equal(1, workspace.Restores);
     }
 
+    /// <summary>Returning to a previously viewed scope reuses its published workspace snapshot.</summary>
+    [Fact]
+    public void SwitchingBackUsesTheWorkspaceSnapshot()
+    {
+        var studio = Studio("studio");
+        var projectWorkspace = Studio("project");
+        var project = new SwitchableProject { Workspace = projectWorkspace };
+        var controller = new BricksController(studio, project);
+
+        controller.Refresh();
+        controller.Scope = BrickScope.Studio;
+        var resolves = projectWorkspace.Resolves;
+        controller.Scope = BrickScope.Project;
+
+        Assert.Equal(resolves, projectWorkspace.Resolves);
+    }
+
+    /// <summary>Bricks use the selected project workspace when its host policy accepts Studio packages.</summary>
+    [Fact]
+    public void StudioBricksCanTargetAnAcceptingProjectWorkspace()
+    {
+        var workspace = Substitute.For<IBrickWorkspace>();
+        workspace.Scope.Returns(PackageScope.Project);
+        workspace.Accepts(Arg.Any<PackageManifest>()).Returns(true);
+        var project = Substitute.For<IProjectBricks>();
+        project.Workspace.Returns(workspace);
+        var controller = new BricksController(null, project);
+        var brick = new CatalogBrick("com.acme.editor", null, null, null, BrickState.Available, null, "1.0.0",
+            "registry:example", "^1.0.0", false)
+        {
+            Manifest = new PackageManifest { Name = "com.acme.editor", Scopes = [PackageScope.Studio] },
+        };
+
+        Assert.Equal(BrickScope.Project, controller.ScopeFor(brick));
+    }
+
     /// <summary>Operations queued behind a refresh keep the panel busy until the last one ends, and keep their errors.</summary>
     [Fact]
     public async Task QueuedOperationsKeepTheBusyStateAndTheirErrors()
@@ -355,7 +391,14 @@ public sealed class BricksControllerRaceTests : IDisposable
             }
         }
 
-        public IReadOnlyList<ResolvedPackage> Resolve() => Run(inner.Resolve);
+        public int Resolves => Volatile.Read(ref resolves);
+        int resolves;
+
+        public IReadOnlyList<ResolvedPackage> Resolve()
+        {
+            _ = Interlocked.Increment(ref resolves);
+            return Run(inner.Resolve);
+        }
 
         public void Add(string id, string? source) => Run(() => inner.Add(id, source));
 

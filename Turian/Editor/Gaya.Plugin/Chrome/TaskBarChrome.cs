@@ -26,7 +26,7 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks, IShellHost? shell = null
             gui.RequestFrameIn(0.1);
         }
 
-        using (gui.Node(-1, Height).Expand().Direction(Axis.Horizontal).Gap(8).ContentAlignY(0.5f).Enter())
+        using (gui.Node(-1, Height).Expand().Direction(Axis.Horizontal).Gap(8).AlignContentY(0.5f).Enter())
         {
             if (snapshot.Count == 0)
             {
@@ -55,7 +55,7 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks, IShellHost? shell = null
             // Work that has not reported yet has nothing honest to show, so it animates rather than
             // sitting at an unmoving zero.
             var fraction = rollup.Progress > 0 ? rollup.Progress : (float?)null;
-            gui.ProgressBar(fraction, barWidth, 5);
+            gui.ProgressBar(fraction).Width(barWidth).Height(5);
 
             if (activeRoots > 1)
             {

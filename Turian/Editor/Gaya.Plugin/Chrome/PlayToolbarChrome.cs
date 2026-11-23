@@ -25,7 +25,7 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
         var paused = playMode.State == PlayState.Paused;
 
         using (gui.Node(-1, ButtonSize, "play/buttons").Direction(Axis.Horizontal).Gap(3f)
-                   .Padding(8f, 0f).ContentAlignY(0.5f).Enter())
+                   .Padding(8f, 0f).AlignContentY(0.5f).Enter())
         {
             Button(gui, "startup", Icons.PlayRestart, "gaya.turian.playStartupScene", false);
             Button(gui, "play", playing ? Icons.PlayStop : Icons.PlayStart, "gaya.turian.play", playing);
@@ -36,7 +36,7 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
 
     void Button(Gui gui, string id, string icon, string commandId, bool active)
     {
-        using (gui.Node(ButtonSize, ButtonSize, $"play/{id}").ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        using (gui.Node(ButtonSize, ButtonSize, $"play/{id}").AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var enabled = commands.CanExecute(commandId);
             var interactable = gui.GetInteractable();

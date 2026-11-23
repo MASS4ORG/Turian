@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: CPU and GPU profiler #85
+- Changed: Guinevere 7.0.0
+
 ## [5.3.0] - 2026-11-21
 
 - Added: studio and personal settings #401.

@@ -79,16 +79,14 @@ sealed partial class ExternalEditorFieldEditor(IExternalEditorRegistry registry,
         var labels = entries.Select(static entry => entry.Label).ToArray();
 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{field.Id}/choice").Direction(Axis.Horizontal).Gap(4f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
-            // ReSharper disable once ExplicitCallerInfoArgument
-            var next = gui.Dropdown(labels, current, width: Theme.Scale(controlWidth),
-                height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12), maxVisibleItems: 12,
-                filePath: $"{field.Id}/choice");
+            var next = current;
+            gui.Dropdown([.. labels], ref next,
+                maxVisibleItems: 12, id: $"{field.Id}/choice").Width(Theme.Scale(controlWidth)).Height(Theme.Scale(Theme.RowHeight));
             Choose(gui, field, choice, entries, next, current);
 
-            if (gui.Button(T("Rescan"), width: Theme.Scale(60f), height: Theme.Scale(Theme.RowHeight),
-                    fontSize: Theme.Text(11), id: $"{field.Id}/rescan"))
+            if (gui.Button(T("Rescan"), id: $"{field.Id}/rescan").Width(Theme.Scale(60f)).Height(Theme.Scale(Theme.RowHeight)).Clicked)
             {
                 Invalidate();
             }

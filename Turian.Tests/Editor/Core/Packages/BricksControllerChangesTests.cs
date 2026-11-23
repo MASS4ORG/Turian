@@ -193,12 +193,11 @@ public sealed class BricksControllerChangesTests : IDisposable
         applier.DidNotReceive().ApplyBrickChanges();
     }
 
-    /// <summary>
-    /// A studio-only brick found while managing the project installs into the studio, and the panel moves there;
-    /// the project is not recompiled for it.
-    /// </summary>
-    [Fact]
-    public async Task StudioOnlyBricksInstallIntoTheStudio()
+    /// <summary>An editor-only brick is declared only in the selected workspace.</summary>
+    [Theory]
+    [InlineData(BrickScope.Project)]
+    [InlineData(BrickScope.Studio)]
+    public async Task StudioOnlyBricksInstallIntoTheSelectedWorkspace(BrickScope scope)
     {
         var folder = BrickService.New(Path.Combine(root, "fixtures"), "user.mateo.panel");
         var manifest = new PackageManifest { Name = "user.mateo.panel", Version = SemanticVersion.Parse("0.1.0"), Scopes = [PackageScope.Studio] };
@@ -206,25 +205,30 @@ public sealed class BricksControllerChangesTests : IDisposable
         var brick = new CatalogBrick("user.mateo.panel", null, null, null, BrickState.Available, null, "0.1.0", null,
             $"file:{folder}", IsBuiltin: false)
         { Manifest = manifest };
+        controller.Scope = scope;
         controller.Refresh();
 
-        Assert.Equal(BrickScope.Studio, controller.ScopeFor(brick));
+        Assert.Equal(scope, controller.ScopeFor(brick));
         controller.Toggle(brick);
-        Assert.Equal(BrickScope.Studio, Assert.Single(controller.Pending).Scope);
+        Assert.Equal(scope, Assert.Single(controller.Pending).Scope);
         Assert.True(await controller.ApplyPendingAsync(), controller.Error);
 
-        Assert.Contains("user.mateo.panel", ProjectManifest.Load(studio.Root).Manifest.Dependencies.Keys);
-        Assert.DoesNotContain("user.mateo.panel", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
-        Assert.Equal(BrickScope.Studio, controller.Scope);
-        applier.DidNotReceive().ApplyBrickChanges();
+        Assert.Equal(scope == BrickScope.Studio, ProjectManifest.Load(studio.Root).Manifest.Dependencies.ContainsKey(brick.Id));
+        Assert.Equal(scope == BrickScope.Project, ProjectManifest.Load(project).Manifest.Dependencies.ContainsKey(brick.Id));
+        Assert.Equal(scope, controller.Scope);
+        if (scope == BrickScope.Project)
+        {
+            applier.Received(1).ApplyBrickChanges();
+        }
+        else
+        {
+            applier.DidNotReceive().ApplyBrickChanges();
+        }
     }
 
-    /// <summary>
-    /// A studio brick the studio already uses stays out of the project's list, which would otherwise look as if the
-    /// project had installed it, and is in use when the studio is shown.
-    /// </summary>
+    /// <summary>A shared store copy is visible in both workspaces and is enabled only where declared.</summary>
     [Fact]
-    public async Task StudioBricksInUseStayOutOfTheProjectList()
+    public async Task StudioBrickIsAvailableToTheProjectAndEnabledInTheStudio()
     {
         var folder = BrickService.New(Path.Combine(root, "fixtures"), "user.mateo.panel");
         new PackageManifest { Name = "user.mateo.panel", Version = SemanticVersion.Parse("0.1.0"), Scopes = [PackageScope.Studio] }
@@ -236,13 +240,16 @@ public sealed class BricksControllerChangesTests : IDisposable
 
         controller.Scope = BrickScope.Project;
 
-        Assert.DoesNotContain(controller.Catalog, static b => b.Id == "user.mateo.panel");
+        var available = Assert.Single(controller.Catalog, static b => b.Id == "user.mateo.panel");
+        Assert.Equal(BrickState.Installed, available.State);
+        Assert.False(available.IsInstalled);
+        Assert.Equal(BrickScope.Project, controller.ScopeFor(available));
 
         controller.Scope = BrickScope.Studio;
 
-        var brick = controller.Catalog.Single(static b => b.Id == "user.mateo.panel");
+        var brick = Assert.Single(controller.Catalog, static b => b.Id == "user.mateo.panel");
         Assert.Equal(BrickState.Enabled, brick.State);
-        Assert.False(brick.Accepts(PackageScope.Project));
+        Assert.True(brick.IsInstalled);
     }
 
     static void CopyDirectory(string from, string to)

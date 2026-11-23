@@ -11,7 +11,7 @@ sealed class GamePanel(GameViewport viewport) : IPanel, IDisposable
     {
         var theme = ThemeTokens.Current;
         using (gui.Node(theme.Scale(48), -1, $"{context.PanelId}/stats").ExpandHeight().BlockInput()
-                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .AlignContentX(0.5f).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             if (gui.Pass == Pass.Pass2Render && interactable.OnHover())

@@ -271,7 +271,7 @@ public sealed partial class AssetImporter : IDisposable
         try
         {
             importOverrides = PackageImportOverrides.Load(projectRoot);
-            var packages = ProjectPackages.ResolveOrEmpty(projectRoot);
+            var packages = ProjectPackages.ProjectContent(ProjectPackages.ResolveOrEmpty(projectRoot));
             packageRoots = [.. packages.Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
             bakeFolders = packages.ToDictionary(static p => Path.GetFullPath(p.RootPath),
                 static p => MASS4.Bricks.BrickLayout.PathsOf(Path.GetFullPath(p.RootPath), p.Manifest, MASS4.Bricks.BrickLayout.Bake));

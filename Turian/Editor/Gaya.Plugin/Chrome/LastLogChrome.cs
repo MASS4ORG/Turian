@@ -17,7 +17,7 @@ sealed class LastLogChrome(OutputRevealService requests, IShellHost shell) : ICh
         ArgumentNullException.ThrowIfNull(gui);
 
         using (gui.Node(-1, -1, "statusbar/lastLog").Expand().Direction(Axis.Horizontal).Gap(6f).Padding(8f, 0f)
-                   .ContentAlignY(0.5f).Enter())
+                   .AlignContentY(0.5f).Enter())
         {
             if (LogBuffer.Latest is not { } line)
             {

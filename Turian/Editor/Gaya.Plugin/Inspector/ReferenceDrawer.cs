@@ -50,14 +50,14 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
             return false;
         }
 
-        var result = gui.ObjectField(
-            field.HasMixedValue ? "—" : picker.DisplayName(reference), $"{id}/ref",
+        gui.ObjectField(
+            field.HasMixedValue ? "—" : picker.DisplayName(reference), out var result,
             accept: payload => payload is ReferenceDragPayload drop
                                && drop.Id != Guid.Empty
                                && !reference.IsReadOnly
                                && picker.Accepts(reference, drop.Id),
             isEmpty: !field.HasMixedValue && reference.IsEmpty,
-            showClear: !reference.IsReadOnly);
+            showClear: !reference.IsReadOnly, id: $"{id}/ref");
 
         HandleResult(result, reference, id);
 
@@ -134,9 +134,9 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
         gui.Popup(ref open, () =>
         {
             if (reference is not null) { PickerContent(gui, reference); }
-        }, pickerWidth, pickerHeight,
-            reference is null ? "Select reference" : $"Select {reference.TargetType.Name}",
-            PopupAnchor.Below(gui, openAnchor, pickerWidth, pickerHeight));
+        }, title: reference is null ? "Select reference" : $"Select {reference.TargetType.Name}",
+            position: PopupAnchor.Below(gui, openAnchor, pickerWidth, pickerHeight))
+            .Width(pickerWidth).Height(pickerHeight);
 
         if (open)
         {
@@ -151,7 +151,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     {
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(4).Padding(6).Enter())
         {
-            search = gui.TextInput(search, width: pickerWidth - 24, height: RowHeight, placeholder: "Search…");
+            gui.TextInput(ref search, placeholder: "Search…").Width(pickerWidth - 24).Height(RowHeight);
 
             using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
             {
@@ -182,7 +182,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     static bool CandidateRow(Gui gui, string name, string detail, string id)
     {
         using (gui.Node(-1, RowHeight, $"candidate/{id}")
-                   .ExpandWidth().Direction(Axis.Horizontal).Gap(6).Padding(4, 0).ContentAlignY(0.5f).Enter())
+                   .ExpandWidth().Direction(Axis.Horizontal).Gap(6).Padding(4, 0).AlignContentY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             if (interactable.OnHover())

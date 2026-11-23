@@ -235,8 +235,8 @@ public sealed partial class Workbench
                 }
             }
 
-            using (gui.Node(t.Scale(statusSummaryWidth), height, "chrome/StatusBar/readout").ContentAlignY(0.5f)
-                       .ContentAlignX(1f).Padding(t.Gap, 0f).Enter())
+            using (gui.Node(t.Scale(statusSummaryWidth), height, "chrome/StatusBar/readout").AlignContentY(0.5f)
+                       .AlignContentX(1f).Padding(t.Gap, 0f).Enter())
             {
                 gui.DrawText(StatusReadout.Format(gui.Time.SmoothFps, MemoryBytes(gui.Time.Elapsed)),
                     t.Text(12), t.InkDim);

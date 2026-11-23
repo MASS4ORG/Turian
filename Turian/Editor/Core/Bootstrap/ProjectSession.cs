@@ -1,11 +1,18 @@
+using MASS4.Bricks;
+
 namespace Turian.Editor.Core;
 
 /// <summary>
 /// Opens a project into the editor services: loads its settings, points the build manager and the
 /// asset catalog at it, and restores the documents that were open last time.
 /// </summary>
-public sealed partial class ProjectSession(IServiceProvider services, ILogger log) : IBrickApplier
+public sealed partial class ProjectSession(IServiceProvider services, ILogger log) : IBrickApplier, IProjectEditorBricks
 {
+    IReadOnlyList<ResolvedPackage> enabledBricks = [];
+
+    /// <inheritdoc />
+    public IReadOnlyList<ResolvedPackage> EnabledBricks => Volatile.Read(ref enabledBricks);
+
     /// <summary>The settings of the open project, or null when none has been opened.</summary>
     public AppSettings? Settings { get; private set; }
 
@@ -99,6 +106,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
             // ProjectPackages has logged what is missing and what to do.
             log.LogWarning("The bricks' types are unavailable until the project's bricks resolve");
             BrickAssemblies.Enable([]);
+            Volatile.Write(ref enabledBricks, []);
         }
     }
 
@@ -106,8 +114,10 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     void LoadEnabledBricks()
     {
         var bricks = ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir);
-        BrickAssemblies.Load(bricks, log, Settings.ProjectAbsoluteDir);
-        BrickAssemblies.Enable(bricks);
+        var content = ProjectPackages.ProjectContent(bricks);
+        BrickAssemblies.Load(content, log, Settings.ProjectAbsoluteDir);
+        BrickAssemblies.Enable(content);
+        Volatile.Write(ref enabledBricks, bricks);
     }
 
     void CompleteOpen(string? openScene)

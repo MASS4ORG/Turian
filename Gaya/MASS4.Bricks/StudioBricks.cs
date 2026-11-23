@@ -22,7 +22,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     /// <returns>The folders that can contain plugins.</returns>
     public static IReadOnlyList<string> LibraryDirectories(ResolvedPackage brick) =>
         [.. BrickLayout.PathsOf(brick.RootPath, brick.Manifest, BrickLayout.Precast)
-            .Select(static payload => Path.Combine(payload, "lib"))];
+            .SelectMany(static payload => new[] { Path.Combine(payload, "lib"), Path.Combine(payload, "studio") })];
 
     readonly PackageStore packages = store ?? new PackageStore(PackageStore.DefaultRoot());
 

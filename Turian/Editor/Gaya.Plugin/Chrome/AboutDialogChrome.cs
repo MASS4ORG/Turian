@@ -9,7 +9,6 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 {
     const float dialogWidth = 360f;
     const float bodyHeight = 420f;
-    const float footerHeight = 44f;
     const float logoSize = 96f;
 
     /// <summary>The dialog body's own padding (16 either side) subtracted from <see cref="dialogWidth"/>.</summary>
@@ -29,15 +28,14 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        gui.Dialog(ref isOpen, localization.T("About Turian Studio"), () => Body(gui),
-            Theme.Scale(dialogWidth), Theme.Scale(bodyHeight), () => Footer(gui),
-            footerHeight: Theme.Scale(footerHeight));
+        gui.Dialog(ref isOpen, localization.T("About Turian Studio"), () => Body(gui), () => Footer(gui))
+            .Width(Theme.Scale(dialogWidth)).Height(Theme.Scale(bodyHeight) + gui.ControlStyle.FieldHeight * 2.5f + 4f);
     }
 
     void Body(Gui gui)
     {
         using (gui.Node(Theme.Scale(contentWidth), Theme.Scale(bodyHeight - 32f), "about/scroll")
-                   .Direction(Axis.Vertical).ContentAlignX(0.5f).Gap(Theme.Scale(12f)).Enter())
+                   .Direction(Axis.Vertical).AlignContentX(0.5f).Gap(Theme.Scale(12f)).Enter())
         {
             gui.ScrollY(Theme.InkDim, Theme.Chrome);
             Header(gui);
@@ -48,7 +46,7 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 
     void Header(Gui gui)
     {
-        using (gui.Node().ExpandWidth().Direction(Axis.Vertical).ContentAlignX(0.5f)
+        using (gui.Node().ExpandWidth().Direction(Axis.Vertical).AlignContentX(0.5f)
                    .Gap(Theme.Scale(4f)).Enter())
         {
             if (Logo.Value is { } image)
@@ -111,7 +109,7 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 
     void Link(Gui gui, string label, string url)
     {
-        if (gui.Button(localization.T(label), width: Theme.Scale(contentWidth), height: Theme.Scale(28f)))
+        if (gui.Button(localization.T(label)).Width(Theme.Scale(contentWidth)).Height(Theme.Scale(28f)).Clicked)
         {
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
         }
@@ -119,7 +117,7 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 
     void Footer(Gui gui)
     {
-        if (gui.Button(localization.T("Close"), width: Theme.Scale(80f), height: Theme.Scale(28f)))
+        if (gui.Button(localization.T("Close")).Width(Theme.Scale(80f)).Height(Theme.Scale(28f)).Clicked)
         {
             isOpen = false;
         }
