@@ -109,7 +109,7 @@ public static partial class CsProjectGenerator
     {
         ArgumentNullException.ThrowIfNull(settings);
         return AssemblyGraph.Discover(settings.AssetsAbsoluteDir, settings.TitleToPathFriendly ?? string.Empty,
-            ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir));
+            ProjectPackages.ProjectContent(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)));
     }
 
     static ProjectRootElement GenerateAssemblyDefinition(
@@ -529,7 +529,7 @@ public static partial class CsProjectGenerator
         var resolved = ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir);
         return shipping
             ? BuildProfiles.ShippingBricks(resolved, target)
-            : [.. resolved.Where(static brick => !brick.Manifest.CompileTimeOnly)];
+            : [.. ProjectPackages.ProjectContent(resolved).Where(static brick => !brick.Manifest.CompileTimeOnly)];
     }
 
     // The engine's own packages are already referenced; a script project keeps brick packages to itself.

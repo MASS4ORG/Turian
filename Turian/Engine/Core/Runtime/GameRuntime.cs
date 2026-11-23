@@ -8,6 +8,9 @@ namespace Turian.Engine.Core;
 public sealed class GameRuntime : IDisposable
 {
     bool disposed;
+#if !TURIAN_NO_CPU_MARKERS
+    PlayerProfileCapture? playerProfile;
+#endif
     GameRuntime(string projectDirectory, IContentDirectory content, AssetDatabase assets, AppSettings settings,
         SceneManager scenes)
     {
@@ -107,6 +110,10 @@ public sealed class GameRuntime : IDisposable
             ProjectSettingsLoader.Load(settings, loader, content);
             host?.Prepare(new(settings, context.Logger, context.Development));
             runtime.BindServices(context, loader, input, kind, addServices, host);
+#if !TURIAN_NO_CPU_MARKERS
+            runtime.playerProfile = PlayerProfileCapture.Start(context);
+            runtime.Ticker.PlayerProfile = runtime.playerProfile?.Recorder;
+#endif
             LogBuild(context.Logger, settings.Get<TimeSettings>());
             return runtime;
         }
@@ -239,6 +246,9 @@ public sealed class GameRuntime : IDisposable
     {
         if (disposed) { return; }
         disposed = true;
+#if !TURIAN_NO_CPU_MARKERS
+        playerProfile?.Dispose();
+#endif
         try { Lifetimes?.Dispose(); }
         finally
         {

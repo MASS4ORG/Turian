@@ -130,6 +130,9 @@ public sealed class PackageManifest
     /// <summary>Only the editor uses the package: nothing of it ships, though builds still need it.</summary>
     public bool EditorOnly { get; set; }
 
+    /// <summary>Whether a Studio plugin supports activation while the host is running.</summary>
+    public bool LivePlugin { get; set; }
+
     /// <summary>Only the compiler uses the package (analyzers, source generators): never loaded nor shipped.</summary>
     public bool CompileTimeOnly { get; set; }
 

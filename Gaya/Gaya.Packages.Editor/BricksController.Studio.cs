@@ -16,6 +16,7 @@ public sealed partial class BricksController
     }
 
     static string StudioCode(IEnumerable<ResolvedPackage> bricks) => string.Join('\n', bricks
+        .Where(static brick => !brick.Manifest.LivePlugin)
         .SelectMany(StudioBricks.LibraryDirectories).Where(Directory.Exists)
         .SelectMany(static directory => Directory.EnumerateFiles(directory, "*.dll"))
         .Order(StringComparer.Ordinal).Select(static path =>

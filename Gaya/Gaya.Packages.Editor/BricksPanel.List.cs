@@ -169,9 +169,13 @@ public sealed partial class BricksPanel
                 gui.DrawText(brick.Id, Theme.Text(10f), Theme.InkDim, centerInRect: false);
             }
 
-            if (now.WorkspaceScope is { } scope && !brick.Accepts(scope))
+            var editorOnly = brick.Manifest is { } manifest && (manifest.EditorOnly
+                || manifest.EffectiveScopes.Contains(PackageScope.Studio)
+                && !manifest.EffectiveScopes.Contains(PackageScope.Project));
+            if ((now.Workspace is { } workspace && !brick.Accepts(workspace)) || editorOnly)
             {
-                Cell(gui, $"{id}/scope", brick.Accepts(PackageScope.Studio) ? "Studio" : "Project", 48f, height);
+                var label = editorOnly ? "Editor only" : "Project";
+                Cell(gui, $"{id}/scope", label, editorOnly ? 84f : 56f, height);
             }
 
             var (text, color) = VersionCell(brick, pending);

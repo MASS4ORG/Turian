@@ -21,6 +21,16 @@ public sealed class BricksControllerTests : IDisposable
         controller.Store = new PackageStore(Path.Combine(root, "store"));
     }
 
+    /// <summary>Project workspaces accept Studio-only bricks when resolving project packages.</summary>
+    [Fact]
+    public void ProjectWorkspaceAcceptsStudioOnlyBricks()
+    {
+        var workspace = new ProjectBrickWorkspace(project);
+        var manifest = new PackageManifest { Name = "com.acme.tool", Scopes = [PackageScope.Studio] };
+
+        Assert.True(workspace.Accepts(manifest));
+    }
+
     /// <summary>Makes a source brick beside the project, installed from its folder.</summary>
     string RulesSource()
     {

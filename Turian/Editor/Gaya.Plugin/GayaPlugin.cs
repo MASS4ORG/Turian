@@ -41,6 +41,7 @@ public sealed class GayaPlugin : IPlugin
         context.Services.AddSingleton<LocaleService>();
         context.Services.AddSingleton(sp => new ProjectSession(sp, context.Logger));
         context.Services.AddSingleton<IBrickApplier>(sp => sp.GetRequiredService<ProjectSession>());
+        context.Services.AddSingleton<IProjectEditorBricks>(sp => sp.GetRequiredService<ProjectSession>());
 
         // The registries outlive Configure, so the bridge can keep republishing into them as the user
         // assembly is swapped by a recompile.
@@ -131,8 +132,7 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<SceneTreeController>(),
                     sp.GetRequiredService<PlayModeService>(),
                     sp.GetRequiredService<ILogger>(),
-                    sp.GetRequiredService<EditorCameraSettings>(),
-                    sp.GetService<IPlayFrameProfiler>()))));
+                    sp.GetRequiredService<EditorCameraSettings>()))));
 
         context.Panels.Register(new PanelDescriptor(
             AssetsPanelId, "Assets", PanelPlacement.Bottom,

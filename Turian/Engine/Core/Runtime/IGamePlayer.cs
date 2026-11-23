@@ -14,6 +14,9 @@ public sealed record GamePlayerContext(
     bool Development = false,
     IContentDirectory? Content = null)
 {
+    /// <summary>Allows the launcher to opt this development player into loopback profiling.</summary>
+    public bool AllowPlayerProfiling { get; init; }
+
     /// <summary>The game's packaged content: <see cref="Content"/>, else the project folder on disk.</summary>
     public IContentDirectory ContentDirectory => Content ?? new FileContentDirectory(ProjectDirectory);
 }

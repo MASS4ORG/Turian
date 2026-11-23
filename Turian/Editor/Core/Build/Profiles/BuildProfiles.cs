@@ -145,7 +145,36 @@ public static class BuildProfiles
     public static IReadOnlyList<ResolvedPackage> ShippingBricks(IEnumerable<ResolvedPackage> bricks, BuildTarget target)
     {
         ArgumentNullException.ThrowIfNull(bricks);
-        var shipped = bricks.Where(static b => !b.Manifest.EditorOnly && !b.Manifest.CompileTimeOnly).ToList();
+        var all = bricks.ToList();
+        var byId = all.ToDictionary(static b => b.Id, StringComparer.Ordinal);
+        foreach (var brick in all.Where(static b => b.Manifest.BakeOf is not null))
+        {
+            byId.TryAdd(brick.Manifest.BakeOf!.Brick, brick);
+        }
+        var reachable = new HashSet<string>(StringComparer.Ordinal);
+        void Visit(ResolvedPackage brick)
+        {
+            if (!brick.Manifest.InstallsInProject || brick.Manifest.EditorOnly
+                || brick.Manifest.CompileTimeOnly || !reachable.Add(brick.Id))
+            {
+                return;
+            }
+
+            foreach (var id in brick.Manifest.Dependencies.Keys)
+            {
+                if (byId.TryGetValue(id, out var dependency))
+                {
+                    Visit(dependency);
+                }
+            }
+        }
+
+        foreach (var brick in all.Where(static b => b.Depth == 1))
+        {
+            Visit(brick);
+        }
+
+        var shipped = all.Where(b => reachable.Contains(b.Id)).ToList();
         if (target == BuildTarget.Client)
         {
             return shipped;

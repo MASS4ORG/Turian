@@ -91,6 +91,9 @@ public sealed record PackageResolverOptions
     /// <summary>What the packages are installed into; a package must list it among its scopes.</summary>
     public PackageScope Scope { get; init; } = PackageScope.Project;
 
+    /// <summary>Allows Studio bricks to be installed alongside a project's runtime bricks.</summary>
+    public bool IncludeStudio { get; init; }
+
     /// <summary>The folder holding the host's built-in packages, one per id; null when the host ships none.</summary>
     public string? BuiltinDirectory { get; init; }
 
@@ -296,7 +299,9 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
             throw new PackageException(otherName(manifest.Name));
         }
 
-        if (!manifest.EffectiveScopes.Contains(options.Scope))
+        if (!manifest.EffectiveScopes.Contains(options.Scope)
+            && !(options.Scope == PackageScope.Project && options.IncludeStudio
+                 && manifest.EffectiveScopes.Contains(PackageScope.Studio)))
         {
             throw new PackageException(
                 $"{id} cannot be installed with scope {options.Scope}; its scopes are {string.Join(", ", manifest.EffectiveScopes)}.");

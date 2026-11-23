@@ -42,7 +42,7 @@ public sealed partial class BricksController
         return locked is null
             ? catalog
             :
-            [.. catalog.Where(b => b.Accepts(workspace.Scope) || !locked.Dependencies.ContainsKey(b.Id))];
+            [.. catalog.Where(b => b.Accepts(workspace) || !locked.Dependencies.ContainsKey(b.Id))];
     }
 
     /// <summary>

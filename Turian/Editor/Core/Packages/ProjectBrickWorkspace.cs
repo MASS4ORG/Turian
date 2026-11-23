@@ -19,6 +19,10 @@ public sealed class ProjectBrickWorkspace(string root, SettingsService? settings
     public PackageScope Scope => PackageScope.Project;
 
     /// <inheritdoc />
+    public bool Accepts(PackageManifest manifest) => manifest.EffectiveScopes.Contains(PackageScope.Project)
+        || manifest.EffectiveScopes.Contains(PackageScope.Studio);
+
+    /// <inheritdoc />
     public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; } = ["gaya", ProjectPackages.HostName];
 
     /// <inheritdoc />

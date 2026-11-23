@@ -178,6 +178,42 @@ public static class ProjectPackages
         }
     }
 
+    /// <summary>Returns project bricks and their dependencies, excluding Studio-only roots and their exclusive dependencies.</summary>
+    /// <param name="packages">The project's resolved bricks in dependency order.</param>
+    /// <returns>The bricks available to project code and assets.</returns>
+    public static IReadOnlyList<ResolvedPackage> ProjectContent(IReadOnlyList<ResolvedPackage> packages)
+    {
+        var byId = packages.ToDictionary(static package => package.Id, StringComparer.Ordinal);
+        foreach (var package in packages.Where(static package => package.Manifest.BakeOf is not null))
+        {
+            byId.TryAdd(package.Manifest.BakeOf!.Brick, package);
+        }
+
+        var included = new HashSet<string>(StringComparer.Ordinal);
+        void Visit(ResolvedPackage package)
+        {
+            if (!package.Manifest.InstallsInProject || !included.Add(package.Id))
+            {
+                return;
+            }
+
+            foreach (var id in package.Manifest.Dependencies.Keys)
+            {
+                if (byId.TryGetValue(id, out var dependency))
+                {
+                    Visit(dependency);
+                }
+            }
+        }
+
+        foreach (var package in packages.Where(static package => package.Depth == 1))
+        {
+            Visit(package);
+        }
+
+        return [.. packages.Where(package => included.Contains(package.Id))];
+    }
+
     /// <summary>
     /// Records that the project leaves out a default brick it no longer declares, so it is not added back.
     /// </summary>
@@ -221,6 +257,7 @@ public static class ProjectPackages
             Registries = [PublicRegistry],
             Hosts = new Dictionary<string, SemanticVersion> { [HostName] = EngineVersion },
             BuildHost = HostName,
+            IncludeStudio = true,
             BuiltinDirectory = BuiltinDirectory,
             ReservedCategoryPrefixes = ["gaya", HostName],
             Locked = locked,

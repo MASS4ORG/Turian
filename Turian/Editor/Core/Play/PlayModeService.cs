@@ -24,6 +24,7 @@ public sealed class PlayModeService(
     readonly IServiceProvider editorServices = editorServices;
     readonly ILogger logger = logger;
     readonly IPlayFrameProfiler? frameProfiler = editorServices.GetService<IPlayFrameProfiler>();
+    IPlayFrameProfiler? liveFrameProfiler;
 
     readonly Stopwatch clock = new();
     ServiceProvider? playServices;
@@ -392,7 +393,7 @@ public sealed class PlayModeService(
     {
         try
         {
-            using var frame = frameProfiler?.BeginFrame(PlayFrameSource.Simulation) ?? default;
+            using var frame = BeginProfileFrame(PlayFrameSource.Simulation);
             tick();
         }
         catch (Exception ex)
@@ -401,6 +402,13 @@ public sealed class PlayModeService(
             Stop();
         }
     }
+
+    /// <summary>Opens a frame on the active live profiler or the host's configured fallback.</summary>
+    public PlayFrameScope BeginProfileFrame(PlayFrameSource source) =>
+        (liveFrameProfiler ?? frameProfiler)?.BeginFrame(source) ?? default;
+
+    /// <summary>Sets the live profiler used by Play Mode and the Game Viewport.</summary>
+    public void SetLiveFrameProfiler(IPlayFrameProfiler? profiler) => liveFrameProfiler = profiler;
 
     /// <summary>
     /// Builds the service provider owned by the running game session.

@@ -442,6 +442,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         ArgumentNullException.ThrowIfNull(gui);
         if (gui.Pass == Pass.Pass1Build)
         {
+            app.LivePlugins?.Refresh();
             SyncChrome();
             SyncWindowIdentity(gui);
         }

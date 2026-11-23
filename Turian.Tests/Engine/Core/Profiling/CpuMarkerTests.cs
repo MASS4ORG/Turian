@@ -30,4 +30,34 @@ public sealed class CpuMarkerTests
         }
         Assert.False(Profiler.IsRecording);
     }
+
+    /// <summary>Scheduled work carries its collector to the worker after the scheduling frame ends.</summary>
+    [Fact]
+    public async Task ScheduledWorkUsesItsOriginatingSink()
+    {
+        const string name = "Load Asset";
+        Assert.False(Profiler.ScheduleWork(name).IsScheduled);
+        var sink = Substitute.For<ICpuWorkSink>();
+        sink.IsRecording.Returns(true);
+        sink.ScheduleWork(name).Returns(41L);
+        sink.TryBeginWork(41).Returns(true);
+
+        Assert.True(Profiler.TryAttach(sink));
+        Profiler.ScheduledWork work;
+        try
+        {
+            work = Profiler.ScheduleWork(name);
+            Assert.True(work.IsScheduled);
+        }
+        finally
+        {
+            Assert.True(Profiler.TryDetach(sink));
+        }
+
+        await Task.Run(() => { using var interval = work.Begin(); }, TestContext.Current.CancellationToken);
+
+        sink.Received(1).ScheduleWork(name);
+        sink.Received(1).TryBeginWork(41);
+        sink.Received(1).EndWork(41);
+    }
 }

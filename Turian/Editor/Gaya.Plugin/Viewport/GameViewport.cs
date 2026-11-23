@@ -155,7 +155,8 @@ sealed class GameViewport : IDisposable
 
         overlayRoot = root;
         using var recording = playMode.State == PlayState.Playing
-            ? frameProfiler?.BeginFrame(PlayFrameSource.Viewport) ?? default : default;
+            ? frameProfiler?.BeginFrame(PlayFrameSource.Viewport) ?? playMode.BeginProfileFrame(PlayFrameSource.Viewport)
+            : default;
         using var sample = Profiler.Sample("Game Viewport");
         using (Profiler.Sample("Scene Rendering"))
         {
@@ -264,7 +265,7 @@ sealed class GameViewport : IDisposable
         {
             if (service is null)
             {
-                service = new SceneViewerService(vulkan, assets, width, height);
+                service = new SceneViewerService(vulkan, assets, width, height) { CaptureGpuSubmissions = true };
                 service.OverlaySource = (w, h, dt) =>
                     overlayRoot is null ? null : UiPresenter()?.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
                 service.WorldUiSource = frameInfo =>

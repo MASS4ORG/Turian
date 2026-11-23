@@ -76,8 +76,11 @@ public static class PackagedPlugins
         var assemblies = new List<Assembly>();
         foreach (var package in resolution.Packages)
         {
-            assemblies.AddRange(LoadAssemblies(package, logger));
-            logger.LogInformation("Studio package {Package} {Version} loaded", package.Id, package.Version);
+            if (!package.Manifest.LivePlugin)
+            {
+                assemblies.AddRange(LoadAssemblies(package, logger));
+                logger.LogInformation("Studio package {Package} {Version} loaded", package.Id, package.Version);
+            }
         }
 
         return new StudioPackages(resolution.Packages, assemblies);

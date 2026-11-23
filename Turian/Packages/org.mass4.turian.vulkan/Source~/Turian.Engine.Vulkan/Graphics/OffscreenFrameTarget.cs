@@ -48,6 +48,8 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
     Silk.NET.Vulkan.Buffer stagingBuffer;
     DeviceMemory stagingMemory;
     ulong stagingSize;
+    ulong stagingAllocationBytes;
+    ulong attachmentAllocationBytes;
 
     bool isFrameStarted;
 
@@ -67,7 +69,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
     /// Begins a frame. Returns the command buffer to record rendering commands into,
     /// or <c>null</c> if the target has zero size.
     /// </summary>
-    public CommandBuffer? BeginFrame()
+    public CommandBuffer? BeginFrame() => BeginFrame(captureGpu: false);
+
+    internal CommandBuffer? BeginFrame(bool captureGpu)
     {
         if (Width == 0 || Height == 0)
         {
@@ -92,6 +96,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
         }
 
         isFrameStarted = true;
+#if !TURIAN_NO_CPU_MARKERS
+        BeginGpuCapture(captureGpu);
+#endif
         return commandBuffer;
     }
 
@@ -99,6 +106,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
     public void BeginRenderPass(CommandBuffer cmd, Vector4? clearColor = null)
     {
         Debug.Assert(isFrameStarted);
+#if !TURIAN_NO_CPU_MARKERS
+        MarkGpuBoundary(1);
+#endif
         var color = Vector4.Clamp(clearColor ?? new Vector4(0.39f, 0.58f, 0.93f, 1f), Vector4.Zero, Vector4.One);
         ClearValue[] clearValues =
         [
@@ -131,6 +141,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
     {
         Debug.Assert(isFrameStarted);
         vk.CmdEndRenderPass(cmd);
+#if !TURIAN_NO_CPU_MARKERS
+        MarkGpuBoundary(2);
+#endif
     }
 
     /// <summary>
@@ -185,6 +198,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
             ImageExtent = new Extent3D(Width, Height, 1)
         };
         vk.CmdCopyImageToBuffer(commandBuffer, resolveColorImage, ImageLayout.TransferSrcOptimal, stagingBuffer, 1, &region);
+#if !TURIAN_NO_CPU_MARKERS
+        MarkGpuBoundary(3);
+#endif
 
         _ = vk.EndCommandBuffer(commandBuffer);
 
@@ -196,19 +212,39 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
             PCommandBuffers = &cb
         };
 
+#if !TURIAN_NO_CPU_MARKERS
+        if (gpuCapture.IsActive)
+        {
+            gpuSubmitStart = Stopwatch.GetTimestamp();
+        }
+#endif
         var result = vk.QueueSubmit(device.GraphicsQueue, 1, in submitInfo, fence);
         if (result != Result.Success)
         {
             throw new VulkanException("OffscreenFrameTarget: queue submit failed: {0}", result);
         }
 
-        var endWait = vk.WaitForFences(device.VkDevice, 1, in fence, true, 1_000_000_000UL);
+        var endWait = WaitForReadback();
         if (endWait == Result.Timeout)
         {
             throw new VulkanException("OffscreenFrameTarget.EndFrame: GPU did not signal fence within 1s — likely GPU hang");
         }
 
         isFrameStarted = false;
+#if !TURIAN_NO_CPU_MARKERS
+        if (endWait == Result.Success)
+        {
+            CompleteGpuCapture();
+        }
+#endif
+    }
+
+    Result WaitForReadback()
+    {
+#if !TURIAN_NO_CPU_MARKERS
+        using var sample = Profiler.Sample("Wait for GPU Readback");
+#endif
+        return vk.WaitForFences(device.VkDevice, 1, in fence, true, 1_000_000_000UL);
     }
 
     /// <summary>
@@ -240,6 +276,10 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
     public void Dispose()
     {
         _ = vk.DeviceWaitIdle(device.VkDevice);
+#if !TURIAN_NO_CPU_MARKERS
+        gpuQueries?.Dispose();
+        gpuCapture = default;
+#endif
         DestroyResources();
         GC.SuppressFinalize(this);
     }
@@ -451,6 +491,7 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
             throw new VulkanException("OffscreenFrameTarget: failed to allocate staging memory: {0}", result);
         }
 
+        stagingAllocationBytes = memReq.Size;
         _ = vk.BindBufferMemory(device.VkDevice, stagingBuffer, stagingMemory, 0);
     }
 
@@ -481,6 +522,8 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
 
             vk.DestroyBuffer(device.VkDevice, stagingBuffer, null);
             vk.FreeMemory(device.VkDevice, stagingMemory, null);
+            attachmentAllocationBytes = 0;
+            stagingAllocationBytes = 0;
         }
     }
 }

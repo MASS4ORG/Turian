@@ -71,6 +71,9 @@ public sealed class SceneViewerService : IDisposable
         set => standardSystem.CollectStatistics = value;
     }
 
+    /// <summary>Allows the active profiler to inspect GPU submissions from this viewer.</summary>
+    public bool CaptureGpuSubmissions { get; set; }
+
     /// <summary>Statistics from the latest completed instrumented render call.</summary>
     public RenderFrameStats FrameStats { get; private set; }
 
@@ -185,7 +188,7 @@ public sealed class SceneViewerService : IDisposable
                 new WorldUiFrame(activeCamera, frameTarget.Width, frameTarget.Height, (float)deltaTime)));
         }
 
-        var cmd = frameTarget.BeginFrame();
+        var cmd = frameTarget.BeginFrame(CaptureGpuSubmissions);
         if (cmd is null)
         {
             return;

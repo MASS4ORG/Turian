@@ -66,12 +66,12 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
     /// What one frame draws, read once in the build pass. Actions finish on background threads; reading the controller
     /// again in the render pass could draw a node the build pass never laid out, at the window's corner.
     /// </summary>
-    sealed record Frame(bool HasWorkspace, BricksTab Tab, BrickScope Scope, PackageScope? WorkspaceScope, bool Busy,
+    sealed record Frame(bool HasWorkspace, BricksTab Tab, BrickScope Scope, IBrickWorkspace? Workspace, bool Busy,
         bool RestartRequired, IReadOnlyList<CatalogBrick> Catalog, IReadOnlyList<BrickChange> Pending,
         IReadOnlyList<ScopedRegistry> Registries, string? PublicRegistry)
     {
         public static Frame Of(BricksController controller) => new(controller.HasWorkspace, controller.Tab, controller.Scope,
-            controller.Workspace?.Scope, controller.IsBusy, controller.StudioRestartRequired,
+            controller.Workspace, controller.IsBusy, controller.StudioRestartRequired,
             controller.Catalog, controller.Pending, controller.Registries, controller.Workspace?.PublicRegistry?.Name);
     }
 
@@ -224,7 +224,6 @@ public sealed partial class BricksPanel(BricksController controller, IBrickFileD
 
             scopeChosen = true;
             controller.Scope = scope;
-            _ = controller.RefreshRegistriesAsync();
             inspector?.ShowSelection(controller);
         }
     }

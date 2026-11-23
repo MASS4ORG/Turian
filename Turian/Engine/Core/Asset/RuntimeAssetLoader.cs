@@ -52,7 +52,12 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             if (!inflight.TryGetValue(assetId, out task!))
             {
                 // The worker's cleanup takes gate after its task has been registered.
+#if !TURIAN_NO_CPU_MARKERS
+                var work = Profiler.ScheduleWork("Load Asset");
+                task = work.IsScheduled ? LoadOnProfiledWorker(assetId, work) : Task.Run(() => LoadCore(assetId));
+#else
                 task = Task.Run(() => LoadCore(assetId));
+#endif
                 inflight[assetId] = task;
             }
         }
@@ -201,6 +206,14 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             cache.Remove(assetId);
         }
     }
+
+#if !TURIAN_NO_CPU_MARKERS
+    Task<Asset?> LoadOnProfiledWorker(Guid assetId, Profiler.ScheduledWork work) => Task.Run(() =>
+    {
+        using var scope = work.Begin();
+        return LoadCore(assetId);
+    });
+#endif
 
     Asset? LoadCore(Guid assetId)
     {

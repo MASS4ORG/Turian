@@ -41,6 +41,7 @@ public unsafe partial class OffscreenFrameTarget
             throw new VulkanException("OffscreenFrameTarget: failed to allocate image memory: {0}", result);
         }
 
+        attachmentAllocationBytes += memReq.Size;
         _ = vk.BindImageMemory(device.VkDevice, image, memory, 0);
     }
 

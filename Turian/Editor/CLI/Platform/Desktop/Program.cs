@@ -25,10 +25,15 @@ static class Program
 
         var context = new GamePlayerContext(projectPath, logger, static services => services.BuildServiceProvider(),
 #if DEBUG || DEVELOPMENT_BUILD
-            Development: true);
+            Development: true)
 #else
-            Development: false);
+            Development: false)
 #endif
+        {
+#if DEVELOPMENT_BUILD
+            AllowPlayerProfiling = true,
+#endif
+        };
         try
         {
 #if TURIAN_STATIC_RUNTIME

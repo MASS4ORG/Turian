@@ -262,6 +262,24 @@ public sealed class PackageResolverTests : IDisposable
         await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
     }
 
+    /// <summary>A host can include Studio bricks in an individual project's resolution and lock.</summary>
+    [Fact]
+    public async Task ProjectCanIncludeStudioBricks()
+    {
+        var path = Package("tool", "com.acme.tool", "1.0.0");
+        var manifest = PackageManifest.Load(path);
+        manifest.Scopes = [PackageScope.Studio];
+        manifest.LivePlugin = true;
+        manifest.Save(path);
+        Manifest(("com.acme.tool", "file:../../tool"));
+
+        var resolver = new PackageResolver(store, new PackageResolverOptions { IncludeStudio = true });
+        var resolved = await resolver.ResolveAsync(project, TestContext.Current.CancellationToken);
+
+        Assert.True(Assert.Single(resolved.Packages).Manifest.LivePlugin);
+        Assert.Contains("com.acme.tool", resolved.Lock.Dependencies.Keys);
+    }
+
     /// <summary>
     /// Only a brick that lists the project scope can be a project dependency: studio-only, game-only and
     /// studio-and-game bricks are all refused, while one that also lists project is accepted.

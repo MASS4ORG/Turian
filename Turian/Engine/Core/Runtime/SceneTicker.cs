@@ -181,6 +181,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         }
 
 #if !TURIAN_NO_CPU_MARKERS
+        using var recording = PlayerProfile?.BeginFrame() ?? default;
         using var sample = Profiler.Sample("Scene Tick");
 #endif
         using var asyncContext = Async.EnterContext();
@@ -195,6 +196,10 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
         FinishFrame();
     }
+
+#if !TURIAN_NO_CPU_MARKERS
+    internal PlayerProfileRecorder? PlayerProfile { get; set; }
+#endif
 
     /// <summary>
     /// Advances every loaded scene by exactly one frame, running a single fixed step
