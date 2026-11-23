@@ -16,6 +16,7 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.12.0" />
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <ProjectReference Include="../Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj"/>
     </ItemGroup>
