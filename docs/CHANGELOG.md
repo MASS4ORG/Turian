@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Added: CPU and GPU profiler #85
 - Changed: Guinevere 7.0.0
+
+## [5.3.0] - 2026-11-21
+
 - Added: studio and personal settings #401.
 - Added: external code editor #396 #398 #403 #404.
 - Added: DataAsset validation on save, variant override editing, and the `validate` CLI command #148.
@@ -247,7 +250,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v5.2.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v5.3.0...HEAD
+[5.3.0]: https://github.com/MASS4ORG/Turian/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/MASS4ORG/Turian/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/MASS4ORG/Turian/compare/v5.0.0...v5.1.0
 [5.0.0]: https://github.com/MASS4ORG/Turian/compare/v4.1.2...v5.0.0
