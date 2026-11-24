@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-11-24
+
 - Added: CPU and GPU profiler #85
 - Changed: Guinevere 7.0.0
 
@@ -250,7 +252,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v5.3.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v5.4.0...HEAD
+[5.4.0]: https://github.com/MASS4ORG/Turian/compare/v5.3.0...v5.4.0
 [5.3.0]: https://github.com/MASS4ORG/Turian/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/MASS4ORG/Turian/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/MASS4ORG/Turian/compare/v5.0.0...v5.1.0
