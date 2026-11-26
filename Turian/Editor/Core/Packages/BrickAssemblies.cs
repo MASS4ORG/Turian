@@ -69,7 +69,9 @@ public static partial class BrickAssemblies
     /// <param name="brick">The installed brick.</param>
     /// <returns>True when consumers use the payload instead of compiling the brick's sources.</returns>
     public static bool IsPrecast(ResolvedPackage brick) =>
-        RuntimeAssemblies(brick).Count > 0 || EditorAssemblies(brick).Count > 0;
+        !Fallbacks.ContainsKey(brick.RootPath) && HasPayload(brick);
+
+    static bool HasPayload(ResolvedPackage brick) => Payload(brick, "lib").Length > 0 || Payload(brick, "editor").Length > 0;
 
     /// <summary>The assemblies games run with, which user code compiles against.</summary>
     /// <param name="brick">The installed brick.</param>
@@ -114,10 +116,16 @@ public static partial class BrickAssemblies
                     }
 
                     VerifyLoadedDependencies(path);
-                    TypeRegistry.ScanAssembly(AssemblyLoadContext.Default.LoadFromAssemblyPath(path));
+                    var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+                    if (!BrokenAssemblies.Initialize(assembly, logger))
+                    {
+                        continue;
+                    }
+
+                    TypeRegistry.ScanAssembly(assembly);
                     loadedAny = true;
                 }
-                catch (Exception ex) when (ex is IOException or BadImageFormatException or FileLoadException)
+                catch (Exception ex) when (BrokenAssemblies.IsLoadFailure(ex))
                 {
                     logger.LogWarning(ex, "Could not load brick assembly {Path}", path);
                 }
@@ -183,7 +191,8 @@ public static partial class BrickAssemblies
                 continue;
             }
 
-            var type = assemblies.Where(a => entry.Assembly is null || a.GetName().Name == entry.Assembly)
+            var type = assemblies.Where(static a => !BrokenAssemblies.IsBroken(a))
+                .Where(a => entry.Assembly is null || a.GetName().Name == entry.Assembly)
                 .Select(a => a.GetType(entry.FullyQualifiedName)).FirstOrDefault(static t => t is not null);
             if (type is null)
             {
@@ -299,13 +308,16 @@ public static partial class BrickAssemblies
     static void RegisterModules(ResolvedPackage brick)
     {
         var names = RuntimeAssemblies(brick).Select(static path => Path.GetFileNameWithoutExtension(path)).ToHashSet();
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(a => a.GetName().Name is { } name && names.Contains(name)))
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(a => !BrokenAssemblies.IsBroken(a) && a.GetName().Name is { } name && names.Contains(name)))
         {
             PrecastAssemblies.Register(assembly);
         }
     }
 
-    static string[] Find(ResolvedPackage brick, string folder)
+    static string[] Find(ResolvedPackage brick, string folder) =>
+        Fallbacks.ContainsKey(brick.RootPath) ? [] : Payload(brick, folder);
+
+    static string[] Payload(ResolvedPackage brick, string folder)
     {
         return BuiltForThisEngine(brick)
             ? [.. PrecastDirectories(brick).Select(payload => Path.Combine(payload, folder))

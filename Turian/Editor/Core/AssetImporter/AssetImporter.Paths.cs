@@ -386,6 +386,11 @@ public sealed partial class AssetImporter
             }
 
             disposed = true;
+            if (build is not null)
+            {
+                build.UserAssembliesChanged -= ImportDeferredAfterCompile;
+            }
+
             folderWatcher?.Dispose();
             folderWatcher = null;
             packageWatchers.ForEach(static watcher => watcher.Dispose());

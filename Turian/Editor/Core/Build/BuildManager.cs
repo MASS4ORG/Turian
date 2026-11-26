@@ -77,6 +77,12 @@ public sealed class BuildManager : IDisposable
     /// <summary>Registers MSBuild defaults.  Call once before the first compilation.</summary>
     public static void MsBuildLocatorRegisterDefaults() => MSBuildLocator.RegisterDefaults();
 
+    /// <summary>
+    /// Whether a compile may go on when an editor-only assembly fails to build. A host without the editor's libraries,
+    /// such as the command line, sets it so the runtime code still loads.
+    /// </summary>
+    public bool EditorAssembliesOptional { get; set; }
+
     /// <summary>Updates project settings (e.g. after the user opens a different project).</summary>
     public void UpdateSettings(IAppSettings newSettings)
     {
@@ -447,7 +453,8 @@ public sealed class BuildManager : IDisposable
         RequireProjectLoaded("compile");
 
         var compiler = new CompileUserCode(settings, logger, slotManager.InactiveSlotDirectory, forceRecompile,
-            slotManager.ActiveSlotDirectory);
+            slotManager.ActiveSlotDirectory,
+            EditorAssembliesOptional);
         return await compiler.ExecuteAsync().ConfigureAwait(false);
     }
 

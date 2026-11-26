@@ -19,9 +19,22 @@ public sealed partial class AssetDatabase
     string? packagesProjectRoot;
 
     /// <summary>
+    /// Raises <see cref="AssetReimported"/> for <paramref name="assetId"/>; the importer calls it once the new
+    /// import is registered.
+    /// </summary>
+    /// <param name="assetId">The reimported asset.</param>
+    public void NotifyAssetReimported(Guid assetId) => AssetReimported?.Invoke(assetId);
+
+    /// <summary>
     /// Gets the indexed asset records keyed by asset identifier.
     /// </summary>
     public Dictionary<Guid, AssetRecord> Assets { get; private set; } = [];
+
+    /// <summary>
+    /// Raised, possibly from a background thread, after an asset's source was imported again and its record is
+    /// current, so a runtime holding something it derived from that asset can drop it. Not raised for the initial scan.
+    /// </summary>
+    public event Action<Guid>? AssetReimported;
 
     /// <summary>Cold model and texture load durations for this database.</summary>
     public AssetLoadStatistics LoadStatistics { get; } = new();

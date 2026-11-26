@@ -6,9 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Added: editor brick panels, asset document editor routing and brick asset creation entries #70
-- Added: per-document-type layouts and per-tab panels
-- Fixed: bricks prebuilt with an older minor version of the engine load instead of falling back to source
+- Added: editor brick panels #70
+- Added: per-document-type layouts
+- Added: asset reimport signal on the asset database #422
+- Fixed: projects open whether their bricks are prebuilt or source: precast bricks need prebuilt dependencies, failed assembly loads are skipped, metas of unavailable types are kept and imported after the next compile
 
 ## [5.4.0] - 2026-11-24
 
@@ -16,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed: Guinevere 7.0.0
 
 ## [5.3.0] - 2026-11-21
-
+X
 - Added: studio and personal settings #401.
 - Added: external code editor #396 #398 #403 #404.
 - Added: DataAsset validation on save, variant override editing, and the `validate` CLI command #148.

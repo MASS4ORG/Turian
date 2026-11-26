@@ -10,7 +10,8 @@ public sealed class CompileUserCode(
     ILogger logger,
     string outputDirectory,
     bool forceRecompile = false,
-    string? reuseDirectory = null)
+    string? reuseDirectory = null,
+    bool editorAssembliesOptional = false)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
     /// <summary>
@@ -55,13 +56,27 @@ public sealed class CompileUserCode(
             var compilation = await project.GetCompilationAsync().ConfigureAwait(false)
                 ?? throw new InvalidOperationException($"Compilation of {project.AssemblyName} returned null.");
 
-            await using var fs = new FileStream(Path.Combine(outputDirectory, $"{project.AssemblyName}.dll"),
-                FileMode.Create, FileAccess.Write, FileShare.None);
-            var result = compilation.Emit(fs, manifestResources: EmbeddedResources(graph, project.AssemblyName));
+            using var image = new MemoryStream();
+            var result = compilation.Emit(image, manifestResources: EmbeddedResources(graph, project.AssemblyName));
             var (errors, warnings) = CompilationDiagnosticsReporter.Report(result.Diagnostics, Logger);
             warningCount += warnings;
 
-            if (!result.Success)
+            if (!result.Success && editorAssembliesOptional
+                && graph.Definitions.Any(a => a.EditorOnly && a.Name == project.AssemblyName))
+            {
+                // A host without the editor's libraries, such as the command line, cannot build editor assemblies;
+                // the runtime code does not depend on them.
+                Logger.LogWarning("Editor assembly {Assembly} was not built ({ErrorCount} error(s)); its editor tools are unavailable",
+                    project.AssemblyName, errors);
+                continue;
+            }
+
+            if (result.Success)
+            {
+                await File.WriteAllBytesAsync(Path.Combine(outputDirectory, $"{project.AssemblyName}.dll"), image.ToArray())
+                    .ConfigureAwait(false);
+            }
+            else
             {
                 cache.Invalidate(Settings.ProjectAbsoluteDir, assemblyOutputPath);
                 Logger.LogError(
