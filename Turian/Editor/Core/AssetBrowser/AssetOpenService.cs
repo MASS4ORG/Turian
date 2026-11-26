@@ -12,7 +12,9 @@ public sealed class AssetOpenService(
     AssetInspectionService inspections,
     NodeInspectorController inspector,
     CodeOpener code,
-    ILogger log)
+    ILogger log,
+    UserPanelCatalog? panels = null,
+    AssetImporter? importer = null)
 {
     /// <summary>Opens what a browser row points at.</summary>
     /// <param name="entry">The row; directories and rows without metadata do nothing.</param>
@@ -23,16 +25,22 @@ public sealed class AssetOpenService(
 
         return entry.IsDirectory
             ? AssetActivation.None
-            : Open(entry.AbsolutePath, entry.AssetMetadata);
+            : Open(entry.AbsolutePath, entry.AssetMetadata, entry.IsReadOnly);
     }
 
     /// <summary>Opens a source file, using its metadata when the studio is the one to edit it.</summary>
     /// <param name="absolutePath">Absolute path of the source file.</param>
     /// <param name="metadata">The file's asset metadata, or null when it has none.</param>
+    /// <param name="isReadOnly">Whether the browser entry is read-only.</param>
     /// <returns>What was done.</returns>
-    public AssetActivation Open(string absolutePath, Asset? metadata)
+    public AssetActivation Open(string absolutePath, Asset? metadata, bool isReadOnly = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
+
+        if (panels?.OpenDocument(absolutePath, isReadOnly || importer?.IsSourceReadOnly(absolutePath) == true) is { } documentActivation)
+        {
+            return documentActivation;
+        }
 
         var activation = types.ActivationFor(absolutePath);
 

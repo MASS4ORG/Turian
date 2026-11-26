@@ -12,6 +12,13 @@ sealed class UnsavedChangesGuard(
     /// <summary>Whether anything in the project is not on disk yet.</summary>
     public bool HasUnsavedChanges => unsaved.Any;
 
+    /// <summary>Asks whether to save, discard or keep open one document editor's unsaved edits.</summary>
+    /// <param name="session">The document being closed; named in no way beyond the question.</param>
+    /// <param name="decided">Runs with Save or Discard.</param>
+    /// <param name="cancelled">Runs when the user cancels or dismisses the question.</param>
+    public void AskClose(IAssetDocumentSession session, Action<UnsavedChanges> decided, Action cancelled) =>
+        dialog.Ask(localization.T("This document has unsaved changes. Save them first?"), decided, cancelled);
+
     /// <summary>Runs <paramref name="proceed"/> once unsaved work is saved or discarded; Cancel runs nothing.</summary>
     /// <param name="question">The question asked when there is unsaved work, in English.</param>
     /// <param name="proceed">What leaving the project does.</param>
@@ -29,7 +36,11 @@ sealed class UnsavedChangesGuard(
         {
             if (choice == UnsavedChanges.Save)
             {
-                unsaved.SaveAll();
+                // A document that could not be written stays open and dirty, so the project is not left.
+                if (!unsaved.SaveAll())
+                {
+                    return;
+                }
             }
             else
             {

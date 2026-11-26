@@ -99,11 +99,62 @@ public sealed class BrickEnablementTests : IDisposable
         Assert.False(BrickAssemblies.IsRetired(typeof(DataAsset).Assembly));
     }
 
-    ResolvedPackage PrecastBrick(string name, List<PackageScope> scopes, string? source = null)
+    /// <summary>Only enabled project editor assemblies and studio-only editor assemblies contribute panels.</summary>
+    [Fact]
+    public void EditorAssemblyDiscoveryFollowsScopeAndEnablement()
+    {
+        var studio = PrecastBrick("EditorStudio" + Guid.NewGuid().ToString("N"), [PackageScope.Studio], editor: true);
+        var project = PrecastBrick("EditorProject" + Guid.NewGuid().ToString("N"), [PackageScope.Project], editor: true);
+        var runtime = PrecastBrick("RuntimeProject" + Guid.NewGuid().ToString("N"), [PackageScope.Project]);
+        BrickAssemblies.RecordGameBricks([studio, project, runtime]);
+        Assert.True(BrickAssemblies.Load([studio, project, runtime], NullLogger.Instance));
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        var studioAssembly = assemblies.Single(a => a.GetName().Name == Path.GetFileNameWithoutExtension(
+            Assert.Single(BrickAssemblies.EditorAssemblies(studio))));
+        var projectAssembly = assemblies.Single(a => a.GetName().Name == Path.GetFileNameWithoutExtension(
+            Assert.Single(BrickAssemblies.EditorAssemblies(project))));
+        var runtimeAssembly = assemblies.Single(a => a.GetName().Name == Path.GetFileNameWithoutExtension(
+            Assert.Single(BrickAssemblies.RuntimeAssemblies(runtime))));
+
+        Assert.True(BrickAssemblies.IsEditorAssembly(studioAssembly));
+        Assert.False(BrickAssemblies.IsEditorAssembly(projectAssembly));
+        BrickAssemblies.Enable([project, runtime]);
+        Assert.True(BrickAssemblies.IsEditorAssembly(projectAssembly));
+        Assert.False(BrickAssemblies.IsEditorAssembly(runtimeAssembly));
+        BrickAssemblies.Enable([]);
+        Assert.False(BrickAssemblies.IsEditorAssembly(projectAssembly));
+        Assert.True(BrickAssemblies.IsEditorAssembly(studioAssembly));
+    }
+
+    /// <summary>Precast editor panels appear without user code and disappear when their brick is disabled.</summary>
+    [Fact]
+    public void CatalogDiscoversEnabledEditorBrickWithoutUserAssembly()
+    {
+        var name = "Panel" + Guid.NewGuid().ToString("N");
+        var source = $$"""
+            [{{typeof(PanelAttribute).FullName}}("Fixture", "Tools/{{name}}")]
+            public class {{name}} { }
+            """;
+        var brick = PrecastBrick(name, [PackageScope.Project], source, editor: true);
+        Assert.True(BrickAssemblies.Load([brick], NullLogger.Instance));
+        BrickAssemblies.Enable([brick]);
+        using var build = new BuildManager(new BuildAppSettings { ProjectAbsoluteDir = root }, NullLogger.Instance);
+        using var catalog = new UserPanelCatalog(build, NullLogger.Instance);
+
+        Assert.Null(build.ActiveUserAssembly);
+        var page = Assert.Single(catalog.Pages, page => page.Path == $"Tools/{name}");
+        catalog.EnsureRefreshed();
+        Assert.Same(page, Assert.Single(catalog.Pages, item => item.Path == $"Tools/{name}"));
+        BrickAssemblies.Enable([]);
+        catalog.EnsureRefreshed();
+        Assert.DoesNotContain(catalog.Pages, item => item.Path == $"Tools/{name}");
+    }
+
+    ResolvedPackage PrecastBrick(string name, List<PackageScope> scopes, string? source = null, bool editor = false)
     {
         var id = "test." + name.ToLowerInvariant();
         var folder = Directory.CreateDirectory(Path.Combine(root, id)).FullName;
-        var lib = Directory.CreateDirectory(Path.Combine(BrickAssemblies.PrecastDirectory(folder), "lib")).FullName;
+        var lib = Directory.CreateDirectory(Path.Combine(BrickAssemblies.PrecastDirectory(folder), editor ? "editor" : "lib")).FullName;
         Compile(name, Path.Combine(lib, name + ".dll"), source);
         var manifest = new PackageManifest { Name = id, Version = SemanticVersion.Parse("0.1.0"), Scopes = scopes };
         return new ResolvedPackage(id, manifest, folder, PackageOrigin.Builtin, $"builtin:{id}", null, null, 1, false);
@@ -114,6 +165,7 @@ public sealed class BrickEnablementTests : IDisposable
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Append(typeof(DataAsset).Assembly.Location)
             .Append(typeof(AssetImporter).Assembly.Location)
+            .Append(typeof(PanelAttribute).Assembly.Location)
             .Distinct()
             .Select(static reference => MetadataReference.CreateFromFile(reference));
         var compilation = CSharpCompilation.Create(name,

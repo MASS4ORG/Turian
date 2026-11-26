@@ -315,7 +315,5 @@ public static partial class BrickAssemblies
     }
 
     static bool BuiltForThisEngine(ResolvedPackage brick) =>
-        brick.Manifest.Precast is not { } precast
-        || !precast.BuiltWith.TryGetValue(ProjectPackages.HostName, out var built)
-        || (built.Major == ProjectPackages.EngineVersion.Major && built.Minor == ProjectPackages.EngineVersion.Minor);
+        brick.Manifest.Precast?.LoadsOn(ProjectPackages.HostName, ProjectPackages.EngineVersion) ?? true;
 }

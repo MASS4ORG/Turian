@@ -13,6 +13,7 @@
     { "key": "Undo", "source": "Undo", "translation": "Desfazer" },
     { "key": "Some documents have unsaved changes. Save them before leaving the project?", "source": "Some documents have unsaved changes. Save them before leaving the project?", "translation": "Alguns documentos têm alterações não salvas. Salvá-los antes de sair do projeto?" },
     { "key": "Redo", "source": "Redo", "translation": "Refazer" },
+    { "key": "Playing in {0}", "source": "Playing in {0}", "translation": "Executando em {0}", "note": "{0} is the name of the scene tab the game plays in." },
     { "key": "Unpack Prefab", "source": "Unpack Prefab", "translation": "Desempacotar prefab" },
     { "key": "Unpack and Continue", "source": "Unpack and Continue", "translation": "Desempacotar e continuar" },
     { "key": "\"{0}\" is part of the prefab instance \"{1}\". Unpack the instance to change it?", "source": "\"{0}\" is part of the prefab instance \"{1}\". Unpack the instance to change it?", "translation": "\"{0}\" faz parte da instância de prefab \"{1}\". Desempacotar a instância para alterá-lo?" },

@@ -16,6 +16,8 @@ sealed class UserPanelBridge : IDisposable
     readonly ICommandRegistry commands;
     readonly IMenuRegistry menus;
     readonly ILogger log;
+    readonly Action<string>? reveal;
+    readonly AssetDocumentHost? documents;
 
     readonly List<string> published = [];
 
@@ -25,8 +27,10 @@ sealed class UserPanelBridge : IDisposable
     /// <param name="commands">Where the panel's "show" command is registered.</param>
     /// <param name="menus">Where the panel's menu item is registered.</param>
     /// <param name="log">Where a republish is reported.</param>
+    /// <param name="reveal">Shows a panel when its editor opens a document.</param>
+    /// <param name="documents">Decides whether a panel holding a document may close.</param>
     public UserPanelBridge(UserPanelCatalog catalog, IPanelRegistry panels, ICommandRegistry commands,
-        IMenuRegistry menus, ILogger log)
+        IMenuRegistry menus, ILogger log, Action<string>? reveal = null, AssetDocumentHost? documents = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
 
@@ -35,8 +39,11 @@ sealed class UserPanelBridge : IDisposable
         this.commands = commands;
         this.menus = menus;
         this.log = log;
+        this.reveal = reveal;
+        this.documents = documents;
 
         catalog.Changed += Publish;
+        catalog.OpenRequested += Reveal;
     }
 
     /// <summary>
@@ -45,21 +52,16 @@ sealed class UserPanelBridge : IDisposable
     /// </summary>
     public void Sync() => catalog.EnsureRefreshed();
 
+    void Reveal(string panelId) => reveal?.Invoke(panelId);
+
     void Publish()
     {
-        foreach (var id in published)
-        {
-            menus.Remove(id);
-            commands.Remove(id);
-            panels.Remove(id);
-        }
-
-        published.Clear();
+        Unpublish();
 
         foreach (var page in catalog.Pages)
         {
             panels.Register(new PanelDescriptor(page.Id, page.Name, PanelPlacement.Floating,
-                _ => page.Target as IPanel ?? new UserPanel(page))
+                _ => page.Target is IPanel panel ? new BorrowedPanel(panel, documents) : new UserPanel(page))
             {
                 OpenByDefault = false,
             });
@@ -110,6 +112,48 @@ sealed class UserPanelBridge : IDisposable
     static string MenuIdFor(string menu) =>
         WellKnownMenus.TryGetValue(menu, out var id) ? id : $"menubar/{menu}";
 
+    /// <summary>
+    /// Lends a user panel to the workbench without letting it dispose the panel, and lets a document editor's unsaved
+    /// edits veto closing it.
+    /// </summary>
+    sealed class BorrowedPanel(IPanel target, AssetDocumentHost? documents) : IPanel, IPanelCloseGuard
+    {
+        /// <inheritdoc />
+        public void RequestClose(Action<bool> decide)
+        {
+            if (documents is null || target is not IAssetDocumentSession { DocumentPath: not null } session)
+            {
+                decide(true);
+                return;
+            }
+
+            documents.RequestClose(session, () => decide(true), () => decide(false));
+        }
+
+        /// <inheritdoc />
+        public void Render(Gui gui) => target.Render(gui);
+
+        /// <inheritdoc />
+        public void RenderHeader(Gui gui, PanelHeaderContext context) => target.RenderHeader(gui, context);
+    }
+
+    void Unpublish()
+    {
+        foreach (var id in published)
+        {
+            menus.Remove(id);
+            commands.Remove(id);
+            panels.Remove(id);
+        }
+
+        published.Clear();
+    }
+
     /// <inheritdoc />
-    public void Dispose() => catalog.Changed -= Publish;
+    public void Dispose()
+    {
+        catalog.Changed -= Publish;
+        catalog.OpenRequested -= Reveal;
+        Unpublish();
+    }
 }

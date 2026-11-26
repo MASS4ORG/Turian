@@ -46,13 +46,15 @@ static class StudioCommands
         Add(context, MenuIds.File, "2-save", 2, new CommandDescriptor(
             "gaya.turian.save", "File: Save",
             Save,
-            static sp => sp.GetRequiredService<AssetWorkspace>().Active is not null)
+            static sp => sp.GetRequiredService<AssetWorkspace>().Active is not null
+                || sp.GetRequiredService<AssetDocumentHost>().Active is not null)
         { DynamicLabel = Localized("Save") });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.save", KeyboardKey.S, KeyModifiers.Ctrl));
         Add(context, MenuIds.File, "2-save", 3, new CommandDescriptor(
             "gaya.turian.saveAll", "File: Save All",
-            static sp => sp.GetRequiredService<AssetWorkspace>().SaveAll(),
-            static sp => sp.GetRequiredService<AssetWorkspace>().Documents.Count > 0)
+            SaveAll,
+            static sp => sp.GetRequiredService<AssetWorkspace>().Documents.Count > 0
+                || sp.GetRequiredService<AssetDocumentHost>().Sessions.Count > 0)
         { DynamicLabel = Localized("Save All") });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.saveAll", KeyboardKey.S,
             KeyModifiers.Ctrl | KeyModifiers.Shift));
@@ -67,15 +69,37 @@ static class StudioCommands
     {
         Add(context, MenuIds.Edit, "0", 0, new CommandDescriptor(
             "gaya.turian.undo", "Edit: Undo",
-            static sp => sp.GetRequiredService<UndoService>().Undo(),
-            static sp => sp.GetRequiredService<UndoService>().CanUndo)
-        { DynamicLabel = static sp => StepLabel(sp, "Undo", sp.GetRequiredService<UndoService>().UndoLabel) });
+            static sp =>
+            {
+                if (!sp.GetRequiredService<AssetDocumentHost>().Undo())
+                {
+                    sp.GetRequiredService<UndoService>().Undo();
+                }
+            },
+            static sp => sp.GetRequiredService<AssetDocumentHost>().Active is not null
+                ? sp.GetRequiredService<AssetDocumentHost>().CanUndo
+                : sp.GetRequiredService<UndoService>().CanUndo)
+        {
+            DynamicLabel = static sp => StepLabel(sp, "Undo", sp.GetRequiredService<AssetDocumentHost>().Active is null
+            ? sp.GetRequiredService<UndoService>().UndoLabel : null)
+        });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.undo", KeyboardKey.Z, KeyModifiers.Ctrl));
         Add(context, MenuIds.Edit, "0", 1, new CommandDescriptor(
             "gaya.turian.redo", "Edit: Redo",
-            static sp => sp.GetRequiredService<UndoService>().Redo(),
-            static sp => sp.GetRequiredService<UndoService>().CanRedo)
-        { DynamicLabel = static sp => StepLabel(sp, "Redo", sp.GetRequiredService<UndoService>().RedoLabel) });
+            static sp =>
+            {
+                if (!sp.GetRequiredService<AssetDocumentHost>().Redo())
+                {
+                    sp.GetRequiredService<UndoService>().Redo();
+                }
+            },
+            static sp => sp.GetRequiredService<AssetDocumentHost>().Active is not null
+                ? sp.GetRequiredService<AssetDocumentHost>().CanRedo
+                : sp.GetRequiredService<UndoService>().CanRedo)
+        {
+            DynamicLabel = static sp => StepLabel(sp, "Redo", sp.GetRequiredService<AssetDocumentHost>().Active is null
+            ? sp.GetRequiredService<UndoService>().RedoLabel : null)
+        });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Z, KeyModifiers.Ctrl | KeyModifiers.Shift));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Y, KeyModifiers.Ctrl));
 
@@ -323,8 +347,19 @@ static class StudioCommands
         context.Shortcuts.Add(new KeyBinding("gaya.turian.newScene", KeyboardKey.N, KeyModifiers.Ctrl));
     }
 
+    static void SaveAll(IServiceProvider services)
+    {
+        services.GetRequiredService<AssetWorkspace>().SaveAll();
+        services.GetRequiredService<AssetDocumentHost>().SaveAll();
+    }
+
     static void Save(IServiceProvider services)
     {
+        if (services.GetRequiredService<AssetDocumentHost>().SaveActive() is not null)
+        {
+            return;
+        }
+
         var workspace = services.GetRequiredService<AssetWorkspace>();
         if (workspace.Active is { } document)
         {

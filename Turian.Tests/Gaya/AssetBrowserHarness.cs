@@ -21,6 +21,11 @@ sealed class AssetBrowserHarness : IDisposable
     internal readonly EditorNotifications Notifications = new();
     internal readonly ExternalEditorLauncher Launcher;
     internal readonly AssetOpenService Opener;
+    internal readonly UserPanelCatalog Panels;
+    internal readonly SettingsService Settings = new();
+    internal readonly AssetManager Assets = new();
+    internal readonly AssetWorkspace Workspace;
+    internal readonly ILogger PanelLog = Substitute.For<ILogger>();
     readonly BuildManager build;
     readonly SKSurface surface;
     readonly Font font = Font.FromFamilyName("sans-serif", 14);
@@ -35,13 +40,13 @@ sealed class AssetBrowserHarness : IDisposable
         File.WriteAllText(Path.Combine(Root, "a.txt"), "a");
         File.WriteAllText(Path.Combine(Root, "b.txt"), "b");
         File.WriteAllText(Path.Combine(Root, "Folder", "deep.txt"), "deep");
-        var settings = new SettingsService();
+        var settings = Settings;
         var app = new AppSettings { ProjectAbsoluteDir = Project };
         settings.Set(app);
         build = new BuildManager(app, NullLogger.Instance);
         Importer = new AssetImporter(NullLogger.Instance, Database, settings, build);
         Importer.StopMonitoring();
-        var assets = new AssetManager();
+        var assets = Assets;
         var loader = Substitute.For<IAssetLoader>();
         Inspector = new NodeInspectorController(assets);
         var tree = new SceneTreeController(assets, settings, Importer, loader, Substitute.For<ISceneManager>(), Database);
@@ -50,11 +55,12 @@ sealed class AssetBrowserHarness : IDisposable
         var files = new AssetFileSystem(settings, Importer);
         var types = new AssetTypeCatalog();
         var inspections = new AssetInspectionService(Importer, types, settings, loader, NullLogger.Instance);
-        var workspace = new AssetWorkspace(assets, settings);
+        var workspace = Workspace = new AssetWorkspace(assets, settings);
         Launcher = new ExternalEditorLauncher(Registry, Notifications, NullLogger.Instance)
         { OpenWithSystem = static _ => Task.CompletedTask };
+        Panels = new UserPanelCatalog(build, PanelLog);
         Opener = new AssetOpenService(types, workspace, inspections, Inspector,
-            new CodeOpener(settings, Launcher, Notifications, NullLogger.Instance), NullLogger.Instance);
+            new CodeOpener(settings, Launcher, Notifications, NullLogger.Instance), NullLogger.Instance, Panels, Importer);
         Preferences.ViewMode = mode;
         Panel = new AssetBrowserPanel(files, settings, Opener, inspections, Inspector, Reveal,
             new AssetCreationCatalog(files, settings, build, NullLogger.Instance), Preferences,
@@ -128,6 +134,7 @@ sealed class AssetBrowserHarness : IDisposable
         Panel.Dispose();
         Importer.Dispose();
         Undo.Dispose();
+        Panels.Dispose();
         build.Dispose();
         font.Dispose();
         surface.Dispose();

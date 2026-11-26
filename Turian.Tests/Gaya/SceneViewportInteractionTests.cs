@@ -91,7 +91,7 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         input.IsMouseButtonDown(GMouseButton.Left).Returns(false);
         using var workspace = new AssetWorkspace(assets, new SettingsService());
         using var stage = new PrefabStage(workspace, database);
-        var panel = new ScenePanel(viewport, tree, inspector, workspace, stage);
+        var panel = new ScenePanel(viewport, tree, inspector, new SceneDocument(new AssetWrapper(scene)), stage);
         PanelFrame();
         input.MousePosition.Returns(Descendants(gui.RootNode!).Single(child => child.Id == "scene/toolbar/frame").Rect.Center);
         PanelFrame();

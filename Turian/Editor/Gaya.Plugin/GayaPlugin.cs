@@ -64,11 +64,26 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<IEditorSettings>(), sp.GetService<ISettingsFieldEditors>(),
             sp.GetRequiredService<ExternalEditorFieldEditor>(), sp.GetRequiredService<IExternalEditorRegistry>()));
 
-        context.Services.AddSingleton(sp => new UserPanelBridge(
-            sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands, context.Menus,
-            context.Logger));
+        context.Services.AddSingleton(sp =>
+        {
+            var documents = sp.GetRequiredService<AssetDocumentHost>();
+            var focus = sp.GetRequiredService<IFocusTracker>();
+            documents.FocusedPanel = () => focus.ActivePanelId;
+            documents.Prompt = (session, decided, cancelled) =>
+                sp.GetRequiredService<UnsavedChangesGuard>().AskClose(session, decided, cancelled);
+            return new UserPanelBridge(sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands,
+                context.Menus, context.Logger, id => sp.GetRequiredService<IShellHost>().ShowPanel(id), documents);
+        });
 
         context.Services.AddSingleton<OutputRevealService>();
+
+        context.Services.AddSingleton(sp => new PlayingDocument(
+            sp.GetRequiredService<PlayModeService>(), sp.GetRequiredService<IDocumentService>()));
+        context.Services.AddSingleton(sp => new DocumentSelectionMemory(
+            sp.GetRequiredService<IDocumentService>(), sp.GetRequiredService<NodeInspectorController>(),
+            sp.GetRequiredService<SceneTreeController>()));
+        context.Services.AddSingleton(sp => new DocumentWorkspaceBridge(
+            sp.GetRequiredService<AssetWorkspace>(), sp.GetRequiredService<IDocumentService>()));
 
         context.Services.AddSingleton(sp => new OutputLogBridge(
             sp.GetRequiredService<OutputPanelSettings>(),
@@ -78,20 +93,7 @@ public sealed class GayaPlugin : IPlugin
 
     static void RegisterPanels(IPluginContext context)
     {
-        context.Panels.Register(new PanelDescriptor(
-            SceneTreePanelId, "Scene Tree", PanelPlacement.Left,
-            static sp => new SceneTreePanel(
-                sp.GetRequiredService<SceneTreeController>(),
-                sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetManager>(),
-                sp.GetRequiredService<PrefabAuthoring>(),
-                sp.GetRequiredService<PrefabStage>(),
-                sp.GetRequiredService<SettingsService>(),
-                sp.GetRequiredService<UndoService>(),
-                sp.GetRequiredService<PrefabOverrideOperations>(),
-                sp.GetRequiredService<ConfirmDialogChrome>(),
-                sp.GetRequiredService<StudioLocalization>(),
-                sp.GetRequiredService<AssetDatabase>())));
+        SceneDocumentPanels.Register(context);
 
         var inspectorInstances = new InspectorInstances(context.Panels);
         inspectorInstances.RegisterInitial(InspectorPanelId);
@@ -103,36 +105,6 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<InspectorInstances>().CreateAdditional()))
         { MenuLabel = "New Inspector" });
         context.Menus.Add(new MenuItemDescriptor(MenuIds.View, "gaya.turian.inspector.new", "8"));
-
-        context.Panels.Register(new PanelDescriptor(
-            ViewportPanelId, "Scene", PanelPlacement.Center,
-            static sp => new ScenePanel(
-                new SceneViewport(
-                    sp.GetRequiredService<Vulkan>(),
-                    sp.GetRequiredService<AssetDatabase>(),
-                    sp.GetRequiredService<SceneTreeController>(),
-                    sp.GetRequiredService<NodeInspectorController>(),
-                    sp.GetRequiredService<GizmoDrawerCatalog>(),
-                    sp.GetRequiredService<PlayModeService>(),
-                    sp.GetRequiredService<EditorCameraSettings>(),
-                    sp.GetRequiredService<ILogger>(),
-                    sp.GetRequiredService<UndoService>(),
-                    sp.GetRequiredService<LocaleService>()),
-                sp.GetRequiredService<SceneTreeController>(),
-                sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetWorkspace>(),
-                sp.GetRequiredService<PrefabStage>())));
-
-        context.Panels.Register(new PanelDescriptor(
-            "gaya.turian.game", "Game", PanelPlacement.Center,
-            static sp => new GamePanel(
-                new GameViewport(
-                    sp.GetRequiredService<Vulkan>(),
-                    sp.GetRequiredService<AssetDatabase>(),
-                    sp.GetRequiredService<SceneTreeController>(),
-                    sp.GetRequiredService<PlayModeService>(),
-                    sp.GetRequiredService<ILogger>(),
-                    sp.GetRequiredService<EditorCameraSettings>()))));
 
         context.Panels.Register(new PanelDescriptor(
             AssetsPanelId, "Assets", PanelPlacement.Bottom,
@@ -442,6 +414,11 @@ public sealed class GayaPlugin : IPlugin
 
         services.GetRequiredService<OutputLogBridge>();
         services.GetRequiredService<SceneDocumentBinder>().Attach();
+
+        // The followers subscribe before the bridge starts publishing tabs, so none misses an event.
+        services.GetRequiredService<PlayingDocument>();
+        services.GetRequiredService<DocumentSelectionMemory>();
+        services.GetRequiredService<DocumentWorkspaceBridge>();
 
         // An undone or redone asset edit is saved like any other edit to it.
         services.GetRequiredService<UndoService>().AssetRestored +=

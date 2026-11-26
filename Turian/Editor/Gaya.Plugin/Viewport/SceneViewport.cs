@@ -6,7 +6,7 @@ namespace Gaya.Plugin.Turian;
 /// StudioA's <c>SceneViewerControl</c>: every navigation and gizmo decision still belongs to
 /// <see cref="SceneCameraController"/> and <see cref="TransformGizmo"/> in <c>Editor.Core</c>.
 /// </summary>
-sealed class SceneViewport : IDisposable
+sealed partial class SceneViewport : IDisposable
 {
     /// <summary>Pointer travel, in pixels, under which a press-release still counts as a click.</summary>
     const float clickDragThreshold = 4f;
@@ -29,8 +29,12 @@ sealed class SceneViewport : IDisposable
     readonly ServiceProvider uiServices;
     readonly SceneGridSettings gridSettings;
     readonly SceneOrientationWidget orientationWidget = new();
+    readonly Func<bool> isActive;
 
     readonly HashSet<int> heldKeys = [];
+
+    ViewportCameraPose? releasedPose;
+    bool selectionStale = true;
 
     SceneViewerService? service;
     SceneCameraController? controller;
@@ -68,6 +72,10 @@ sealed class SceneViewport : IDisposable
     /// <param name="undo">Records a whole gizmo drag as one step.</param>
     /// <param name="locale">Resolves UI text for the open editor project.</param>
     /// <param name="layers">Resolves the current project's named rendering layers.</param>
+    /// <param name="isActive">
+    /// Whether this viewport's document is the active one. Selection and framing requests are global, so only the
+    /// active document's viewport follows them; null means always.
+    /// </param>
     public SceneViewport(
         Vulkan vulkan,
         AssetDatabase assets,
@@ -79,8 +87,10 @@ sealed class SceneViewport : IDisposable
         ILogger log,
         UndoService undo,
         LocaleService locale,
-        LayerFilter? layers = null)
+        LayerFilter? layers = null,
+        Func<bool>? isActive = null)
     {
+        this.isActive = isActive ?? (static () => true);
         this.vulkan = vulkan;
         this.assets = assets;
         this.sceneTree = sceneTree;
@@ -142,6 +152,11 @@ sealed class SceneViewport : IDisposable
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
+        if (selectionStale && isActive())
+        {
+            SyncSelection();
+        }
+
         if (gui.Pass != Pass.Pass2Render)
         {
             DrawGestureFeedback(gui);
@@ -215,6 +230,8 @@ sealed class SceneViewport : IDisposable
                 service.WorldUiSource = frameInfo =>
                     overlayRoot is null ? [] : UiPresenter()?.RenderWorldPanels(overlayRoot, frameInfo) ?? [];
                 controller = new SceneCameraController(service.Camera);
+                releasedPose?.Apply(controller);
+                releasedPose = null;
             }
             else if (service.Width != width || service.Height != height)
             {
@@ -571,50 +588,6 @@ sealed class SceneViewport : IDisposable
         }
     }
 
-    // ── Selection ───────────────────────────────────────────────────────────
-
-    void OnSelectionChanged()
-    {
-        Gizmo.SelectedNode = inspector.SelectedNode;
-        Gizmo.SelectedNodes = inspector.SelectedNodes;
-        UpdatePreviewCamera(inspector.SelectedNode?.GetComponent<CameraComponent>());
-    }
-
-    void UpdatePreviewCamera(CameraComponent? camera)
-    {
-        if (camera is null || failure is not null)
-        {
-            DisposePreview();
-            return;
-        }
-
-        previewCamera = camera;
-
-        var aspect = camera.AspectRatio > 0.01f ? camera.AspectRatio : 16f / 9f;
-        var width = (uint)previewMaxWidth;
-        var height = (uint)Math.Max(1, MathF.Round(previewMaxWidth / aspect));
-
-        try
-        {
-            previewService ??= new SceneViewerService(vulkan, assets, width, height);
-            if (previewService.Width != width || previewService.Height != height)
-            {
-                previewService.Resize(width, height);
-            }
-        }
-        catch (Exception ex)
-        {
-            log.LogError(ex, "The camera preview could not start");
-            DisposePreview();
-            return;
-        }
-
-        if (previewPixels.Length != width * height * 4)
-        {
-            previewPixels = new byte[width * height * 4];
-        }
-    }
-
     void DrawMarquee(Gui gui, Rect viewport)
     {
         if (!marqueeOwnsDrag || Vector2.DistanceSquared(pressPosition, marqueePosition) <= 16f)
@@ -629,19 +602,9 @@ sealed class SceneViewport : IDisposable
         gui.DrawRectBorder(rect, ThemeTokens.Current.Accent);
     }
 
-    void DisposePreview()
-    {
-        previewCamera = null;
-        previewService?.Dispose();
-        previewService = null;
-        previewFrame?.Dispose();
-        previewFrame = null;
-        previewPixels = [];
-    }
-
     void OnFrameNodeRequested(Node node, FrameNodeOptions options)
     {
-        if (controller is null)
+        if (controller is null || !isActive())
         {
             return;
         }
@@ -664,18 +627,7 @@ sealed class SceneViewport : IDisposable
         Gizmo.DragEnded -= OnGizmoDragEnded;
         Gizmo.TransformEdited -= NotifyGizmoMutation;
 
-        DisposePreview();
-        frame?.Dispose();
-        frame = null;
-        if (service is not null)
-        {
-            service.OnPopulateGizmos = null;
-        }
-
-        service?.Dispose();
-        service = null;
-        uiPresenter?.Dispose();
-        uiPresenter = null;
+        ReleaseRenderTargets();
         uiServices.Dispose();
     }
 }

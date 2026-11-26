@@ -15,17 +15,21 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
     bool isOpen;
     string message = string.Empty;
     Action<UnsavedChanges>? decided;
+    Action? cancelled;
 
     /// <summary>
-    /// Opens the dialog. <paramref name="onDecided"/> runs when the user saves or discards; cancelling,
-    /// by the button or by dismissing the dialog, runs nothing.
+    /// Opens the dialog. <paramref name="onDecided"/> runs when the user saves or discards; cancelling, by the button
+    /// or by dismissing the dialog, runs <paramref name="onCancelled"/>.
     /// </summary>
     /// <param name="question">The question shown, already localized.</param>
     /// <param name="onDecided">What to do with the user's choice.</param>
-    public void Ask(string question, Action<UnsavedChanges> onDecided)
+    /// <param name="onCancelled">What to do when the user cancels, or null for nothing.</param>
+    public void Ask(string question, Action<UnsavedChanges> onDecided, Action? onCancelled = null)
     {
+        Cancel();
         message = question;
         decided = onDecided;
+        cancelled = onCancelled;
         isOpen = true;
     }
 
@@ -39,8 +43,16 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
 
         if (!isOpen)
         {
-            decided = null;
+            Cancel();
         }
+    }
+
+    void Cancel()
+    {
+        var callback = cancelled;
+        decided = null;
+        cancelled = null;
+        callback?.Invoke();
     }
 
     void Body(Gui gui)
@@ -76,6 +88,7 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
     {
         var callback = decided;
         decided = null;
+        cancelled = null;
         isOpen = false;
         callback?.Invoke(choice);
     }

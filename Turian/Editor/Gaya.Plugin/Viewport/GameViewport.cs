@@ -452,14 +452,32 @@ sealed class GameViewport : IDisposable
     {
         playMode.StateChanged -= OnPlayStateChanged;
 
+        ReleaseRenderTargets();
+        statisticsDrawing?.Dispose();
+        statisticsDrawing = null;
+    }
+
+    /// <summary>Whether the viewport currently holds its render target, which it builds on the first frame after a release.</summary>
+    internal bool HasRenderTarget => service is not null;
+
+    /// <summary>Releases the render service and frame buffers while the document is out of sight; the next render rebuilds them.</summary>
+    public void Suspend()
+    {
+        ReleaseInput();
+        ReleaseRenderTargets();
+    }
+
+    void ReleaseRenderTargets()
+    {
         frame?.Dispose();
         frame = null;
         service?.Dispose();
         service = null;
         uiPresenter?.Dispose();
         uiPresenter = null;
+        uiServices = null;
         overlayRoot = null;
-        statisticsDrawing?.Dispose();
-        statisticsDrawing = null;
+        lastResizedCamera = null;
+        pixels = [];
     }
 }

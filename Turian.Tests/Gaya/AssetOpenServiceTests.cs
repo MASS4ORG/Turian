@@ -111,4 +111,108 @@ public sealed class AssetOpenServiceTests : IDisposable
         Assert.Equal(AssetActivation.None, harness.Opener.Open(Path.Combine(harness.Root, "notes.unclaimed"), null));
         Assert.Empty(editor.Opened);
     }
+    sealed class DocumentEditor : IAssetDocumentEditor
+    {
+        public bool FailCheck { get; set; }
+        public bool FailOpen { get; set; }
+        public List<string> Opened { get; } = [];
+        public bool IsReadOnly { get; private set; }
+
+        public bool CanOpen(string sourcePath) => FailCheck
+            ? throw new InvalidOperationException()
+            : sourcePath.EndsWith(".ui", StringComparison.OrdinalIgnoreCase);
+
+        public void Open(string sourcePath, bool isReadOnly = false)
+        {
+            IsReadOnly = isReadOnly;
+            if (FailOpen)
+            {
+                throw new InvalidOperationException();
+            }
+
+            Opened.Add(sourcePath);
+        }
+    }
+
+    /// <summary>Document editors use the catalog's existing target and reveal the corresponding panel.</summary>
+    [Fact]
+    public void MatchingEditorOpensAndRevealsItsPanel()
+    {
+        var target = new DocumentEditor();
+        var pages = (IList<UserPanelPage>)harness.Panels.Pages;
+        pages.Add(new UserPanelPage("fixture.panel", "Fixture", "Tools/Fixture", target));
+        var shown = new List<string>();
+        using var bridge = new UserPanelBridge(harness.Panels, new PanelRegistry(), new CommandRegistry(),
+            new MenuRegistry(), NullLogger.Instance, shown.Add);
+        var path = Path.Combine(harness.Root, "screen.ui");
+
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(path, null));
+        Assert.Equal([path], target.Opened);
+        Assert.False(target.IsReadOnly);
+        Assert.Equal(["fixture.panel"], shown);
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(new AssetEntry(path, false, null, null, true)));
+        Assert.True(target.IsReadOnly);
+        bridge.Dispose();
+        harness.Opener.Open(path, null);
+        Assert.Equal(2, shown.Count);
+        pages.Clear();
+        Assert.Null(harness.Panels.OpenDocument(path));
+    }
+
+    /// <summary>Documents and style sheets route to the editor that accepts them; anything else keeps its own opening.</summary>
+    [Fact]
+    public void RoutingFollowsWhatTheEditorAccepts()
+    {
+        var target = new AssetDocumentHostTests.DocumentFixture();
+        ((IList<UserPanelPage>)harness.Panels.Pages).Add(new UserPanelPage("doc.panel", "Doc", "Tools/Doc", target));
+        var ui = Path.Combine(harness.Root, "screen.ui");
+        var unclaimed = Path.Combine(harness.Root, "notes.unclaimed");
+
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(ui, null));
+        Assert.Equal(ui, target.DocumentPath);
+        var pss = Path.Combine(harness.Root, "theme.pss");
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(pss, null));
+        Assert.Equal(pss, target.DocumentPath);
+        Assert.Equal(AssetActivation.None, harness.Opener.Open(unclaimed, null));
+        Assert.Equal(pss, target.DocumentPath);
+    }
+
+    /// <summary>A broken predicate is skipped; a claiming editor failure does not fall back.</summary>
+    [Fact]
+    public void EditorFailuresDoNotCrashOrFallBack()
+    {
+        var pages = (IList<UserPanelPage>)harness.Panels.Pages;
+        pages.Add(new UserPanelPage("bad.check", "Bad", "Tools/Bad", new DocumentEditor { FailCheck = true }));
+        var target = new DocumentEditor { FailOpen = true };
+        pages.Add(new UserPanelPage("bad.open", "Bad", "Tools/Bad", target));
+        var path = Path.Combine(harness.Root, "screen.ui");
+
+        Assert.Equal(AssetActivation.None, harness.Opener.Open(path, null));
+        Assert.Empty(target.Opened);
+        Assert.Contains(harness.PanelLog.ReceivedCalls(), static call => call.GetMethodInfo().Name == "Log"
+            && (LogLevel)call.GetArguments()[0]! == LogLevel.Warning);
+        target.FailOpen = false;
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(path, null));
+        Assert.Equal([path], target.Opened);
+    }
+
+    /// <summary>Registered package policy also applies when opening a source path directly.</summary>
+    [Fact]
+    public void RegisteredPackagePolicyReachesDocumentEditor()
+    {
+        var package = Path.Combine(harness.Project, "package");
+        var roots = new List<(string Root, bool ReadOnly)> { (package, true) };
+        typeof(AssetImporter).GetField("packageRoots", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(harness.Importer, roots);
+        var target = new DocumentEditor();
+        ((IList<UserPanelPage>)harness.Panels.Pages)
+            .Add(new UserPanelPage("package.panel", "Package", "Tools/Package", target));
+        var path = Path.Combine(package, "screen.ui");
+
+        Assert.True(harness.Importer.IsSourceReadOnly(path));
+        Assert.False(harness.Importer.IsSourceReadOnly(Path.Combine(harness.Root, "screen.ui")));
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(path, null));
+        Assert.True(target.IsReadOnly);
+    }
+
 }

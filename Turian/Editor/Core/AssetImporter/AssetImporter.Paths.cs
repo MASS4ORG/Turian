@@ -237,6 +237,15 @@ public sealed partial class AssetImporter
         return !IsUnderAssetsRoot(path);
     }
 
+    /// <summary>Whether the source belongs to a registered read-only package.</summary>
+    /// <param name="sourcePath">The source file or destination path.</param>
+    /// <returns>True when its containing package is read-only.</returns>
+    public bool IsSourceReadOnly(string sourcePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        return PackageRootOf(sourcePath) is { ReadOnly: true };
+    }
+
     /// <summary>The installed package whose folder holds <paramref name="path"/>, or null.</summary>
     (string Root, bool ReadOnly)? PackageRootOf(string path)
     {

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: editor brick panels, asset document editor routing and brick asset creation entries #70
+- Added: per-document-type layouts and per-tab panels
+- Fixed: bricks prebuilt with an older minor version of the engine load instead of falling back to source
+
 ## [5.4.0] - 2026-11-24
 
 - Added: CPU and GPU profiler #85

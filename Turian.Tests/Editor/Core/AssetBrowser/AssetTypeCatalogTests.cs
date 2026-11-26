@@ -18,6 +18,9 @@ public class AssetTypeCatalogTests
     [InlineData("Assets/Bottle.glb", AssetActivation.ExternalProgram)]
     [InlineData("Assets/Player.cs", AssetActivation.ExternalProgram)]
     [InlineData("Assets/LICENSE.txt", AssetActivation.ExternalProgram)]
+    [InlineData("Assets/Menu.ui", AssetActivation.ExternalProgram)]
+    [InlineData("Assets/Menu.pss", AssetActivation.ExternalProgram)]
+    [InlineData("Assets/Menu.uss", AssetActivation.None)]
     [InlineData("Assets/theme.mp3", AssetActivation.None)]
     [InlineData("Assets/no-extension", AssetActivation.None)]
     public void BuiltInKindsOpenTheWayTheirFilesAreEdited(string path, AssetActivation expected) =>

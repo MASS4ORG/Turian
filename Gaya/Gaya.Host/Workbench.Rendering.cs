@@ -91,7 +91,7 @@ public sealed partial class Workbench
             TrackFocus(gui, panelId);
             var context = new PanelHeaderContext(panelId, T(descriptor.Title), strip.FreeArea,
                 app.Focus.ActivePanelId == panelId, app.Services);
-            Resolve(descriptor).RenderHeader(gui, context);
+            InDocumentScope(gui, descriptor, "header", panel => panel.RenderHeader(gui, context));
         }
         catch (Exception ex)
         {
@@ -122,7 +122,7 @@ public sealed partial class Workbench
         using (gui.Node().Expand().Enter())
         {
             TrackFocus(gui, panelId);
-            Resolve(descriptor).Render(gui);
+            InDocumentScope(gui, descriptor, "body", panel => panel.Render(gui));
         }
     }
 
@@ -156,8 +156,15 @@ public sealed partial class Workbench
         || input.IsMouseButtonPressed(MouseButton.Middle);
 
     /// <inheritdoc />
-    public IPanel? Panel(string panelId) =>
-        descriptors.TryGetValue(panelId, out var descriptor) ? Resolve(descriptor) : null;
+    public IPanel? Panel(string panelId)
+    {
+        if (!descriptors.TryGetValue(panelId, out var descriptor) || !descriptor.AllowedIn(activeSlot.Kind))
+        {
+            return null;
+        }
+
+        return Resolve(descriptor, app.Documents.Active);
+    }
 
     /// <inheritdoc />
     public string Title(string panelId) =>

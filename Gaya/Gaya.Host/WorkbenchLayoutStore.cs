@@ -9,7 +9,7 @@ namespace Gaya.Host;
 /// <param name="FloatBounds">The floating window it was in, or null when it was docked.</param>
 public sealed record ParkedPanel(DockZone Zone, string? TabbedWith = null, Rect? FloatBounds = null);
 
-/// <summary>What the workbench persists: the dock tree and what it knows about the panels outside it.</summary>
+/// <summary>What the workbench persists for one layout: the dock tree and what it knows about the panels outside it.</summary>
 /// <param name="Layout">The dock arrangement.</param>
 /// <param name="KnownPanels">
 /// Every panel the layout has accounted for. A known panel missing from the tree was closed and stays
@@ -21,10 +21,19 @@ public sealed record WorkbenchLayoutState(
     HashSet<string> KnownPanels,
     Dictionary<string, ParkedPanel> ParkedPanels);
 
+/// <summary>Everything read from the layout file.</summary>
+/// <param name="Layouts">The saved layout of each document kind, by kind id, and of no document under its own key.</param>
+/// <param name="Legacy">
+/// The single layout an earlier version wrote, which seeds every kind that has none of its own; null for a current file.
+/// </param>
+public sealed record WorkbenchLayouts(
+    IReadOnlyDictionary<string, WorkbenchLayoutState> Layouts,
+    WorkbenchLayoutState? Legacy = null);
+
 /// <summary>
-/// Persists the workbench's <see cref="DockLayout"/> between runs. The file is a convenience, never a
-/// requirement: anything unreadable, from another schema version, or naming panels no plugin
-/// contributes is discarded and the layout is re-seeded from the registry.
+/// Persists the workbench's <see cref="DockLayout"/>s between runs, one per document kind plus one for no document. The
+/// file is a convenience, never a requirement: anything unreadable, from another schema version, or naming panels no
+/// plugin contributes is discarded and the layout is re-seeded from the registry.
 /// </summary>
 public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
 {
@@ -43,6 +52,12 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
     /// <summary>Height of the bottom dock row in a seeded layout.</summary>
     public const float DefaultBottomHeight = 240f;
 
+    /// <summary>The file format version this store writes; a file from a newer version is ignored.</summary>
+    public const int FormatVersion = 2;
+
+    /// <summary>The key the layout shown while no document is active is saved under, which no document kind may use.</summary>
+    public const string NoDocumentKey = "(none)";
+
     /// <summary>
     /// Where the layout is written: <c>~/.gaya/layout.json</c> unless the
     /// caller supplies its own path.
@@ -50,10 +65,11 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
     public string Path { get; } = path ?? UserConfigPath.For("layout.json");
 
     /// <summary>
-    /// Reads the saved layout, or returns null when there is nothing usable to read. A file holding
-    /// only a dock tree, as earlier versions wrote, comes back with no known panels.
+    /// Reads the saved layouts, or returns null when there is nothing usable to read. A file holding one layout, as
+    /// earlier versions wrote, comes back as <see cref="WorkbenchLayouts.Legacy"/>; a layout entry that cannot be read is
+    /// left out while the others are kept.
     /// </summary>
-    public WorkbenchLayoutState? Load()
+    public WorkbenchLayouts? Load()
     {
         try
         {
@@ -68,39 +84,38 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
                 return null;
             }
 
-            if (root["layout"] is not { } layoutNode)
-            {
-                return DockLayout.FromJson(text) is { } bare
-                    ? new WorkbenchLayoutState(bare, [], [])
-                    : null;
-            }
-
-            if (DockLayout.FromJson(layoutNode.ToJsonString()) is not { } layout)
-            {
-                return null;
-            }
-
-            var known = root["known"]?.Deserialize<HashSet<string>>(JsonOptions) ?? [];
-            known.UnionWith(layout.PanelIds);
-            var parked = root["parked"]?.Deserialize<Dictionary<string, ParkedPanelJson>>(JsonOptions) ?? [];
-
-            return new WorkbenchLayoutState(layout, known,
-                parked.ToDictionary(entry => entry.Key, entry => entry.Value.ToParked()));
+            return ReadRoot(root, text);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+                                       or InvalidOperationException or FormatException)
         {
             log.LogWarning(ex, "Could not read the workbench layout from {Path}", Path);
             return null;
         }
     }
 
+    /// <summary>Tells the current format from the single-layout formats and reads whichever the file holds.</summary>
+    WorkbenchLayouts? ReadRoot(JsonObject root, string text)
+    {
+        if (root["layouts"] is JsonObject layouts)
+        {
+            return root["version"]?.GetValue<int>() == FormatVersion ? new WorkbenchLayouts(ReadLayouts(layouts)) : null;
+        }
+
+        var legacy = root["layout"] is null
+            ? DockLayout.FromJson(text) is { } bare ? new WorkbenchLayoutState(bare, [], []) : null
+            : ReadEntry(root);
+        return legacy is null ? null : new WorkbenchLayouts(new Dictionary<string, WorkbenchLayoutState>(), legacy);
+    }
+
     /// <summary>
-    /// Writes the layout, creating the directory if needed. A failure is logged and swallowed — a
+    /// Writes the layouts, creating the directory if needed. A failure is logged and swallowed — a
     /// layout that cannot be saved must not take the editor down with it.
     /// </summary>
-    public void Save(WorkbenchLayoutState state)
+    /// <param name="layouts">The layout state of each kind by kind id, and of no document under <see cref="NoDocumentKey"/>.</param>
+    public void Save(IReadOnlyDictionary<string, WorkbenchLayoutState> layouts)
     {
-        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(layouts);
 
         try
         {
@@ -110,15 +125,20 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
                 Directory.CreateDirectory(directory);
             }
 
-            var root = new JsonObject
+            var entries = new JsonObject();
+            foreach (var (key, state) in layouts.OrderBy(static entry => entry.Key, StringComparer.Ordinal))
             {
-                ["layout"] = JsonNode.Parse(state.Layout.ToJson()),
-                ["known"] = JsonSerializer.SerializeToNode(state.KnownPanels.Order().ToList(), JsonOptions),
-                ["parked"] = JsonSerializer.SerializeToNode(
-                    state.ParkedPanels.ToDictionary(entry => entry.Key, entry => ParkedPanelJson.From(entry.Value)),
-                    JsonOptions),
-            };
+                entries[key] = new JsonObject
+                {
+                    ["layout"] = JsonNode.Parse(state.Layout.ToJson()),
+                    ["known"] = JsonSerializer.SerializeToNode(state.KnownPanels.Order().ToList(), JsonOptions),
+                    ["parked"] = JsonSerializer.SerializeToNode(
+                        state.ParkedPanels.ToDictionary(entry => entry.Key, entry => ParkedPanelJson.From(entry.Value)),
+                        JsonOptions),
+                };
+            }
 
+            var root = new JsonObject { ["version"] = FormatVersion, ["layouts"] = entries };
             File.WriteAllText(Path, root.ToJsonString(JsonOptions));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -126,6 +146,46 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
             log.LogWarning(ex, "Could not save the workbench layout to {Path}", Path);
         }
     }
+
+    Dictionary<string, WorkbenchLayoutState> ReadLayouts(JsonObject layouts)
+    {
+        var result = new Dictionary<string, WorkbenchLayoutState>();
+        foreach (var (key, node) in layouts)
+        {
+            try
+            {
+                if (node is JsonObject entry && ReadEntry(entry) is { } state)
+                {
+                    result[key] = state;
+                }
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+            {
+                log.LogWarning(ex, "Ignored the unreadable workbench layout {Layout} in {Path}", key, Path);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>Reads one layout with its known and parked panels, or null when the dock tree is unusable.</summary>
+    static WorkbenchLayoutState? ReadEntry(JsonObject entry)
+    {
+        if (entry["layout"] is not { } layoutNode
+            || DockLayout.FromJson(layoutNode.ToJsonString()) is not { } layout)
+        {
+            return null;
+        }
+
+        var known = Read<HashSet<string>>(entry["known"]);
+        known.UnionWith(layout.PanelIds);
+        var parked = Read<Dictionary<string, ParkedPanelJson>>(entry["parked"]);
+
+        return new WorkbenchLayoutState(layout, known,
+            parked.ToDictionary(static item => item.Key, static item => item.Value.ToParked()));
+    }
+
+    static T Read<T>(JsonNode? node) where T : new() => node is null ? new T() : node.Deserialize<T>(JsonOptions) ?? new T();
 
     /// <summary>The on-disk shape of a <see cref="ParkedPanel"/>; <see cref="Rect"/> has no JSON form of its own.</summary>
     sealed record ParkedPanelJson(DockZone Zone, string? TabbedWith, float[]? FloatBounds)

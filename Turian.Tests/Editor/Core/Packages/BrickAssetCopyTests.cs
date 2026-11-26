@@ -69,6 +69,20 @@ public sealed class BrickAssetCopyTests : IDisposable
         Assert.DoesNotContain(stats.ToString(), prefab, StringComparison.Ordinal);
     }
 
+    /// <summary>UI style sheets reference assets by id too, so remapping rewrites them along with the other sources.</summary>
+    [Fact]
+    public void RemappingRepointsUiStyleSheets()
+    {
+        var sheet = Path.Combine(project, "Assets", "Menu.pss");
+        File.WriteAllText(sheet, $"button {{ background-image = \"{stats}\"; }}\n");
+
+        var copy = Assert.Single(BrickService.CopyAssets(project, "user.mateo.stats", ["Runtime/Hero.dataasset"], "Stats", remapReferences: true));
+
+        var text = File.ReadAllText(sheet);
+        Assert.Contains(copy.NewId.ToString(), text, StringComparison.Ordinal);
+        Assert.DoesNotContain(stats.ToString(), text, StringComparison.Ordinal);
+    }
+
     /// <summary>Copying twice keeps both copies, and asking for an asset the brick lacks fails.</summary>
     [Fact]
     public void NamesStayUniqueAndMissingAssetsFail()

@@ -4,9 +4,9 @@ namespace Gaya.Plugin.Turian;
 /// The scene hierarchy: the open scene's nodes, expandable, with the selected one driving the
 /// inspector. A right-click offers rename, delete, copy, paste and node creation.
 /// </summary>
-sealed class SceneTreePanel : IPanel
+sealed class SceneTreePanel : IPanel, IDisposable
 {
-
+    readonly AssetManager assets;
     readonly TreeViewState state = new() { MultiSelect = true };
     readonly List<TreeItem> rows = [];
     readonly Dictionary<Node, string> keysByNode = [];
@@ -65,8 +65,20 @@ sealed class SceneTreePanel : IPanel
 
         // SceneLoaded covers opening, closing, reloading and the play-mode hierarchy swap; NodeUpdated
         // covers an edit to a node already on screen, such as a rename from the inspector.
-        sceneTree.SceneLoaded += _ => stale = true;
-        assets.NodeUpdated += _ => stale = true;
+        this.assets = assets;
+        sceneTree.SceneLoaded += OnSceneLoaded;
+        assets.NodeUpdated += OnNodeUpdated;
+    }
+
+    void OnSceneLoaded(Node? _) => stale = true;
+
+    void OnNodeUpdated(Node? _) => stale = true;
+
+    /// <summary>Stops following the controller and the asset manager once the tab this tree belongs to is gone.</summary>
+    public void Dispose()
+    {
+        sceneTree.SceneLoaded -= OnSceneLoaded;
+        assets.NodeUpdated -= OnNodeUpdated;
     }
 
     /// <summary>A node row carries its node id, so it can be dropped on a reference field.</summary>

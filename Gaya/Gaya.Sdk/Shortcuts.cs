@@ -396,7 +396,10 @@ public interface IFocusTracker
 /// </summary>
 public interface IPanelAccessor
 {
-    /// <summary>The panel's instance, created on first use, or null when no such panel is registered.</summary>
+    /// <summary>
+    /// The panel's instance, created on first use, or null when no such panel is registered. A document-bound panel
+    /// resolves to the active document's instance, and to null while no document of its kinds is active.
+    /// </summary>
     /// <param name="panelId">The panel to reach.</param>
     IPanel? Panel(string panelId);
 
@@ -428,6 +431,12 @@ public static class ShellCommands
 
     /// <summary>Brings the Bricks panel to the front.</summary>
     public const string Bricks = "gaya.shell.bricks";
+
+    /// <summary>Restores the active layout (the active document's kind, or no document) to its default arrangement.</summary>
+    public const string ResetLayout = "gaya.shell.resetLayout";
+
+    /// <summary>Restores every layout to its default arrangement.</summary>
+    public const string ResetAllLayouts = "gaya.shell.resetAllLayouts";
 }
 
 /// <summary>Ids of the panels the workbench itself contributes, before any plugin is configured.</summary>

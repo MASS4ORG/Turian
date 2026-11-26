@@ -38,6 +38,11 @@ public sealed class SceneTreeController(
     /// <summary>Gets the scene root being edited, ignoring any running play session.</summary>
     public Node? EditorSceneRoot => sceneRoot;
 
+    /// <summary>The loaded hierarchy of an open scene, whether or not it is the current one.</summary>
+    /// <param name="assetId">The scene's asset id.</param>
+    /// <returns>The scene root, or null when that scene is not loaded.</returns>
+    public Node? FindSceneRoot(Guid assetId) => loadedSceneRoots.GetValueOrDefault(assetId);
+
     /// <summary>
     /// Gets a value indicating whether the panels are currently showing a running play session
     /// rather than the scene being edited.
@@ -404,7 +409,11 @@ public sealed class SceneTreeController(
     public Node? FindNodeById(Guid nodeId)
         => CurrentSceneRoot is not null ? FindNodeById(CurrentSceneRoot, nodeId) : null;
 
-    static Node? FindNodeById(Node current, Guid id)
+    /// <summary>Searches the hierarchy under <paramref name="current"/> for a node by ID.</summary>
+    /// <param name="current">The root to search from.</param>
+    /// <param name="id">The node id.</param>
+    /// <returns>The node, or null when none has that id.</returns>
+    public static Node? FindNodeById(Node current, Guid id)
     {
         if (current.Id == id)
         {

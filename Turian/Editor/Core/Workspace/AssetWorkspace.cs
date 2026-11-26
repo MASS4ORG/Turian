@@ -103,7 +103,11 @@ public sealed class AssetWorkspace : IDisposable
 
         if (resolution == UnsavedChanges.Save && document.Asset is not null)
         {
-            assets.SaveAsset(document.Asset);
+            // A write that failed keeps the document open and dirty rather than losing its edits.
+            if (!assets.SaveAsset(document.Asset) && document.Asset.IsModified)
+            {
+                return;
+            }
         }
 
         if (document.Asset is not null)

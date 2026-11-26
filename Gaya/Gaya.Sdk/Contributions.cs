@@ -36,6 +36,20 @@ public interface IPanel
     void RenderHeader(Gui gui, PanelHeaderContext context) { }
 }
 
+/// <summary>
+/// Optional companion of <see cref="IPanel"/> for a panel that may refuse to be closed, such as one holding unsaved
+/// work. The workbench asks it when the user closes the panel from its tab or the View menu.
+/// </summary>
+public interface IPanelCloseGuard
+{
+    /// <summary>
+    /// Asks whether the panel may close. The panel stays open until <paramref name="decide"/> says otherwise, so an
+    /// answer may come later from a dialog.
+    /// </summary>
+    /// <param name="decide">Call exactly once: true closes the panel, false keeps it open.</param>
+    void RequestClose(Action<bool> decide);
+}
+
 /// <summary>Context for widgets owned by the active panel's tab strip.</summary>
 /// <param name="PanelId">The active panel instance's stable id.</param>
 /// <param name="Title">The panel instance's displayed title.</param>
@@ -62,6 +76,40 @@ public sealed record PanelDescriptor(
     /// asked for; after that the saved layout decides.
     /// </summary>
     public bool OpenByDefault { get; init; } = true;
+
+    /// <summary>
+    /// The document kinds a document-bound panel belongs to; empty for a global panel, which has one instance and may
+    /// join the layout of any kind. A document-bound panel joins only the layouts of these kinds and has one instance
+    /// per open document, built by <see cref="DocumentFactory"/>.
+    /// </summary>
+    public IReadOnlyList<string> DocumentKinds { get; init; } = [];
+
+    /// <summary>Creates a document-bound panel's instance for one document; required when <see cref="DocumentKinds"/> is set.</summary>
+    public Func<IServiceProvider, IDocument, IPanel>? DocumentFactory { get; init; }
+
+    /// <summary>Whether the panel has one instance per open document rather than a single global one.</summary>
+    public bool IsDocumentBound => DocumentKinds.Count > 0 && DocumentFactory is not null;
+
+    /// <summary>Whether the panel may appear in the layout of a kind; global panels may appear in every layout.</summary>
+    /// <param name="kind">The kind of the active document, or null for the no-document layout.</param>
+    /// <returns>True when the panel is global, or document-bound to <paramref name="kind"/>.</returns>
+    public bool AllowedIn(string? kind) =>
+        !IsDocumentBound || (kind is not null && DocumentKinds.Contains(kind));
+
+    /// <summary>Describes a panel with one instance per open document of the listed kinds.</summary>
+    /// <param name="id">Stable unique id.</param>
+    /// <param name="title">Title shown in the panel header / tab.</param>
+    /// <param name="defaultPlacement">Where a layout of one of the kinds docks it by default.</param>
+    /// <param name="documentKinds">The kinds whose layouts may hold the panel.</param>
+    /// <param name="factory">Creates the instance for a document, resolving its dependencies from the provider.</param>
+    /// <returns>The descriptor.</returns>
+    public static PanelDescriptor ForDocuments(string id, string title, PanelPlacement defaultPlacement,
+        IReadOnlyList<string> documentKinds, Func<IServiceProvider, IDocument, IPanel> factory) =>
+        new(id, title, defaultPlacement, static _ => throw new InvalidOperationException("Document panels need a document."))
+        {
+            DocumentKinds = documentKinds,
+            DocumentFactory = factory,
+        };
 }
 
 /// <summary>Collects <see cref="PanelDescriptor"/> contributions.</summary>

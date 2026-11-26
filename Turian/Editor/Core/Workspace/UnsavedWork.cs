@@ -6,17 +6,20 @@ namespace Turian.Editor.Core;
 /// </summary>
 /// <param name="workspace">The open documents.</param>
 /// <param name="autoSave">Asset edits waiting to be written.</param>
+/// <param name="documents">The document editors, which hold their own unsaved edits.</param>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class UnsavedWork(AssetWorkspace workspace, AssetAutoSave autoSave)
+public sealed class UnsavedWork(AssetWorkspace workspace, AssetAutoSave autoSave, AssetDocumentHost? documents = null)
 {
     /// <summary>Whether anything would be lost by leaving the project now.</summary>
-    public bool Any => workspace.HasUnsavedChanges || autoSave.HasPending;
+    public bool Any => workspace.HasUnsavedChanges || autoSave.HasPending || documents?.HasUnsavedChanges == true;
 
     /// <summary>Writes the pending asset edits and saves every document.</summary>
-    public void SaveAll()
+    /// <returns>False when a document editor could not write its document, so leaving must not go on.</returns>
+    public bool SaveAll()
     {
         autoSave.Flush(force: true);
         workspace.SaveAll();
+        return documents?.SaveAll() ?? true;
     }
 
     /// <summary>Drops the pending asset edits and closes the documents without saving them.</summary>
@@ -24,5 +27,6 @@ public sealed class UnsavedWork(AssetWorkspace workspace, AssetAutoSave autoSave
     {
         autoSave.Discard();
         workspace.CloseAll();
+        documents?.DiscardAll();
     }
 }

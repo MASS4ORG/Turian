@@ -109,6 +109,6 @@ public sealed partial class AssetTypeCatalog
         new("turian.text", "Text", [".txt", ".md", ".json", ".xml", ".csv", ".ini", ".strings"],
             AssetActivation.ExternalProgram, EditorIcons.Text),
         new("turian.uiDocument", "UI Document", [".ui"], AssetActivation.ExternalProgram, EditorIcons.UiDocument),
-        new("turian.uiStyleSheet", "UI Style Sheet", [".uss"], AssetActivation.ExternalProgram, EditorIcons.StyleSheet),
+        new("turian.uiStyleSheet", "UI Style Sheet", [".pss"], AssetActivation.ExternalProgram, EditorIcons.StyleSheet),
     ];
 }

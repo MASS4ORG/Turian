@@ -13,14 +13,16 @@ namespace Turian.Editor.Core;
 /// a preference.
 /// </remarks>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class UserPanelCatalog
+public sealed class UserPanelCatalog : IDisposable
 {
     readonly BuildManager buildManager;
     readonly ILogger log;
 
     readonly List<UserPanelPage> pages = [];
-    ReflectionAssembly? scanned;
-    bool scannedOnce;
+    readonly Dictionary<ReflectionAssembly, IReadOnlyList<UserPanelPage>> scanned = [];
+    bool disposed;
+    (int Ownership, int Loaded) editorGeneration = (-1, -1);
+    ReflectionAssembly[] editorAssemblies = [];
 
     /// <summary>Creates the catalog over the build manager that owns the user assembly.</summary>
     /// <param name="buildManager">Supplies the currently loaded user assembly.</param>
@@ -37,6 +39,50 @@ public sealed class UserPanelCatalog
     /// <summary>Raised after a rescan produced a different set of panels, so a shell can re-register them.</summary>
     public event Action? Changed;
 
+    /// <summary>Raised when a document editor panel should be shown.</summary>
+    public event Action<string>? OpenRequested;
+
+    internal AssetActivation? OpenDocument(string sourcePath, bool isReadOnly = false)
+    {
+        foreach (var page in Pages)
+        {
+            if (page.Target is IAssetDocumentEditor editor && Accepts(page, editor, sourcePath))
+            {
+                return OpenDocument(page, editor, sourcePath, isReadOnly);
+            }
+        }
+
+        return null;
+    }
+
+    bool Accepts(UserPanelPage page, IAssetDocumentEditor editor, string sourcePath)
+    {
+        try
+        {
+            return editor.CanOpen(sourcePath);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Document editor {Panel} could not check {Path}", page.Id, sourcePath);
+            return false;
+        }
+    }
+
+    AssetActivation OpenDocument(UserPanelPage page, IAssetDocumentEditor editor, string sourcePath, bool isReadOnly)
+    {
+        try
+        {
+            editor.Open(sourcePath, isReadOnly);
+            OpenRequested?.Invoke(page.Id);
+            return AssetActivation.Edit;
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Document editor {Panel} could not open {Path}", page.Id, sourcePath);
+            return AssetActivation.None;
+        }
+    }
+
     /// <summary>
     /// The panels user code currently contributes. Rescans when the user assembly has been swapped
     /// since the last call, which is what makes the panel list follow a recompile.
@@ -50,40 +96,105 @@ public sealed class UserPanelCatalog
         }
     }
 
-    /// <summary>Rescans if the user assembly changed. Cheap when it has not.</summary>
+    /// <summary>Refreshes panels when their contributing assemblies change.</summary>
     public void EnsureRefreshed()
     {
-        var current = buildManager.ActiveUserAssembly;
-        if (scannedOnce && ReferenceEquals(current, scanned))
+        if (disposed)
         {
             return;
         }
 
-        scanned = current;
-        scannedOnce = true;
-        Rescan(current);
-    }
-
-    void Rescan(ReflectionAssembly? assembly)
-    {
-        var previous = pages.Count;
-        pages.Clear();
-
-        if (assembly is not null)
+        var generation = (Ownership: BrickAssemblies.EditorGeneration, Loaded: BrickAssemblies.Generation);
+        if (editorGeneration != generation)
         {
-            foreach (var userAssembly in buildManager.ActiveUserAssemblies)
-            {
-                pages.AddRange(Scan(userAssembly, log));
-            }
+            editorAssemblies = [.. buildManager.LoadedAssemblies.Where(BrickAssemblies.IsEditorAssembly)];
+            editorGeneration = generation;
         }
 
-        log.LogDebug("User panels: {Count} page(s) from {Assembly}", pages.Count,
-            assembly?.GetName().Name ?? "no user assembly");
+        var current = buildManager.PanelUserAssemblies.Concat(editorAssemblies).Distinct().ToArray();
+        Refresh(current);
+    }
 
+    internal IReadOnlyList<UserPanelPage> Refresh(IReadOnlyCollection<ReflectionAssembly> current)
+    {
+        var removed = RemoveAssemblies(current, out var changed);
+        changed |= AddAssemblies(current);
+
+        if (!changed)
+        {
+            return pages;
+        }
+
+        var previous = pages.Count;
+        pages.Clear();
+        pages.AddRange(scanned.Values.SelectMany(static value => value));
         if (previous != 0 || pages.Count != 0)
         {
             Changed?.Invoke();
         }
+
+        DisposePages(removed);
+        return pages;
+    }
+
+    List<UserPanelPage> RemoveAssemblies(IReadOnlyCollection<ReflectionAssembly> current, out bool changed)
+    {
+        var gone = scanned.Keys.Except(current).ToArray();
+        changed = gone.Length > 0;
+        var removed = new List<UserPanelPage>();
+        foreach (var assembly in gone)
+        {
+            removed.AddRange(scanned[assembly]);
+            scanned.Remove(assembly);
+        }
+
+        return removed;
+    }
+
+    bool AddAssemblies(IReadOnlyCollection<ReflectionAssembly> current)
+    {
+        var changed = false;
+        foreach (var assembly in current)
+        {
+            if (!scanned.ContainsKey(assembly))
+            {
+                scanned.Add(assembly, Scan(assembly, log));
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    void DisposePages(IEnumerable<UserPanelPage> removed)
+    {
+        foreach (var page in removed)
+        {
+            if (page.Target is IDisposable disposable)
+            {
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "User panel {Panel} could not be disposed", page.Id);
+                }
+            }
+        }
+    }
+
+    /// <summary>Releases the catalog's panel instances.</summary>
+    public void Dispose()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
+        editorAssemblies = [];
+        Refresh([]);
     }
 
     /// <summary>
