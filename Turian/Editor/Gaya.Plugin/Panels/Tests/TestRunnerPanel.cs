@@ -2,7 +2,7 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>Lists and runs project component tests and displays failures at their source line.</summary>
 sealed class TestRunnerPanel(SettingsService settings, BackgroundTaskRunner tasks, PlayModeService play,
-    BuildManager build, ILogger logger) : IPanel
+    BuildManager build, UnsavedWork unsaved, ILogger logger) : IPanel
 {
     sealed record Completion(string Project, SceneTestReport Report);
     Completion? completed;
@@ -91,6 +91,7 @@ sealed class TestRunnerPanel(SettingsService settings, BackgroundTaskRunner task
     void Start(bool listOnly)
     {
         if (settings.Settings is not { } current || running) { return; }
+        if (!unsaved.SaveBefore("run component tests")) { return; }
         var snapshot = (BuildAppSettings)new BuildAppSettings().Load(current);
         var selection = filter;
         running = true;

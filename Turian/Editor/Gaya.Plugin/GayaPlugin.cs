@@ -190,7 +190,8 @@ public sealed class GayaPlugin : IPlugin
         TestRunnerPanelId, "Test Runner", PanelPlacement.Center,
         static sp => new TestRunnerPanel(sp.GetRequiredService<SettingsService>(),
             sp.GetRequiredService<BackgroundTaskRunner>(), sp.GetRequiredService<PlayModeService>(),
-            sp.GetRequiredService<BuildManager>(), sp.GetRequiredService<ILogger>()))
+            sp.GetRequiredService<BuildManager>(), sp.GetRequiredService<UnsavedWork>(),
+            sp.GetRequiredService<ILogger>()))
     { OpenByDefault = false });
 
     static void RegisterShellChrome(IPluginContext context)

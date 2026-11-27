@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: asset reimport signal on the asset database #422
 - Added: workspace documents #420
 - Fixed: open read-only assets from the asset browser #449
+- Fixed: save work before component tests #448
 
 ## [5.4.0] - 2026-11-24
 

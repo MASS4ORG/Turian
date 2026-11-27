@@ -16,6 +16,7 @@ public sealed class AssetReimportSignalTests : IDisposable
         var settings = new SettingsService();
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
         importer = new AssetImporter(NullLogger.Instance, database, settings);
+        importer.StopMonitoring();
         importer.GenerateMetaFiles(Path.Combine(project, "Assets"));
         database.AssetReimported += reimported.Add;
     }
@@ -36,16 +37,13 @@ public sealed class AssetReimportSignalTests : IDisposable
         importer.ReimportNow(source);
         var id = Asset.Load($"{source}.meta")!.Id;
 
-        // The project's file watcher may import the same write too, so only the first raise is pinned.
-        Assert.NotEmpty(reimported);
-        Assert.All(reimported.ToArray(), raised => Assert.Equal(id, raised));
+        Assert.Equal(id, Assert.Single(reimported));
         Assert.True(database.Assets.ContainsKey(id));
 
-        var before = reimported.Count;
         File.WriteAllText(source, "two");
         importer.ReimportNow(source);
 
-        Assert.True(reimported.Count > before);
+        Assert.Equal([id, id], reimported);
     }
 
     /// <summary>The initial scan imports many assets without telling subscribers about each.</summary>
