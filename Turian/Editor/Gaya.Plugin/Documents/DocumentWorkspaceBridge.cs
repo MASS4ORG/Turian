@@ -29,31 +29,19 @@ sealed class DocumentWorkspaceBridge : IDisposable
         workspace.Activated += OnActivated;
     }
 
-    void OnOpened(AssetWrapper tab)
-    {
-        if (tab.Asset is not null)
-        {
-            documents.Open(AssetDocument.For(tab));
-        }
-    }
+    void OnOpened(AssetWrapper tab) => documents.Open(AssetDocument.For(tab));
 
-    void OnClosed(AssetWrapper tab)
-    {
-        if (tab.Asset is { } asset)
-        {
-            documents.Close(asset.Id.ToString());
-        }
-    }
+    void OnClosed(AssetWrapper tab) => documents.Close(tab.Id);
 
     void OnActivated(AssetWrapper? tab)
     {
-        if (tab?.Asset is { } asset)
+        if (tab is null)
         {
-            documents.Activate(asset.Id.ToString());
+            documents.Deactivate();
         }
         else
         {
-            documents.Deactivate();
+            documents.Activate(tab.Id);
         }
     }
 

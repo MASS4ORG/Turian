@@ -44,6 +44,10 @@ public interface IDocumentKindRegistry
     /// <summary>Adds a document kind. Re-adding the same id replaces the earlier one.</summary>
     /// <param name="kind">The kind to register.</param>
     void Register(DocumentKind kind);
+
+    /// <summary>Removes a document kind, for a contributor whose set changes at runtime.</summary>
+    /// <param name="kindId">The kind to remove.</param>
+    void Remove(string kindId);
 }
 
 /// <summary>

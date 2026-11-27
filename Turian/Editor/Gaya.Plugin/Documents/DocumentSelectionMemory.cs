@@ -4,13 +4,15 @@ namespace Gaya.Plugin.Turian;
 /// Gives each scene tab its own node selection on top of the one global inspector selection: leaving a tab remembers
 /// which nodes were selected there, and activating a tab selects its remembered nodes again, so the Inspector always
 /// shows the active tab's selection. Nodes are remembered by id and looked up in the tab's own hierarchy, so a rebuilt
-/// scene keeps its selection.
+/// scene keeps its selection. A document's other subjects are deselected when it is left, and so is whatever a removed
+/// inspector source described.
 /// </summary>
 sealed class DocumentSelectionMemory : IDisposable
 {
     readonly IDocumentService documents;
     readonly NodeInspectorController inspector;
     readonly SceneTreeController sceneTree;
+    readonly InspectorSourceCatalog? sources;
     readonly Dictionary<string, Remembered> remembered = [];
     string? current;
 
@@ -20,15 +22,21 @@ sealed class DocumentSelectionMemory : IDisposable
     /// <param name="documents">The workbench's documents.</param>
     /// <param name="inspector">The global selection.</param>
     /// <param name="sceneTree">Where each open scene's hierarchy is found.</param>
+    /// <param name="sources">Tells which selected objects live with a document; none do when null.</param>
     public DocumentSelectionMemory(IDocumentService documents, NodeInspectorController inspector,
-        SceneTreeController sceneTree)
+        SceneTreeController sceneTree, InspectorSourceCatalog? sources = null)
     {
         this.documents = documents;
         this.inspector = inspector;
         this.sceneTree = sceneTree;
+        this.sources = sources;
         current = documents.Active?.Id;
         documents.ActiveChanged += OnActiveChanged;
         documents.Closed += OnClosed;
+        if (sources is not null)
+        {
+            sources.Removed += OnSourceRemoved;
+        }
     }
 
     void OnActiveChanged(IDocument? document)
@@ -45,6 +53,8 @@ sealed class DocumentSelectionMemory : IDisposable
             {
                 remembered.Remove(previous);
             }
+
+            Deselect(selected => sources?.IsSubject(selected) == true);
         }
 
         current = document?.Id;
@@ -52,6 +62,20 @@ sealed class DocumentSelectionMemory : IDisposable
     }
 
     void OnClosed(IDocument document) => remembered.Remove(document.Id);
+
+    void OnSourceRemoved(IInspectorSource removed) => Deselect(selected =>
+        selected is not (Node or Component) && sources!.Accepts(removed, selected)
+                                            && sources.SourceFor(selected) is null);
+
+    void Deselect(Func<object, bool> leaving)
+    {
+        var selected = inspector.Selection.Objects;
+        var kept = selected.Where(item => !leaving(item)).ToList();
+        if (kept.Count != selected.Count)
+        {
+            inspector.SelectMany(kept, inspector.SelectedObject);
+        }
+    }
 
     /// <summary>
     /// Selects the nodes remembered for the tab. A tab with nothing remembered clears node selections left over from the
@@ -92,5 +116,9 @@ sealed class DocumentSelectionMemory : IDisposable
     {
         documents.ActiveChanged -= OnActiveChanged;
         documents.Closed -= OnClosed;
+        if (sources is not null)
+        {
+            sources.Removed -= OnSourceRemoved;
+        }
     }
 }

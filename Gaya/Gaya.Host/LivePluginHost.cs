@@ -19,7 +19,7 @@ sealed class LivePluginHost : IDisposable
         this.studio = studio;
         this.logger = logger;
         project = app.Services.GetService<IProjectEditorBricks>();
-        context = new(app.Services, app.Panels, app.Commands, app.Menus);
+        context = new(app.Services, app.Panels, app.Commands, app.Menus) { DocumentKinds = app.DocumentKinds };
         studio.Applied += ReadStudio;
         ReadStudio(true);
         Refresh();

@@ -124,6 +124,9 @@ public sealed class DocumentKindRegistry : IDocumentKindRegistry
         kinds[kind.Id] = kind;
     }
 
+    /// <inheritdoc />
+    public void Remove(string kindId) => kinds.Remove(kindId);
+
     /// <summary>Looks a kind up by id.</summary>
     /// <param name="id">The kind id.</param>
     /// <returns>The kind, or null when none is registered under that id.</returns>

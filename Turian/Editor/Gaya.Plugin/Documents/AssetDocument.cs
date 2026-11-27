@@ -6,8 +6,8 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed class AssetDocument : IDocument
 {
-    /// <summary>The id of the kind every non-scene workspace tab belongs to.</summary>
-    public const string KindId = "turian.asset";
+    /// <summary>The id of the kind every non-scene asset tab belongs to.</summary>
+    public const string KindId = WorkspaceDocumentKinds.Asset;
 
     /// <summary>Adapts an open workspace tab.</summary>
     /// <param name="wrapper">The tab; it must wrap an asset.</param>
@@ -33,7 +33,15 @@ sealed class AssetDocument : IDocument
     /// <summary>The kind of every non-scene tab: it owns no panels.</summary>
     public static DocumentKind AssetKind { get; } = new(KindId, "Asset");
 
-    /// <summary>Adapts a workspace tab as the document its asset calls for: a scene for prefabs, an asset otherwise.</summary>
-    /// <param name="tab">The tab; it must wrap an asset.</param>
-    public static IDocument For(AssetWrapper tab) => tab.Asset is Prefab ? new SceneDocument(tab) : new AssetDocument(tab);
+    /// <summary>
+    /// Adapts a workspace tab as the document it calls for: a scene for prefabs, an asset for other assets, otherwise
+    /// the contributed document.
+    /// </summary>
+    /// <param name="tab">The tab.</param>
+    public static IDocument For(AssetWrapper tab) => tab.Asset switch
+    {
+        Prefab => new SceneDocument(tab),
+        not null => new AssetDocument(tab),
+        null => new ContributedDocument(tab),
+    };
 }

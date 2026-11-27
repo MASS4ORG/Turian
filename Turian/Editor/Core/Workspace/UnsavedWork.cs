@@ -14,12 +14,12 @@ public sealed class UnsavedWork(AssetWorkspace workspace, AssetAutoSave autoSave
     public bool Any => workspace.HasUnsavedChanges || autoSave.HasPending || documents?.HasUnsavedChanges == true;
 
     /// <summary>Writes the pending asset edits and saves every document.</summary>
-    /// <returns>False when a document editor could not write its document, so leaving must not go on.</returns>
+    /// <returns>False when a document could not be written, so leaving must not go on.</returns>
     public bool SaveAll()
     {
         autoSave.Flush(force: true);
-        workspace.SaveAll();
-        return documents?.SaveAll() ?? true;
+        var saved = workspace.SaveAll();
+        return (documents?.SaveAll() ?? true) && saved;
     }
 
     /// <summary>Drops the pending asset edits and closes the documents without saving them.</summary>

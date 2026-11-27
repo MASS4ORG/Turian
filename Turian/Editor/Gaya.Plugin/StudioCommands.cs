@@ -73,15 +73,15 @@ static class StudioCommands
             {
                 if (!sp.GetRequiredService<AssetDocumentHost>().Undo())
                 {
-                    sp.GetRequiredService<UndoService>().Undo();
+                    ActiveHistory(sp).Undo();
                 }
             },
             static sp => sp.GetRequiredService<AssetDocumentHost>().Active is not null
                 ? sp.GetRequiredService<AssetDocumentHost>().CanUndo
-                : sp.GetRequiredService<UndoService>().CanUndo)
+                : ActiveHistory(sp).CanUndo)
         {
             DynamicLabel = static sp => StepLabel(sp, "Undo", sp.GetRequiredService<AssetDocumentHost>().Active is null
-            ? sp.GetRequiredService<UndoService>().UndoLabel : null)
+            ? ActiveHistory(sp).UndoLabel : null)
         });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.undo", KeyboardKey.Z, KeyModifiers.Ctrl));
         Add(context, MenuIds.Edit, "0", 1, new CommandDescriptor(
@@ -90,15 +90,15 @@ static class StudioCommands
             {
                 if (!sp.GetRequiredService<AssetDocumentHost>().Redo())
                 {
-                    sp.GetRequiredService<UndoService>().Redo();
+                    ActiveHistory(sp).Redo();
                 }
             },
             static sp => sp.GetRequiredService<AssetDocumentHost>().Active is not null
                 ? sp.GetRequiredService<AssetDocumentHost>().CanRedo
-                : sp.GetRequiredService<UndoService>().CanRedo)
+                : ActiveHistory(sp).CanRedo)
         {
             DynamicLabel = static sp => StepLabel(sp, "Redo", sp.GetRequiredService<AssetDocumentHost>().Active is null
-            ? sp.GetRequiredService<UndoService>().RedoLabel : null)
+            ? ActiveHistory(sp).RedoLabel : null)
         });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Z, KeyModifiers.Ctrl | KeyModifiers.Shift));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Y, KeyModifiers.Ctrl));
@@ -209,6 +209,11 @@ static class StudioCommands
             static sp => sp.GetRequiredService<AboutDialogChrome>().Open())
         { DynamicLabel = Localized("About") });
     }
+
+    // With no document open, project-wide steps such as moving files stay reachable.
+    static IDocumentHistory ActiveHistory(IServiceProvider services) =>
+        services.GetRequiredService<AssetWorkspace>().Active?.History
+        ?? new UndoServiceHistory(services.GetRequiredService<UndoService>);
 
     /// <summary>"Undo Rename" or plain "Undo" when there is nothing to name.</summary>
     static string StepLabel(IServiceProvider services, string action, string? step)

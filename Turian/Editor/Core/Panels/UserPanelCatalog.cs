@@ -15,24 +15,23 @@ namespace Turian.Editor.Core;
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed class UserPanelCatalog : IDisposable
 {
-    readonly BuildManager buildManager;
+    readonly EditorAssemblySet assemblies;
     readonly ILogger log;
 
     readonly List<UserPanelPage> pages = [];
     readonly Dictionary<ReflectionAssembly, IReadOnlyList<UserPanelPage>> scanned = [];
     bool disposed;
-    (int Ownership, int Loaded) editorGeneration = (-1, -1);
-    ReflectionAssembly[] editorAssemblies = [];
 
     /// <summary>Creates the catalog over the build manager that owns the user assembly.</summary>
     /// <param name="buildManager">Supplies the currently loaded user assembly.</param>
     /// <param name="log">Where a page that cannot be created is reported.</param>
-    public UserPanelCatalog(BuildManager buildManager, ILogger log)
+    /// <param name="assemblies">The assemblies to scan; one over <paramref name="buildManager"/> when omitted.</param>
+    public UserPanelCatalog(BuildManager buildManager, ILogger log, EditorAssemblySet? assemblies = null)
     {
         ArgumentNullException.ThrowIfNull(buildManager);
         ArgumentNullException.ThrowIfNull(log);
 
-        this.buildManager = buildManager;
+        this.assemblies = assemblies ?? new EditorAssemblySet(buildManager);
         this.log = log;
     }
 
@@ -104,15 +103,7 @@ public sealed class UserPanelCatalog : IDisposable
             return;
         }
 
-        var generation = (Ownership: BrickAssemblies.EditorGeneration, Loaded: BrickAssemblies.Generation);
-        if (editorGeneration != generation)
-        {
-            editorAssemblies = [.. buildManager.LoadedAssemblies.Where(BrickAssemblies.IsEditorAssembly)];
-            editorGeneration = generation;
-        }
-
-        var current = buildManager.PanelUserAssemblies.Concat(editorAssemblies).Distinct().ToArray();
-        Refresh(current);
+        Refresh(assemblies.Current);
     }
 
     internal IReadOnlyList<UserPanelPage> Refresh(IReadOnlyCollection<ReflectionAssembly> current)
@@ -193,7 +184,6 @@ public sealed class UserPanelCatalog : IDisposable
         }
 
         disposed = true;
-        editorAssemblies = [];
         Refresh([]);
     }
 

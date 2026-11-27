@@ -6,8 +6,8 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed class SceneDocument : IDocument
 {
-    /// <summary>The id of the one document kind every workspace tab belongs to.</summary>
-    public const string KindId = "turian.scene";
+    /// <summary>The id of the document kind every scene and prefab tab belongs to.</summary>
+    public const string KindId = WorkspaceDocumentKinds.Scene;
 
     /// <summary>Adapts an open workspace tab.</summary>
     /// <param name="wrapper">The tab; it must wrap an asset.</param>

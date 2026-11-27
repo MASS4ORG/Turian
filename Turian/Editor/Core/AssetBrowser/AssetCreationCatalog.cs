@@ -27,7 +27,7 @@ public sealed class AssetCreationCatalog : IDisposable
     readonly SettingsService settings;
     readonly BuildManager buildManager;
     readonly ILogger log;
-    readonly IReadOnlyList<IAssetCreationProvider> providers;
+    readonly List<IAssetCreationProvider> providers;
 
     readonly List<AssetCreationKind> kinds = [];
     ReflectionAssembly[] scanned = [];
@@ -51,8 +51,23 @@ public sealed class AssetCreationCatalog : IDisposable
         this.settings = settings;
         this.buildManager = buildManager;
         this.log = log;
-        this.providers = providers?.ToArray() ?? [];
+        this.providers = [.. providers ?? []];
         buildManager.UserAssembliesChanged += Invalidate;
+    }
+
+    /// <summary>Adds the entries of a brick that is active, on the UI thread.</summary>
+    /// <param name="provider">The brick's entries.</param>
+    /// <returns>The registration; disposing it removes them.</returns>
+    public IDisposable Add(IAssetCreationProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        providers.Add(provider);
+        Invalidate();
+        return new ContributionLifetime(() =>
+        {
+            providers.Remove(provider);
+            Invalidate();
+        });
     }
 
     /// <summary>The kinds currently offered, built-ins first.</summary>
@@ -81,11 +96,25 @@ public sealed class AssetCreationCatalog : IDisposable
         kinds.Add(new AssetCreationKind("Folder", fileSystem.DefaultFolderName));
         kinds.Add(new AssetCreationKind("Scene", fileSystem.DefaultSceneName));
         kinds.Add(new AssetCreationKind("Material", fileSystem.DefaultMaterialName));
-        // Providers outlive brick changes until restart, so their kinds follow the same enabled-brick filter.
+        // Providers from dependency injection outlive brick changes until restart, so their kinds follow the same
+        // enabled-brick filter.
         kinds.AddRange(Scan(current, log)
-            .Concat(providers.SelectMany(static provider => provider.Kinds)
+            .Concat(providers.SelectMany(KindsOf)
                 .Where(static kind => OwnerOf(kind) is not { } owner || !BrickAssemblies.IsRetired(owner)))
             .DistinctBy(static kind => (kind.PayloadType, kind.PayloadType is null ? kind.MenuPath : null)));
+    }
+
+    IReadOnlyList<AssetCreationKind> KindsOf(IAssetCreationProvider provider)
+    {
+        try
+        {
+            return [.. provider.Kinds];
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "New menu: {Provider} could not list its entries", provider.GetType().FullName);
+            return [];
+        }
     }
 
     /// <inheritdoc />

@@ -37,11 +37,23 @@ public sealed class AssetOpenService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
 
-        if (panels?.OpenDocument(absolutePath, isReadOnly || importer?.IsSourceReadOnly(absolutePath) == true) is { } documentActivation)
+        return OpenDocument(absolutePath, isReadOnly) ?? OpenByType(absolutePath, metadata);
+    }
+
+    // A kind that claims the file keeps it, so a document that fails to open does not fall through to another opener.
+    AssetActivation? OpenDocument(string absolutePath, bool isReadOnly)
+    {
+        var readOnly = isReadOnly || importer?.IsSourceReadOnly(absolutePath) == true;
+        if (workspace.KindFor(absolutePath) is null)
         {
-            return documentActivation;
+            return panels?.OpenDocument(absolutePath, readOnly);
         }
 
+        return workspace.Open(absolutePath, readOnly) is null ? AssetActivation.None : AssetActivation.Edit;
+    }
+
+    AssetActivation OpenByType(string absolutePath, Asset? metadata)
+    {
         var activation = types.ActivationFor(absolutePath);
 
         switch (activation)
