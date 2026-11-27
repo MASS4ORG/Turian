@@ -1,24 +1,29 @@
 namespace Turian.Tests;
 
-/// <summary>Checks the question asked when a document editor closes with unsaved edits.</summary>
+/// <summary>Checks the question asked when the user leaves a project with unsaved documents.</summary>
 [Collection(SerialTests.Name)]
 public sealed class UnsavedChangesGuardTests : IDisposable
 {
     readonly AssetBrowserHarness harness = new();
+    readonly DocumentProject project = new();
     readonly UnsavedChangesDialogChrome dialog = new(new StudioLocalization());
     readonly UnsavedChangesGuard guard;
-    readonly AssetDocumentHostTests.DocumentFixture session = new();
+    int left;
 
-    /// <summary>Creates the guard over the real dialog.</summary>
+    /// <summary>Creates the guard over the real dialog and a workspace with a contributed document kind.</summary>
     public UnsavedChangesGuardTests()
     {
-        var unsaved = new UnsavedWork(harness.Workspace, new AssetAutoSave(
-            new AssetInspectionService(null!, new AssetTypeCatalog(), harness.Settings, null!, NullLogger.Instance)));
+        var unsaved = new UnsavedWork(project.Workspace, new AssetAutoSave(
+            new AssetInspectionService(null!, new AssetTypeCatalog(), project.Settings, null!, NullLogger.Instance)));
         guard = new UnsavedChangesGuard(unsaved, dialog, new StudioLocalization());
     }
 
     /// <inheritdoc />
-    public void Dispose() => harness.Dispose();
+    public void Dispose()
+    {
+        project.Dispose();
+        harness.Dispose();
+    }
 
     void Frame() => harness.Frame(dialog.Render);
 
@@ -40,45 +45,54 @@ public sealed class UnsavedChangesGuardTests : IDisposable
         Frame();
     }
 
-    /// <summary>Save and Don't Save report the choice and never the cancel callback.</summary>
-    [Theory]
-    [InlineData(0, UnsavedChanges.Save)]
-    [InlineData(1, UnsavedChanges.Discard)]
-    public void ChoicesAreReported(int button, UnsavedChanges expected)
-    {
-        UnsavedChanges? choice = null;
-        var cancelled = 0;
-        guard.AskClose(session, answer => choice = answer, () => cancelled++);
+    void Leave() => guard.Leave("Save them?", () => left++);
 
+    /// <summary>With nothing unsaved the project is left at once.</summary>
+    [Fact]
+    public void ACleanProjectIsLeftWithoutAQuestion()
+    {
+        project.OpenFake("menu");
+
+        Assert.False(guard.HasUnsavedChanges);
+        Leave();
+
+        Assert.Equal(1, left);
+    }
+
+    /// <summary>Save writes the documents before leaving, Don't Save drops them, and Cancel keeps everything.</summary>
+    [Theory]
+    [InlineData(0, 1, 1)]
+    [InlineData(1, 1, 0)]
+    [InlineData(2, 0, 0)]
+    public void TheChoiceDecidesWhatHappensToTheDocuments(int button, int leaves, int saves)
+    {
+        var (_, document) = project.OpenFake("menu");
+        document.Edit();
+        Assert.True(guard.HasUnsavedChanges);
+
+        Leave();
+        Assert.Equal(0, left);
         Press(button);
 
-        Assert.Equal(expected, choice);
-        Assert.Equal(0, cancelled);
+        Assert.Equal(leaves, left);
+        Assert.Equal(saves, document.Saves.Count);
+        Assert.Equal(button == 1, document.Disposed);
+        Assert.Equal(button == 2, guard.HasUnsavedChanges);
     }
 
-    /// <summary>Cancel reports a cancel exactly once and no choice.</summary>
+    /// <summary>A document that cannot be written keeps the project open with its edits.</summary>
     [Fact]
-    public void CancelIsReported()
+    public void AFailedSaveKeepsTheProjectOpen()
     {
-        UnsavedChanges? choice = null;
-        var cancelled = 0;
-        guard.AskClose(session, answer => choice = answer, () => cancelled++);
+        var (tab, document) = project.OpenFake("menu");
+        document.Edit();
+        document.SaveFailure = "locked";
 
-        Press(2);
-        Frame();
+        Leave();
+        Press(0);
 
-        Assert.Null(choice);
-        Assert.Equal(1, cancelled);
-    }
-
-    /// <summary>A new question while one is open cancels the earlier one.</summary>
-    [Fact]
-    public void ANewQuestionCancelsThePendingOne()
-    {
-        var cancelled = 0;
-        guard.AskClose(session, _ => { }, () => cancelled++);
-        guard.AskClose(session, _ => { }, () => cancelled += 10);
-
-        Assert.Equal(1, cancelled);
+        Assert.Equal(0, left);
+        Assert.True(tab.IsDirty);
+        Assert.Same(tab, Assert.Single(project.Workspace.Documents));
     }
 }

@@ -63,7 +63,8 @@ public sealed partial class AssetWorkspace
 
     // A source that is open again, gone, or no longer claimed stays as it is.
     bool CanReturn(IWorkspaceDocumentKind kind, WithdrawnTab tab) =>
-        Find(tab.AssetId.ToString()) is null && File.Exists(tab.Path) && Claims(kind, tab.Path);
+        Find(tab.AssetId.ToString()) is null && File.Exists(tab.Path)
+        && WorkspaceDocumentKindRegistry.Claims(kind, tab.Path);
 
     void Restore(IWorkspaceDocumentKind kind, WithdrawnTab tab)
     {

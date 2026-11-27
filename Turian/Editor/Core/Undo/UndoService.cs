@@ -167,8 +167,27 @@ public sealed class UndoService : IDisposable
             { UndoEffect = revert, RedoEffect = perform }, mergeable: false);
         }
 
+        JoinGesture();
         WatchSelection();
         Changed?.Invoke();
+    }
+
+    // Within a gesture, a performed change joins the step the gesture already made in the same document.
+    void JoinGesture()
+    {
+        if (gestures == 0)
+        {
+            return;
+        }
+
+        if (history.UndoSteps is [.., var earlier, var latest] && earlier.Id == gestureStep
+            && earlier.Document == latest.Document)
+        {
+            history.JoinLatest();
+            return;
+        }
+
+        gestureStep = history.UndoSteps[^1].Id;
     }
 
     /// <summary>Starts a gesture, such as a gizmo drag: everything it changes, however long, is one step.</summary>

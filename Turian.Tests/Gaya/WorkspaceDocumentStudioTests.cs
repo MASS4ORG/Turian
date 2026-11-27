@@ -77,9 +77,7 @@ public sealed class WorkspaceDocumentStudioTests : IDisposable
             Substitute.For<ISceneManager>(), new AssetDatabase());
         using var undo = new UndoService(tree, inspector, project.Assets, loader);
         project.Undo = undo;
-        using var panels = new AssetBrowserHarness();
-        using var host = new AssetDocumentHost(panels.Panels, project.Settings, project.Assets, NullLogger.Instance);
-        using var services = new ServiceCollection().AddSingleton(host).AddSingleton(project.Workspace)
+        using var services = new ServiceCollection().AddSingleton(project.Workspace)
             .AddSingleton(undo).AddSingleton(new StudioLocalization()).BuildServiceProvider();
         var context = Substitute.For<IPluginContext>();
         StudioCommands.Register(context);
@@ -278,9 +276,7 @@ public sealed class WorkspaceDocumentStudioTests : IDisposable
             Substitute.For<ISceneManager>(), new AssetDatabase());
         using var undo = new UndoService(tree, inspector, project.Assets, loader);
         project.Undo = undo;
-        using var panels = new AssetBrowserHarness();
-        using var host = new AssetDocumentHost(panels.Panels, project.Settings, project.Assets, NullLogger.Instance);
-        using var services = new ServiceCollection().AddSingleton(host).AddSingleton(project.Workspace)
+        using var services = new ServiceCollection().AddSingleton(project.Workspace)
             .AddSingleton(undo).AddSingleton(new StudioLocalization()).BuildServiceProvider();
         var context = Substitute.For<IPluginContext>();
         StudioCommands.Register(context);
@@ -338,11 +334,13 @@ public sealed class WorkspaceDocumentStudioTests : IDisposable
         var package = Path.Combine(browser.Project, "package");
         typeof(AssetImporter).GetField("packageRoots", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(browser.Importer, new List<(string Root, bool ReadOnly)> { (package, true) });
-        using var services = new ServiceCollection().AddSingleton(browser.Importer).BuildServiceProvider();
         var kind = new FakeDocumentKind();
-        using var workspace = new AssetWorkspace(new AssetManager(), browser.Settings, [kind], services);
-        var opener = new AssetOpenService(new AssetTypeCatalog(), workspace, null!, browser.Inspector, null!,
-            NullLogger.Instance, browser.Panels, browser.Importer);
+        var registry = new WorkspaceDocumentKindRegistry([kind]);
+        using var services = new ServiceCollection().AddSingleton(browser.Importer).AddSingleton(registry)
+            .BuildServiceProvider();
+        using var workspace = new AssetWorkspace(new AssetManager(), browser.Settings, services: services);
+        var opener = new AssetOpenService(new AssetTypeCatalog([], registry), workspace, null!, browser.Inspector,
+            null!, NullLogger.Instance, browser.Importer);
         var source = Write(Path.Combine(package, "screen.fake"));
 
         Assert.Equal(AssetActivation.Edit, opener.Open(source, null));

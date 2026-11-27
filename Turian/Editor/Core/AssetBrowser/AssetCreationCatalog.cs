@@ -55,6 +55,12 @@ public sealed class AssetCreationCatalog : IDisposable
         buildManager.UserAssembliesChanged += Invalidate;
     }
 
+    /// <summary>
+    /// Raised when the offered kinds may differ from those read last, possibly on a background thread, so a menu built
+    /// from <see cref="Kinds"/> reads them again.
+    /// </summary>
+    public event Action? Changed;
+
     /// <summary>Adds the entries of a brick that is active, on the UI thread.</summary>
     /// <param name="provider">The brick's entries.</param>
     /// <returns>The registration; disposing it removes them.</returns>
@@ -129,6 +135,7 @@ public sealed class AssetCreationCatalog : IDisposable
         scanned = [];
         scannedOnce = false;
         kinds.Clear();
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -138,7 +145,15 @@ public sealed class AssetCreationCatalog : IDisposable
     /// <param name="kind">What to create.</param>
     /// <param name="targetDirectory">Absolute directory to create it in.</param>
     /// <returns>True when the asset was written.</returns>
-    public bool Create(AssetCreationKind kind, string targetDirectory)
+    public bool Create(AssetCreationKind kind, string targetDirectory) => CreateAt(kind, targetDirectory) is not null;
+
+    /// <summary>
+    /// <see cref="Create"/> for a caller that goes on with the new asset, such as one that opens it.
+    /// </summary>
+    /// <param name="kind">What to create.</param>
+    /// <param name="targetDirectory">Absolute directory to create it in.</param>
+    /// <returns>The new file or folder's path, or null when it was not written.</returns>
+    public string? CreateAt(AssetCreationKind kind, string targetDirectory)
     {
         ArgumentNullException.ThrowIfNull(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetDirectory);
@@ -147,45 +162,42 @@ public sealed class AssetCreationCatalog : IDisposable
         {
             if (kind.Creator is not null)
             {
-                return kind.Creator(targetDirectory) is not null;
+                return kind.Creator(targetDirectory);
             }
 
-            if (kind.PayloadType is not null)
-            {
-                return CreateDataAsset(kind, targetDirectory);
-            }
-
-            return kind.MenuPath switch
-            {
-                "Folder" => fileSystem.CreateFolder(targetDirectory, kind.DefaultName),
-                "Scene" => fileSystem.CreateEmptySceneAsync(targetDirectory, kind.DefaultName)
-                    .GetAwaiter().GetResult(),
-                "Material" => fileSystem.CreateEmptyMaterialAsync(targetDirectory, kind.DefaultName)
-                    .GetAwaiter().GetResult(),
-                _ => false
-            };
+            return kind.PayloadType is not null
+                ? CreateDataAsset(kind, targetDirectory)
+                : CreateBuiltIn(kind, targetDirectory);
         }
         catch (Exception ex)
         {
             log.LogError(ex, "Could not create a {Kind} in {Directory}", kind.MenuPath, targetDirectory);
-            return false;
+            return null;
         }
     }
+
+    string? CreateBuiltIn(AssetCreationKind kind, string targetDirectory) => kind.MenuPath switch
+    {
+        "Folder" => fileSystem.CreateFolderAt(targetDirectory, kind.DefaultName),
+        "Scene" => fileSystem.WriteEmptySceneAsync(targetDirectory, kind.DefaultName).GetAwaiter().GetResult(),
+        "Material" => fileSystem.WriteEmptyMaterialAsync(targetDirectory, kind.DefaultName).GetAwaiter().GetResult(),
+        _ => null,
+    };
 
     // The assembly a contributed kind comes from, which decides whether its brick is still active.
     static ReflectionAssembly? OwnerOf(AssetCreationKind kind) =>
         kind.PayloadType?.Assembly ?? kind.Creator?.Method.DeclaringType?.Assembly;
 
-    bool CreateDataAsset(AssetCreationKind kind, string targetDirectory)
+    string? CreateDataAsset(AssetCreationKind kind, string targetDirectory)
     {
         if (settings.Settings is not { } appSettings)
         {
-            return false;
+            return null;
         }
 
         if (Activator.CreateInstance(kind.PayloadType!) is not DataAsset payload)
         {
-            return false;
+            return null;
         }
 
         var assetPath = UniquePath(targetDirectory, kind.DefaultName);
@@ -200,7 +212,7 @@ public sealed class AssetCreationCatalog : IDisposable
         Serializer.SaveAsync(assetPath, payload).GetAwaiter().GetResult();
         Serializer.SaveAsync(assetPath + ".meta", meta).GetAwaiter().GetResult();
         ProjectSettingsFiles.RegisterCreated(appSettings, payload, meta.Id);
-        return true;
+        return assetPath;
     }
 
     /// <summary>

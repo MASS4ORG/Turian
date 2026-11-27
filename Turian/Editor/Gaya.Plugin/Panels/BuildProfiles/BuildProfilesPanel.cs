@@ -6,7 +6,7 @@ namespace Gaya.Plugin.Turian;
 /// change. Profiles are added, switched to and built from here.
 /// </summary>
 sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectionService inspections, AssetAutoSave autoSave,
-    UndoService undo, ReferenceDrawer references, BuildManager build, BackgroundTaskRunner tasks)
+    UndoService undo, ReferenceDrawer references, BuildManager build, BackgroundTaskRunner tasks, UnsavedWork unsaved)
     : IPanel, IDisposable
 {
     const float listWidth = 220f;
@@ -356,15 +356,17 @@ sealed partial class BuildProfilesPanel(SettingsService settings, AssetInspectio
         Refresh(project);
     }
 
-    /// <summary>Saves pending edits first, so the export reads the profile as it is shown.</summary>
+    /// <summary>
+    /// Saves everything first, so the export reads the profile and the documents as they are shown, and builds nothing
+    /// while a document cannot be written.
+    /// </summary>
     void Build(Guid id, bool install = false)
     {
-        if (settings.Settings is not { } project)
+        if (settings.Settings is not { } project || !unsaved.SaveBefore("export"))
         {
             return;
         }
 
-        autoSave.Flush(force: true);
         if (BuildProfiles.List(project).FirstOrDefault(p => p.Id == id) is not { } profile)
         {
             return;

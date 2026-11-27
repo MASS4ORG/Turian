@@ -162,6 +162,12 @@ sealed partial class InspectorPanel
         }
     }
 
+    // Writes happen in the render pass, so that is when a group has anything to collect.
+    IDisposable? GroupSubjectEdits(Gui gui, object target) =>
+        gui.Pass == Pass.Pass2Render && IsSubject(target)
+            ? sources!.GroupEdits(frameSubjects, $"Edit {frameSubjects.Count} Objects")
+            : null;
+
     FormModel BuildSubjectForm(object target)
     {
         subjectForm = sources!.Build(frameSubjects, target);

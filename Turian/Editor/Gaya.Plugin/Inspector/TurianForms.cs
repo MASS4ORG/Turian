@@ -39,6 +39,8 @@ static class TurianForms
         _ = drawers.Add(WrappedTextDrawer.Takes, WrappedTextDrawer.Instance);
         _ = drawers.Add(BrickVersionDrawer.Takes, BrickVersionDrawer.Instance);
         _ = drawers.Add(EngineColorDrawer.Takes, EngineColorDrawer.Instance);
+        _ = drawers.Add(SchemaRangeDrawer.Takes, SchemaRangeDrawer.Instance);
+        _ = drawers.Add(SchemaTextAreaDrawer.Takes, SchemaTextAreaDrawer.Instance);
         _ = drawers.Add(typeof(Vector3), ColorVectorDrawer.Instance);
         _ = drawers.Add(typeof(Vector4), ColorVectorDrawer.Instance);
         return drawers;

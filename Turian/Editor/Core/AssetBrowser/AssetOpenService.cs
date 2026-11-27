@@ -1,9 +1,9 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Opens an asset the way its kind says it should be opened: as a studio document, in the inspector,
-/// in the program the desktop associates with the file, or not at all. The asset browser calls this
-/// instead of deciding for itself, so every shell treats a double click alike.
+/// Opens an asset the way <see cref="AssetTypeCatalog"/> says it should be opened: as a studio document, in the
+/// inspector, in the program the desktop associates with the file, or not at all. The asset browser calls this instead
+/// of deciding for itself, so every shell treats a double click alike.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed class AssetOpenService(
@@ -13,9 +13,11 @@ public sealed class AssetOpenService(
     NodeInspectorController inspector,
     CodeOpener code,
     ILogger log,
-    UserPanelCatalog? panels = null,
     AssetImporter? importer = null)
 {
+    // Starts the desktop program for a file.
+    internal Action<ProcessStartInfo> Launch { get; set; } = static start => Process.Start(start)?.Dispose();
+
     /// <summary>Opens what a browser row points at.</summary>
     /// <param name="entry">The row; directories and rows without metadata do nothing.</param>
     /// <returns>What was done.</returns>
@@ -37,27 +39,14 @@ public sealed class AssetOpenService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
 
-        return OpenDocument(absolutePath, isReadOnly) ?? OpenByType(absolutePath, metadata);
-    }
-
-    // A kind that claims the file keeps it, so a document that fails to open does not fall through to another opener.
-    AssetActivation? OpenDocument(string absolutePath, bool isReadOnly)
-    {
-        var readOnly = isReadOnly || importer?.IsSourceReadOnly(absolutePath) == true;
-        if (workspace.KindFor(absolutePath) is null)
-        {
-            return panels?.OpenDocument(absolutePath, readOnly);
-        }
-
-        return workspace.Open(absolutePath, readOnly) is null ? AssetActivation.None : AssetActivation.Edit;
-    }
-
-    AssetActivation OpenByType(string absolutePath, Asset? metadata)
-    {
         var activation = types.ActivationFor(absolutePath);
 
         switch (activation)
         {
+            // A kind that claims the file keeps it, so a document that fails to open does not fall through.
+            case AssetActivation.Edit when workspace.KindFor(absolutePath) is not null:
+                return OpenDocument(absolutePath, isReadOnly);
+
             case AssetActivation.Edit when metadata is not null:
                 workspace.Open(metadata);
                 return AssetActivation.Edit;
@@ -80,6 +69,39 @@ public sealed class AssetOpenService(
         }
     }
 
+    /// <summary>
+    /// Imports a file that was just created, so it has its metadata, then opens it the way a double click does.
+    /// </summary>
+    /// <param name="absolutePath">Absolute path of the new asset; a folder does nothing.</param>
+    /// <returns>What was done.</returns>
+    public AssetActivation OpenCreated(string absolutePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
+
+        if (!File.Exists(absolutePath))
+        {
+            return AssetActivation.None;
+        }
+
+        try
+        {
+            importer?.ReimportNow(absolutePath);
+            var metaPath = absolutePath + ".meta";
+            return Open(absolutePath, File.Exists(metaPath) ? Asset.Load(metaPath) : null);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "The new asset {Path} could not be opened", absolutePath);
+            return AssetActivation.None;
+        }
+    }
+
+    AssetActivation OpenDocument(string absolutePath, bool isReadOnly)
+    {
+        var readOnly = isReadOnly || importer?.IsSourceReadOnly(absolutePath) == true;
+        return workspace.Open(absolutePath, readOnly) is null ? AssetActivation.None : AssetActivation.Edit;
+    }
+
     static bool IsScript(string path) => string.Equals(Path.GetExtension(path), ".cs", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Hands a file to the program the desktop opens its kind with.</summary>
@@ -90,7 +112,7 @@ public sealed class AssetOpenService(
 
         try
         {
-            Process.Start(new ProcessStartInfo(absolutePath) { UseShellExecute = true })?.Dispose();
+            Launch(new ProcessStartInfo(absolutePath) { UseShellExecute = true });
         }
         catch (Exception ex)
         {

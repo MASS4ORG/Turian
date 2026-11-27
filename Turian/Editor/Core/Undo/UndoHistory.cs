@@ -44,8 +44,18 @@ public sealed record UndoStep(
             after[target] = state;
         }
 
-        return this with { Before = before, After = after, LastChanged = next.LastChanged };
+        return this with
+        {
+            Before = before,
+            After = after,
+            LastChanged = next.LastChanged,
+            UndoEffect = Chain(next.UndoEffect, UndoEffect),
+            RedoEffect = Chain(RedoEffect, next.RedoEffect),
+        };
     }
+
+    static Action? Chain(Action? first, Action? second) =>
+        first is null ? second : second is null ? first : first + second;
 
     /// <summary>Reverts what the step did outside its objects; runs before their states are restored.</summary>
     public Action? UndoEffect { get; init; }
@@ -138,6 +148,18 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
         {
             undo[^1] = undo[^1].Merge(step);
         }
+    }
+
+    /// <summary>Joins the latest step into the one before it; nothing happens with fewer than two.</summary>
+    public void JoinLatest()
+    {
+        if (undo.Count < 2)
+        {
+            return;
+        }
+
+        undo[^2] = undo[^2].Merge(undo[^1]);
+        undo.RemoveAt(undo.Count - 1);
     }
 
     /// <summary>Takes back the latest push, restoring the redo steps it dropped, when its change failed.</summary>

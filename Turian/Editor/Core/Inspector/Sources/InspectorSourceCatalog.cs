@@ -120,6 +120,38 @@ public sealed class InspectorSourceCatalog
         return new InspectorForm(this, alive, Describe(source, alive));
     }
 
+    /// <summary>
+    /// Makes everything the subjects record until the result is disposed one step in each of their histories, so one
+    /// edit of several subjects is undone at once.
+    /// </summary>
+    /// <param name="subjects">The edited selection.</param>
+    /// <param name="label">What the step is, for the Edit menu.</param>
+    /// <returns>The open groups, or null for fewer than two subjects or none that records.</returns>
+    public IDisposable? GroupEdits(IReadOnlyList<object> subjects, string label)
+    {
+        ArgumentNullException.ThrowIfNull(subjects);
+
+        var groups = new List<IDisposable>();
+        if (subjects.Count > 1)
+        {
+            var histories = new HashSet<IDocumentHistory>(ReferenceEqualityComparer.Instance);
+            foreach (var subject in subjects.OfType<IInspectorSubject>())
+            {
+                Run(label, () =>
+                {
+                    if (subject.History is { } history && histories.Add(history))
+                    {
+                        groups.Add(history.BeginGroup(label));
+                    }
+                });
+            }
+        }
+
+        return groups.Count == 0
+            ? null
+            : new ContributionLifetime(() => groups.ForEach(group => Run(label, group.Dispose)));
+    }
+
     FormModel Describe(IInspectorSource source, IReadOnlyList<object> subjects)
     {
         if (subjects.Any(subject => !ReferenceEquals(SourceFor(subject), source)))

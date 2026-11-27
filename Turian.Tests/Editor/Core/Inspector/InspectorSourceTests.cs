@@ -155,6 +155,105 @@ public sealed class InspectorSourceTests
         Assert.Equal(10, subject.Width);
     }
 
+    /// <summary>
+    /// A property with a default and no reset of its own is marked while it differs, and resetting writes the default.
+    /// </summary>
+    [Fact]
+    public void ADefaultResetsByWritingIt()
+    {
+        var subject = new FakeSubject();
+        using var form = new InspectorSourceCatalog([new DefaultedSource()], notifications).Build([subject])!;
+        var width = Field(form.Model, "Width");
+        var binding = Binding(width);
+        var ratio = Binding(Field(form.Model, "Ratio"));
+        var share = Binding(Field(form.Model, "Share"));
+        Assert.False(binding.IsSet);
+        Assert.True(binding.CanReset);
+        Assert.False(ratio.IsSet);
+        Assert.False(share.IsSet);
+        Assert.False(Binding(Field(form.Model, "Plain")).CanReset);
+        Assert.False(Binding(Field(form.Model, "Plain")).IsSet);
+
+        width.SetValue(40);
+
+        Assert.True(binding.IsSet);
+        binding.Reset();
+        Assert.Equal(10, subject.Width);
+        Assert.False(binding.IsSet);
+        Binding(Field(form.Model, "Plain")).Reset();
+        Assert.Empty(Reported());
+    }
+
+    sealed class DefaultedSource : IInspectorSource
+    {
+        public Type SelectionType => typeof(FakeSubject);
+
+        public InspectorSchema Describe(object selection)
+        {
+            var subject = (FakeSubject)selection;
+            return new("Defaulted",
+            [
+                new("width", "Width", typeof(int), () => subject.Width, value => subject.Width = (int)value!)
+                {
+                    Default = 10,
+                },
+                new("ratio", "Ratio", typeof(float), static () => 0.1f + 0.2f, static _ => { }) { Default = 0.3f },
+                new("share", "Share", typeof(double), static () => 0.1 + 0.2, static _ => { }) { Default = 0.3 },
+                new("plain", "Plain", typeof(string), static () => "text", static _ => { }),
+            ]);
+        }
+    }
+
+    /// <summary>Edits are grouped once per history, only for several subjects that record somewhere.</summary>
+    [Fact]
+    public void SeveralSubjectsOfOneHistoryShareAGroup()
+    {
+        var history = new DocumentHistory();
+        var other = new DocumentHistory();
+        var first = new FakeSubject { Log = history };
+        var second = new FakeSubject { Log = history };
+        var third = new FakeSubject { Log = other };
+
+        Assert.Null(catalog.GroupEdits([first], "Edit"));
+        Assert.Null(catalog.GroupEdits([new FakeSubject(), new object()], "Edit"));
+        Assert.Null(catalog.GroupEdits([new Unrecorded(), new Unrecorded()], "Edit"));
+        using (catalog.GroupEdits([first, second, third], "Edit 3"))
+        {
+            history.Record("a", static () => { }, static () => { });
+            history.Record("b", static () => { }, static () => { });
+            other.Record("c", static () => { }, static () => { });
+        }
+
+        Assert.Equal("Edit 3", history.UndoLabel);
+        Assert.Equal("Edit 3", other.UndoLabel);
+        history.Undo();
+        Assert.False(history.CanUndo);
+        Assert.Empty(Reported());
+    }
+
+    // A subject that records nowhere keeps the interface's default.
+    sealed class Unrecorded : IInspectorSubject
+    {
+        public string Key => "unrecorded";
+
+        public bool IsAlive => true;
+
+        public event Action? Invalidated { add { } remove { } }
+    }
+
+    /// <summary>A subject whose history cannot be reached is reported, and the others still group.</summary>
+    [Fact]
+    public void AFailingHistoryIsReported()
+    {
+        var history = new DocumentHistory();
+        var broken = new FakeSubject { HistoryFailure = new NotSupportedException("no history") };
+
+        using var group = catalog.GroupEdits([broken, new FakeSubject { Log = history }], "Edit");
+
+        Assert.NotNull(group);
+        Assert.Contains("no history", Assert.Single(Reported()));
+    }
+
     /// <summary>Several subjects share the properties they all have, and an edit reaches every one.</summary>
     [Fact]
     public void SeveralSubjectsCombineTheirSharedProperties()

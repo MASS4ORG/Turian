@@ -34,4 +34,10 @@ public interface IInspectorSubject
     /// Values are read every frame and need no notice.
     /// </summary>
     event Action? Invalidated;
+
+    /// <summary>
+    /// Where edits of the subject are recorded, so that one edit made to several subjects is a single step; null when
+    /// they are not grouped.
+    /// </summary>
+    IDocumentHistory? History => null;
 }

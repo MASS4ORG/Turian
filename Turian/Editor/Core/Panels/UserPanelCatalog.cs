@@ -38,50 +38,6 @@ public sealed class UserPanelCatalog : IDisposable
     /// <summary>Raised after a rescan produced a different set of panels, so a shell can re-register them.</summary>
     public event Action? Changed;
 
-    /// <summary>Raised when a document editor panel should be shown.</summary>
-    public event Action<string>? OpenRequested;
-
-    internal AssetActivation? OpenDocument(string sourcePath, bool isReadOnly = false)
-    {
-        foreach (var page in Pages)
-        {
-            if (page.Target is IAssetDocumentEditor editor && Accepts(page, editor, sourcePath))
-            {
-                return OpenDocument(page, editor, sourcePath, isReadOnly);
-            }
-        }
-
-        return null;
-    }
-
-    bool Accepts(UserPanelPage page, IAssetDocumentEditor editor, string sourcePath)
-    {
-        try
-        {
-            return editor.CanOpen(sourcePath);
-        }
-        catch (Exception ex)
-        {
-            log.LogWarning(ex, "Document editor {Panel} could not check {Path}", page.Id, sourcePath);
-            return false;
-        }
-    }
-
-    AssetActivation OpenDocument(UserPanelPage page, IAssetDocumentEditor editor, string sourcePath, bool isReadOnly)
-    {
-        try
-        {
-            editor.Open(sourcePath, isReadOnly);
-            OpenRequested?.Invoke(page.Id);
-            return AssetActivation.Edit;
-        }
-        catch (Exception ex)
-        {
-            log.LogWarning(ex, "Document editor {Panel} could not open {Path}", page.Id, sourcePath);
-            return AssetActivation.None;
-        }
-    }
-
     /// <summary>
     /// The panels user code currently contributes. Rescans when the user assembly has been swapped
     /// since the last call, which is what makes the panel list follow a recompile.

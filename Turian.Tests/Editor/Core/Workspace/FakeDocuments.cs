@@ -74,6 +74,9 @@ sealed class FakeDocument(DocumentOpenContext context) : IWorkspaceDocument
     /// <summary>Makes <see cref="Save"/> break its contract by returning no result.</summary>
     public bool SavesNothing { get; set; }
 
+    /// <summary>Makes <see cref="Save"/> report success while leaving the edits unwritten.</summary>
+    public bool StaysDirty { get; set; }
+
     bool dirty;
 
     /// <inheritdoc />
@@ -136,7 +139,7 @@ sealed class FakeDocument(DocumentOpenContext context) : IWorkspaceDocument
             return null!;
         }
 
-        IsDirty = false;
+        IsDirty = StaysDirty;
         Conflict = null;
         Changed?.Invoke();
         return DocumentSaveResult.Saved;

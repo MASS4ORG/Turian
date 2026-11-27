@@ -5,24 +5,7 @@ public sealed partial class AssetWorkspace
 {
     /// <summary>The contributed kind that edits a source file, or null when asset tabs are what opens it.</summary>
     /// <param name="sourcePath">Absolute path of the source file.</param>
-    public IWorkspaceDocumentKind? KindFor(string sourcePath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
-        return kinds.Kinds.FirstOrDefault(kind => Claims(kind, sourcePath));
-    }
-
-    static bool Claims(IWorkspaceDocumentKind kind, string sourcePath)
-    {
-        try
-        {
-            return kind.CanOpen(sourcePath);
-        }
-        catch (Exception ex)
-        {
-            Log.Logger.LogWarning(ex, "Document kind {Kind} could not check {Path}", kind.Id, sourcePath);
-            return false;
-        }
-    }
+    public IWorkspaceDocumentKind? KindFor(string sourcePath) => kinds.KindFor(sourcePath);
 
     static Asset? LoadMetadata(string sourcePath)
     {
@@ -94,11 +77,18 @@ public sealed partial class AssetWorkspace
             : DocumentSaveResult.Saved;
     }
 
-    // An asset whose write is refused stays open; the asset writers log why.
-    bool SaveBeforeClose(AssetWrapper document) =>
-        document is { Asset: { } asset, IsReadOnly: false }
-            ? assets.SaveAsset(asset) || !asset.IsModified
-            : Save(document).Succeeded;
+    // An asset that is still modified after its write stays open; the asset writers log why. The manager reports
+    // success even when a writer marks the asset modified again, so only the asset itself is trusted.
+    bool SaveBeforeClose(AssetWrapper document)
+    {
+        if (document is not { Asset: { } asset, IsReadOnly: false })
+        {
+            return Save(document).Succeeded;
+        }
+
+        assets.SaveAsset(asset);
+        return !asset.IsModified;
+    }
 
     // Closing and opening again makes every asset listener drop its cached content and read the source.
     internal void ReloadAsset(AssetWrapper document)

@@ -8,6 +8,9 @@ namespace Turian.Editor.Core;
 /// <param name="document">The asset id steps recorded here belong to; the current document when null.</param>
 public sealed class UndoServiceHistory(Func<UndoService?> service, Guid? document = null) : IDocumentHistory
 {
+    // The label of the outermost open group, which names the step its changes make.
+    string? group;
+
     /// <inheritdoc />
     public bool CanUndo => service()?.CanUndo ?? false;
 
@@ -29,7 +32,7 @@ public sealed class UndoServiceHistory(Func<UndoService?> service, Guid? documen
 
         // The service performs a step as it records it, and this change is already made.
         var made = false;
-        service()?.Perform(label, [], () =>
+        service()?.Perform(group ?? label, [], () =>
         {
             if (made)
             {
@@ -38,6 +41,25 @@ public sealed class UndoServiceHistory(Func<UndoService?> service, Guid? documen
 
             made = true;
         }, undo, document: document);
+    }
+
+    /// <inheritdoc />
+    public IDisposable BeginGroup(string label)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
+        var undo = service();
+        undo?.BeginGesture();
+        var outermost = group is null;
+        group ??= label;
+        return new ContributionLifetime(() =>
+        {
+            if (outermost)
+            {
+                group = null;
+            }
+
+            undo?.EndGesture();
+        });
     }
 
     /// <inheritdoc />

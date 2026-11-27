@@ -23,7 +23,7 @@ public enum AssetActivation
 /// <param name="Id">Stable unique id, e.g. <c>turian.texture</c>.</param>
 /// <param name="DisplayName">Name shown wherever the kind is named, such as the inspector heading.</param>
 /// <param name="Extensions">Source extensions it claims, leading dot included.</param>
-/// <param name="Activation">What opening one of its files does.</param>
+/// <param name="Activation">What opening one of its files does when no workspace document kind claims it.</param>
 /// <param name="DefaultIcon">
 /// The icon id the asset browser shows for a file of this kind when it has no live preview — either
 /// because the kind never gets one (a script, a UI document) or because rendering one for every row
@@ -37,9 +37,8 @@ public sealed record AssetTypeDescriptor(
     string DefaultIcon = EditorIcons.File);
 
 /// <summary>
-/// Every asset kind the studio knows, keyed by source extension. It answers what a double click in
-/// the asset browser should do, which is a decision about the asset type rather than about the shell,
-/// so both the Guinevere studio and the CLI reach the same answer.
+/// Every asset kind the studio knows, keyed by source extension. It is the one answer to what opening a file does,
+/// including files a workspace document kind claims, so the Guinevere studio and the CLI agree.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed partial class AssetTypeCatalog
@@ -48,6 +47,7 @@ public sealed partial class AssetTypeCatalog
         new(StringComparer.OrdinalIgnoreCase);
 
     readonly List<AssetTypeDescriptor> types = [];
+    readonly WorkspaceDocumentKindRegistry? documentKinds;
 
     /// <summary>Creates the catalog with the built-in kinds registered.</summary>
     public AssetTypeCatalog()
@@ -85,10 +85,16 @@ public sealed partial class AssetTypeCatalog
     public AssetTypeDescriptor? Resolve(string? path) =>
         string.IsNullOrWhiteSpace(path) ? null : byExtension.GetValueOrDefault(Path.GetExtension(path));
 
-    /// <summary>What opening a file does. An unclaimed extension does nothing.</summary>
+    /// <summary>
+    /// What opening a file does: a file a workspace document kind claims opens as a document, otherwise its asset kind
+    /// decides, and an unclaimed extension does nothing.
+    /// </summary>
     /// <param name="path">A source file path.</param>
     /// <returns>The activation to perform.</returns>
-    public AssetActivation ActivationFor(string? path) => Resolve(path)?.Activation ?? AssetActivation.None;
+    public AssetActivation ActivationFor(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && documentKinds?.KindFor(path) is not null
+            ? AssetActivation.Edit
+            : Resolve(path)?.Activation ?? AssetActivation.None;
 
     /// <summary>
     /// The kinds the studio ships with. Scenes open as documents; materials and data assets are edited
@@ -98,17 +104,19 @@ public sealed partial class AssetTypeCatalog
     /// </summary>
     static IEnumerable<AssetTypeDescriptor> BuiltIn =>
     [
-        new("turian.scene", "Scene", [".prefab"], AssetActivation.Edit, EditorIcons.Scene),
-        new("turian.material", "Material", [".material"], AssetActivation.Inspect, EditorIcons.Material),
-        new("turian.dataAsset", "Data Asset", [".dataasset", ".asset", ".data"], AssetActivation.Inspect, EditorIcons.Data),
-        new("turian.texture", "Texture", [".png", ".jpg", ".jpeg", ".tga", ".bmp", ".gif", ".webp", ".dds"],
+        new(AssetTypeIds.Scene, "Scene", [".prefab"], AssetActivation.Edit, EditorIcons.Scene),
+        new(AssetTypeIds.Material, "Material", [".material"], AssetActivation.Inspect, EditorIcons.Material),
+        new(AssetTypeIds.DataAsset, "Data Asset", [".dataasset", ".asset", ".data"], AssetActivation.Inspect,
+            EditorIcons.Data),
+        new(AssetTypeIds.Texture, "Texture", [".png", ".jpg", ".jpeg", ".tga", ".bmp", ".gif", ".webp", ".dds"],
             AssetActivation.ExternalProgram, EditorIcons.Image),
-        new("turian.model", "Model", [".obj", ".fbx", ".gltf", ".glb", ".dae", ".blend"],
+        new(AssetTypeIds.Model, "Model", [".obj", ".fbx", ".gltf", ".glb", ".dae", ".blend"],
             AssetActivation.ExternalProgram, EditorIcons.Model),
-        new("turian.script", "Script", [".cs"], AssetActivation.ExternalProgram, EditorIcons.Script),
-        new("turian.text", "Text", [".txt", ".md", ".json", ".xml", ".csv", ".ini", ".strings"],
+        new(AssetTypeIds.Script, "Script", [".cs"], AssetActivation.ExternalProgram, EditorIcons.Script),
+        new(AssetTypeIds.Text, "Text", [".txt", ".md", ".json", ".xml", ".csv", ".ini", ".strings"],
             AssetActivation.ExternalProgram, EditorIcons.Text),
-        new("turian.uiDocument", "UI Document", [".ui"], AssetActivation.ExternalProgram, EditorIcons.UiDocument),
-        new("turian.uiStyleSheet", "UI Style Sheet", [".pss"], AssetActivation.ExternalProgram, EditorIcons.StyleSheet),
+        new(AssetTypeIds.UiDocument, "UI Document", [".ui"], AssetActivation.ExternalProgram, EditorIcons.UiDocument),
+        new(AssetTypeIds.UiStyleSheet, "UI Style Sheet", [".pss"], AssetActivation.ExternalProgram,
+            EditorIcons.StyleSheet),
     ];
 }

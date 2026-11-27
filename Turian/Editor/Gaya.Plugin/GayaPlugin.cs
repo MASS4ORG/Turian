@@ -66,16 +66,12 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<IEditorSettings>(), sp.GetService<ISettingsFieldEditors>(),
             sp.GetRequiredService<ExternalEditorFieldEditor>(), sp.GetRequiredService<IExternalEditorRegistry>()));
 
-        context.Services.AddSingleton(sp =>
-        {
-            var documents = sp.GetRequiredService<AssetDocumentHost>();
-            var focus = sp.GetRequiredService<IFocusTracker>();
-            documents.FocusedPanel = () => focus.ActivePanelId;
-            documents.Prompt = (session, decided, cancelled) =>
-                sp.GetRequiredService<UnsavedChangesGuard>().AskClose(session, decided, cancelled);
-            return new UserPanelBridge(sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands,
-                context.Menus, context.Logger, id => sp.GetRequiredService<IShellHost>().ShowPanel(id), documents);
-        });
+        context.Services.AddSingleton(sp => new UserPanelBridge(
+            sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands, context.Menus, context.Logger));
+
+        context.Services.AddSingleton(sp => new NewAssetMenuBridge(
+            sp.GetRequiredService<AssetCreationCatalog>(), sp.GetRequiredService<EditorAssemblySet>(),
+            context.Commands, context.Menus));
 
         context.Services.AddSingleton<OutputRevealService>();
 
@@ -184,7 +180,8 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<NodeInspectorController>(),
                     sp.GetRequiredService<AssetRevealService>()),
                 sp.GetRequiredService<BuildManager>(),
-                sp.GetRequiredService<BackgroundTaskRunner>()))
+                sp.GetRequiredService<BackgroundTaskRunner>(),
+                sp.GetRequiredService<UnsavedWork>()))
         { OpenByDefault = false });
     }
 
@@ -386,6 +383,7 @@ public sealed class GayaPlugin : IPlugin
         services.GetRequiredService<AssetAutoSave>().Flush();
         services.GetRequiredService<LivePluginBridge>().Sync();
         services.GetRequiredService<UserMenuBridge>().Sync();
+        services.GetRequiredService<NewAssetMenuBridge>().Sync();
         services.GetRequiredService<ProjectSettingsMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<PlatformSettingsBridge>().Sync();
@@ -450,6 +448,7 @@ public sealed class GayaPlugin : IPlugin
         services.GetRequiredService<ProjectSession>().Restoring += livePlugins.Sync;
         livePlugins.Sync();
         services.GetRequiredService<UserMenuBridge>().Sync();
+        services.GetRequiredService<NewAssetMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<PlatformSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();

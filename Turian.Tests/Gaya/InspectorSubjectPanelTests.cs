@@ -178,6 +178,29 @@ public sealed class InspectorSubjectPanelTests
         Assert.Equal(1, second.Listeners);
     }
 
+    /// <summary>One click that edits several subjects is one step in their document's history.</summary>
+    [Fact]
+    public void AMultiSelectionEditIsOneStep()
+    {
+        using var host = new Harness();
+        var history = new DocumentHistory();
+        var first = new FakeSubject { Name = "first", Log = history };
+        var second = new FakeSubject { Name = "second", Log = history };
+        host.Selection.SelectMany([first, second], second);
+        host.Frame();
+        var editor = host.Find("inspector/section0/field0/editor").Rect;
+
+        host.Click(new Vector2(editor.X + 6, editor.Y + editor.H / 2));
+
+        Assert.True(first.Visible);
+        Assert.True(second.Visible);
+        Assert.Equal("Edit 2 Objects", history.UndoLabel);
+        history.Undo();
+        Assert.False(first.Visible);
+        Assert.False(second.Visible);
+        Assert.False(history.CanUndo);
+    }
+
     /// <summary>A change to an object outside the selection does not draw the form again.</summary>
     [Fact]
     public void AnUnselectedSubjectChangingDoesNotRebuildTheForm()

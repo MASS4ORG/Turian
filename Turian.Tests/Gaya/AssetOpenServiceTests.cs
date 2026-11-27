@@ -1,6 +1,9 @@
 namespace Turian.Tests;
 
-/// <summary>Opening an asset follows its kind: scripts go to the external editor, and nothing else changes.</summary>
+/// <summary>
+/// Opening an asset follows its kind: scripts go to the external editor, claimed files open as documents and the rest
+/// follow their asset type.
+/// </summary>
 public sealed class AssetOpenServiceTests : IDisposable
 {
     readonly AssetBrowserHarness harness = new();
@@ -111,108 +114,119 @@ public sealed class AssetOpenServiceTests : IDisposable
         Assert.Equal(AssetActivation.None, harness.Opener.Open(Path.Combine(harness.Root, "notes.unclaimed"), null));
         Assert.Empty(editor.Opened);
     }
-    sealed class DocumentEditor : IAssetDocumentEditor
+
+    /// <summary>
+    /// With the UI brick's document kind registered, style sheets and text files still go to the program the desktop
+    /// opens them with, while only the UI document opens as a tab.
+    /// </summary>
+    [Theory]
+    [InlineData("theme.pss")]
+    [InlineData("README.md")]
+    [InlineData("LICENSE.txt")]
+    [InlineData("table.csv")]
+    public void TextSourcesOpenInTheSystemProgramBesideTheUiDocumentKind(string name)
     {
-        public bool FailCheck { get; set; }
-        public bool FailOpen { get; set; }
-        public List<string> Opened { get; } = [];
-        public bool IsReadOnly { get; private set; }
+        var kind = new FakeDocumentKind { Id = "turian.ui", Extension = ".ui" };
+        using var registration = harness.Kinds.Add(kind);
+        var launched = new List<ProcessStartInfo>();
+        harness.Opener.Launch = launched.Add;
+        var source = Source(name);
 
-        public bool CanOpen(string sourcePath) => FailCheck
-            ? throw new InvalidOperationException()
-            : sourcePath.EndsWith(".ui", StringComparison.OrdinalIgnoreCase);
+        var activation = harness.Opener.Open(source, null);
 
-        public void Open(string sourcePath, bool isReadOnly = false)
-        {
-            IsReadOnly = isReadOnly;
-            if (FailOpen)
-            {
-                throw new InvalidOperationException();
-            }
+        Assert.Equal(AssetActivation.ExternalProgram, activation);
+        var start = Assert.Single(launched);
+        Assert.Equal(source, start.FileName);
+        Assert.True(start.UseShellExecute);
+        Assert.Null(harness.Workspace.KindFor(source));
+        Assert.Empty(harness.Workspace.Documents);
+        Assert.Empty(kind.Opened);
 
-            Opened.Add(sourcePath);
-        }
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(Source("menu.ui"), null));
+        Assert.Single(kind.Opened);
+        Assert.Single(launched);
     }
 
-    /// <summary>Document editors use the catalog's existing target and reveal the corresponding panel.</summary>
+    /// <summary>A system without a program for the file is logged, and the double click does not throw.</summary>
     [Fact]
-    public void MatchingEditorOpensAndRevealsItsPanel()
+    public void AMissingSystemProgramIsNotAnError()
     {
-        var target = new DocumentEditor();
-        var pages = (IList<UserPanelPage>)harness.Panels.Pages;
-        pages.Add(new UserPanelPage("fixture.panel", "Fixture", "Tools/Fixture", target));
-        var shown = new List<string>();
-        using var bridge = new UserPanelBridge(harness.Panels, new PanelRegistry(), new CommandRegistry(),
-            new MenuRegistry(), NullLogger.Instance, shown.Add);
-        var path = Path.Combine(harness.Root, "screen.ui");
+        harness.Opener.Launch = static _ => throw new InvalidOperationException("no program");
 
-        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(path, null));
-        Assert.Equal([path], target.Opened);
-        Assert.False(target.IsReadOnly);
-        Assert.Equal(["fixture.panel"], shown);
-        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(new AssetEntry(path, false, null, null, true)));
-        Assert.True(target.IsReadOnly);
-        bridge.Dispose();
-        harness.Opener.Open(path, null);
-        Assert.Equal(2, shown.Count);
-        pages.Clear();
-        Assert.Null(harness.Panels.OpenDocument(path));
+        Assert.Equal(AssetActivation.ExternalProgram, harness.Opener.Open(Source("notes.txt"), null));
     }
 
-    /// <summary>Documents and style sheets route to the editor that accepts them; anything else keeps its own opening.</summary>
+    /// <summary>Unless replaced, a program is started with the request as it is given.</summary>
     [Fact]
-    public void RoutingFollowsWhatTheEditorAccepts()
+    public void TheDefaultLaunchStartsTheProgram()
     {
-        var target = new AssetDocumentHostTests.DocumentFixture();
-        ((IList<UserPanelPage>)harness.Panels.Pages).Add(new UserPanelPage("doc.panel", "Doc", "Tools/Doc", target));
-        var ui = Path.Combine(harness.Root, "screen.ui");
-        var unclaimed = Path.Combine(harness.Root, "notes.unclaimed");
+        var request = new ProcessStartInfo("dotnet", "--version") { RedirectStandardOutput = true };
 
-        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(ui, null));
-        Assert.Equal(ui, target.DocumentPath);
-        var pss = Path.Combine(harness.Root, "theme.pss");
-        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(pss, null));
-        Assert.Equal(pss, target.DocumentPath);
-        Assert.Equal(AssetActivation.None, harness.Opener.Open(unclaimed, null));
-        Assert.Equal(pss, target.DocumentPath);
+        harness.Opener.Launch(request);
+
+        Assert.Throws<System.ComponentModel.Win32Exception>(() =>
+            harness.Opener.Launch(new ProcessStartInfo(Path.Combine(harness.Root, "no-such-program"))));
     }
 
-    /// <summary>A broken predicate is skipped; a claiming editor failure does not fall back.</summary>
+    /// <summary>A file a kind claims opens as its tab, and goes back to its own opening when the kind leaves.</summary>
     [Fact]
-    public void EditorFailuresDoNotCrashOrFallBack()
+    public void ADocumentKindDecidesHowItsFilesOpenWhileItIsRegistered()
     {
-        var pages = (IList<UserPanelPage>)harness.Panels.Pages;
-        pages.Add(new UserPanelPage("bad.check", "Bad", "Tools/Bad", new DocumentEditor { FailCheck = true }));
-        var target = new DocumentEditor { FailOpen = true };
-        pages.Add(new UserPanelPage("bad.open", "Bad", "Tools/Bad", target));
-        var path = Path.Combine(harness.Root, "screen.ui");
+        var launched = new List<ProcessStartInfo>();
+        harness.Opener.Launch = launched.Add;
+        var source = Source("menu.ui");
+        var kind = new FakeDocumentKind { Extension = ".ui" };
+        var registration = harness.Kinds.Add(kind);
 
-        Assert.Equal(AssetActivation.None, harness.Opener.Open(path, null));
-        Assert.Empty(target.Opened);
-        Assert.Contains(harness.PanelLog.ReceivedCalls(), static call => call.GetMethodInfo().Name == "Log"
-            && (LogLevel)call.GetArguments()[0]! == LogLevel.Warning);
-        target.FailOpen = false;
-        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(path, null));
-        Assert.Equal([path], target.Opened);
+        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(new AssetEntry(source, false, null, null, true)));
+        Assert.True(harness.Workspace.Active!.IsReadOnly);
+        harness.Workspace.Close(harness.Workspace.Active);
+        registration.Dispose();
+
+        Assert.Equal(AssetActivation.ExternalProgram, harness.Opener.Open(source, null));
+        Assert.Single(launched);
+        Assert.Single(kind.Opened);
     }
 
-    /// <summary>Registered package policy also applies when opening a source path directly.</summary>
+    /// <summary>A new file is imported, so a document kind finds its metadata, and opens as a double click would.</summary>
     [Fact]
-    public void RegisteredPackagePolicyReachesDocumentEditor()
+    public void ACreatedFileIsImportedAndOpened()
     {
-        var package = Path.Combine(harness.Project, "package");
-        var roots = new List<(string Root, bool ReadOnly)> { (package, true) };
-        typeof(AssetImporter).GetField("packageRoots", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(harness.Importer, roots);
-        var target = new DocumentEditor();
-        ((IList<UserPanelPage>)harness.Panels.Pages)
-            .Add(new UserPanelPage("package.panel", "Package", "Tools/Package", target));
-        var path = Path.Combine(package, "screen.ui");
+        var kind = new FakeDocumentKind();
+        using var registration = harness.Kinds.Add(kind);
+        var source = Path.Combine(harness.Root, "made.fake");
+        File.WriteAllText(source, string.Empty);
 
-        Assert.True(harness.Importer.IsSourceReadOnly(path));
-        Assert.False(harness.Importer.IsSourceReadOnly(Path.Combine(harness.Root, "screen.ui")));
-        Assert.Equal(AssetActivation.Edit, harness.Opener.Open(path, null));
-        Assert.True(target.IsReadOnly);
+        Assert.Equal(AssetActivation.Edit, harness.Opener.OpenCreated(source));
+
+        Assert.True(File.Exists(source + ".meta"));
+        Assert.Equal(source, Assert.Single(kind.Opened).SourcePath);
+        Assert.Same(harness.Workspace.Active!.Document, kind.Opened[0]);
     }
 
+    /// <summary>A new folder has nothing to open, and a new asset whose metadata is unreadable opens nothing.</summary>
+    [Fact]
+    public void ACreatedEntryThatCannotOpenDoesNothing()
+    {
+        var source = Path.Combine(harness.Root, "broken.prefab");
+        File.WriteAllText(source, string.Empty);
+        File.WriteAllText(source + ".meta", "not json");
+        var inspections = new AssetInspectionService(harness.Importer, new AssetTypeCatalog(), harness.Settings,
+            null!, NullLogger.Instance);
+        var withoutImporter = new AssetOpenService(new AssetTypeCatalog(), harness.Workspace, inspections,
+            harness.Inspector, null!, NullLogger.Instance);
+
+        Assert.Equal(AssetActivation.None, harness.Opener.OpenCreated(Path.Combine(harness.Root, "Folder")));
+        Assert.Equal(AssetActivation.None, withoutImporter.OpenCreated(source));
+        Assert.Empty(harness.Workspace.Documents);
+    }
+
+    string Source(string name)
+    {
+        var path = Path.Combine(harness.Root, name);
+        File.WriteAllText(path, string.Empty);
+        File.WriteAllText(path + ".meta",
+            Serializer.Serialize(new Asset { Id = Guid.NewGuid(), RelativePath = path }));
+        return path;
+    }
 }

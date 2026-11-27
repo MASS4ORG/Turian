@@ -171,7 +171,11 @@ sealed partial class AssetBrowserPanel
             return;
         }
 
-        creation.Create(kind, directory);
+        if (creation.CreateAt(kind, directory) is { } path)
+        {
+            opener.OpenCreated(path);
+        }
+
         Refresh();
     }
 

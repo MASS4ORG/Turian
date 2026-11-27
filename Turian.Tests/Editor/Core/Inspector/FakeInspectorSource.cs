@@ -21,6 +21,14 @@ class FakeSubject : IInspectorSubject
     bool alive = true;
     string key = "element";
 
+    /// <summary>Where the source records the subject's edits, when a test gives it a history.</summary>
+    public IDocumentHistory? Log { get; set; }
+
+    public Exception? HistoryFailure { get; set; }
+
+    /// <inheritdoc />
+    public IDocumentHistory? History => HistoryFailure is { } failure ? throw failure : Log;
+
     /// <summary>The followers of <see cref="Invalidated"/>.</summary>
     public int Listeners => Invalidated?.GetInvocationList().Length ?? 0;
 
@@ -85,7 +93,10 @@ sealed class FakeInspectorSource : IInspectorSource
             new("visible", "Visible", typeof(bool), () => subject.Visible, value =>
             {
                 Writes.Add("visible");
-                subject.Visible = (bool)value!;
+                var before = subject.Visible;
+                var after = (bool)value!;
+                subject.Visible = after;
+                subject.Log?.Record("Set Visible", () => subject.Visible = before, () => subject.Visible = after);
             }),
             new("name", "Name", typeof(string), () => subject.Name, value =>
             {

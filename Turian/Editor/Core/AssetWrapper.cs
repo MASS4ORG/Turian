@@ -149,7 +149,12 @@ public sealed class AssetWrapper : IWorkspaceDocument, IEquatable<AssetWrapper>,
                 return DocumentSaveResult.Failed(conflict);
             }
 
-            return document.Save(overwrite) ?? DocumentSaveResult.Failed("The save returned no result.");
+            var result = document.Save(overwrite) ?? DocumentSaveResult.Failed("The save returned no result.");
+
+            // A document that says it was written but is still dirty must not be closed or left behind.
+            return result.Succeeded && document.IsDirty
+                ? DocumentSaveResult.Failed($"{document.Title} still has unsaved changes after saving.")
+                : result;
         }
         catch (Exception ex)
         {

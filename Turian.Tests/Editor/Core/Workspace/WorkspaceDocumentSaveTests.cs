@@ -245,8 +245,31 @@ public sealed class WorkspaceDocumentSaveTests : IDisposable
         Assert.False(result.Succeeded);
         Assert.True(tab.IsDirty);
         Assert.Empty(project.Reported());
-        Assert.True(Workspace.SaveAll());
+        Assert.False(Workspace.SaveAll());
         Assert.True(tab.IsDirty);
+    }
+
+    /// <summary>A contributed save that reports success but leaves edits behind counts as failed everywhere.</summary>
+    [Fact]
+    public void ASuccessfulSaveThatLeavesADocumentDirtyKeepsIt()
+    {
+        var (tab, document) = project.OpenFake("one");
+        Assert.True(Workspace.Save(tab).Succeeded);
+        Assert.Empty(document.Saves);
+        document.Edit();
+        document.StaysDirty = true;
+
+        var result = Workspace.Save(tab);
+
+        Assert.Contains("still has unsaved changes", result.Error, StringComparison.Ordinal);
+        Assert.False(Workspace.SaveAll());
+        Assert.False(Workspace.Close(tab, UnsavedChanges.Save));
+        Assert.Same(tab, Assert.Single(Workspace.Documents));
+        Assert.False(document.Disposed);
+        Assert.Equal(3, project.Reported().Count);
+
+        document.StaysDirty = false;
+        Assert.True(Workspace.Close(tab, UnsavedChanges.Save));
     }
 
     /// <summary>A tab built outside a workspace has nowhere to write to or read from.</summary>

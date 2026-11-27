@@ -1,34 +1,52 @@
 namespace Turian.Tests;
 
-/// <summary>Checks that Save, Save All, Undo and Redo reach the focused document editor and otherwise the scene.</summary>
+/// <summary>
+/// Checks that Save, Save All, Play, Build and Run and Export reach every workspace document, and that nothing starts
+/// while one cannot be written.
+/// </summary>
 [Collection(SerialTests.Name)]
 public sealed class StudioCommandsRoutingTests : IDisposable
 {
-    readonly AssetBrowserHarness harness = new();
-    readonly AssetDocumentHost host;
+    readonly DocumentProject project = new();
+    readonly BackgroundTaskManager tasks = new();
+    readonly BuildManager build = new(new AppSettings(), NullLogger.Instance);
+    readonly IPlaySceneHost playHost = Substitute.For<IPlaySceneHost>();
+    readonly IShellHost shell = Substitute.For<IShellHost>();
+    readonly AssetDatabase database = new();
     readonly ServiceProvider services;
     readonly IPluginContext context = Substitute.For<IPluginContext>();
-    readonly AssetDocumentHostTests.DocumentFixture document = new()
-    {
-        DocumentPath = "/project/Assets/Menu.ui",
-    };
 
-    /// <summary>Registers the studio commands over a host that sees one document editor.</summary>
+    /// <summary>Registers the studio commands over a workspace with a contributed document kind.</summary>
     public StudioCommandsRoutingTests()
     {
-        host = new AssetDocumentHost(harness.Panels, harness.Settings, harness.Assets, NullLogger.Instance);
-        ((IList<UserPanelPage>)harness.Panels.Pages).Add(new UserPanelPage("doc.panel", "Doc", "Tools/Doc", document));
-        services = new ServiceCollection().AddSingleton(host).AddSingleton(harness.Workspace)
-            .AddSingleton(harness.Undo).AddSingleton(new StudioLocalization()).BuildServiceProvider();
+        playHost.CurrentSceneRoot.Returns(new Node());
+        var autoSave = new AssetAutoSave(new AssetInspectionService(null!, new AssetTypeCatalog(), project.Settings,
+            null!, NullLogger.Instance));
+        services = new ServiceCollection()
+            .AddSingleton(project.Workspace)
+            .AddSingleton(new UnsavedWork(project.Workspace, autoSave, project.Notifications))
+            .AddSingleton(new BackgroundTaskRunner(tasks, NullLogger.Instance))
+            .AddSingleton(build)
+            .AddSingleton(shell)
+            .AddSingleton(Substitute.For<IFocusTracker>())
+            .AddSingleton(sp => new PlayModeService(playHost, database, sp, NullLogger.Instance))
+            .AddSingleton(sp => new ProjectSession(sp, NullLogger.Instance))
+            .AddSingleton(database)
+            .AddSingleton(new SceneTreeController(project.Assets, project.Settings, null!,
+                Substitute.For<IAssetLoader>(), Substitute.For<ISceneManager>(), database))
+            .AddSingleton<ILogger>(NullLogger.Instance)
+            .AddSingleton(new StudioLocalization())
+            .BuildServiceProvider();
         StudioCommands.Register(context);
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
+        services.GetRequiredService<PlayModeService>().Stop();
         services.Dispose();
-        host.Dispose();
-        harness.Dispose();
+        build.Dispose();
+        project.Dispose();
     }
 
     CommandDescriptor Command(string id) => context.Commands.ReceivedCalls()
@@ -39,80 +57,172 @@ public sealed class StudioCommandsRoutingTests : IDisposable
 
     void Run(string id) => Command(id).Execute(services);
 
-    void Focus(string? panelId) => host.FocusedPanel = () => panelId;
+    PlayModeService Play => services.GetRequiredService<PlayModeService>();
 
-    /// <summary>Save writes the focused document editor's document and is available whenever one has focus.</summary>
-    [Fact]
-    public void SaveWritesTheFocusedDocument()
+    // A running task of the same name makes the command's own task a duplicate, so no real build starts.
+    TaskCompletionSource Occupy(string label)
     {
-        document.IsDirty = true;
-        Assert.False(CanRun("gaya.turian.save"));
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        services.GetRequiredService<BackgroundTaskRunner>().Run(
+            new BackgroundTaskSpec { Label = label, Kind = BackgroundTaskKind.Build },
+            (_, _) => release.Task);
+        return release;
+    }
 
-        Focus("doc.panel");
+    /// <summary>Save writes the active document only, and is offered only while one is open.</summary>
+    [Fact]
+    public void SaveWritesTheActiveDocument()
+    {
+        Assert.False(CanRun("gaya.turian.save"));
+        Run("gaya.turian.save");
+        var (_, other) = project.OpenFake("other");
+        var (_, active) = project.OpenFake("active");
+        other.Edit();
+        active.Edit();
+
         Assert.True(CanRun("gaya.turian.save"));
         Run("gaya.turian.save");
 
-        Assert.Equal(1, document.Saves);
-        Assert.False(document.IsDirty);
+        Assert.False(active.IsDirty);
+        Assert.True(other.IsDirty);
+        Assert.Empty(other.Saves);
     }
 
-    /// <summary>With another panel focused, Save leaves the document editor alone.</summary>
+    /// <summary>Save All writes every dirty document, and is offered only while one is open.</summary>
     [Fact]
-    public void SaveIgnoresADocumentWithoutFocus()
+    public void SaveAllWritesEveryDirtyDocument()
     {
-        document.IsDirty = true;
-        Focus("scene.tree");
+        Assert.False(CanRun("gaya.turian.saveAll"));
+        var (_, first) = project.OpenFake("first");
+        var (_, second) = project.OpenFake("second");
+        first.Edit();
+        second.Edit();
 
-        Run("gaya.turian.save");
-
-        Assert.Equal(0, document.Saves);
-        Assert.True(document.IsDirty);
-    }
-
-    /// <summary>Save All is available for an open document and writes every dirty one.</summary>
-    [Fact]
-    public void SaveAllIncludesDocumentEditors()
-    {
         Assert.True(CanRun("gaya.turian.saveAll"));
-        document.IsDirty = true;
-
         Run("gaya.turian.saveAll");
 
-        Assert.Equal(1, document.Saves);
-        document.DocumentPath = null;
-        Assert.False(CanRun("gaya.turian.saveAll"));
+        Assert.False(project.Workspace.HasUnsavedChanges);
     }
 
-    /// <summary>Undo and Redo go to the focused editor's own stack, with the scene's history untouched.</summary>
+    /// <summary>Play saves the contributed documents, starts, and stops on the next call without saving again.</summary>
     [Fact]
-    public void UndoAndRedoFollowFocus()
+    public void PlaySavesTheDocumentsFirst()
     {
-        document.Undos = 1;
-        Focus("doc.panel");
+        var (_, document) = project.OpenFake("menu");
+        document.Edit();
 
-        Assert.True(CanRun("gaya.turian.undo"));
-        Assert.False(CanRun("gaya.turian.redo"));
-        Assert.Equal("Undo", Command("gaya.turian.undo").MenuLabelFor(services));
-        Run("gaya.turian.undo");
+        Run("gaya.turian.play");
 
-        Assert.Equal((1, 0), (document.UndoCalls, document.Undos));
-        Assert.True(CanRun("gaya.turian.redo"));
-        Run("gaya.turian.redo");
-        Assert.Equal(1, document.RedoCalls);
+        Assert.Equal([false], document.Saves);
+        Assert.True(Play.IsActive);
+        document.Edit();
+        Run("gaya.turian.play");
+        Assert.False(Play.IsActive);
+        Assert.Single(document.Saves);
     }
 
-    /// <summary>Without focus the commands fall back to the scene, which has nothing to undo here.</summary>
+    /// <summary>Play reports a scene it cannot start.</summary>
     [Fact]
-    public void UndoFallsBackToTheSceneWithoutFocus()
+    public void PlayWithoutASceneDoesNotStart()
     {
-        document.Undos = 1;
-        Focus("scene.tree");
+        playHost.CurrentSceneRoot.Returns((Node?)null);
 
-        Assert.False(CanRun("gaya.turian.undo"));
-        Assert.False(CanRun("gaya.turian.redo"));
-        Run("gaya.turian.undo");
-        Run("gaya.turian.redo");
+        Run("gaya.turian.play");
 
-        Assert.Equal((0, 0), (document.UndoCalls, document.RedoCalls));
+        Assert.False(Play.IsActive);
+    }
+
+    /// <summary>Nothing starts while a document cannot be written, and the user is told which one.</summary>
+    [Theory]
+    [InlineData("gaya.turian.play", "Cannot play")]
+    [InlineData("gaya.turian.playStartupScene", "Cannot play")]
+    [InlineData("gaya.turian.buildAndRun", "Cannot build and run")]
+    [InlineData("gaya.turian.export", "Cannot export")]
+    public void AFailedSaveStopsTheCommand(string command, string refusal)
+    {
+        var (tab, document) = project.OpenFake("menu");
+        document.Edit();
+        document.SaveFailure = "locked";
+
+        Run(command);
+
+        Assert.True(tab.IsDirty);
+        Assert.False(Play.IsActive);
+        Assert.Empty(tasks.Snapshot());
+        var messages = project.Reported();
+        Assert.Contains(messages, static message => message.Contains("locked", StringComparison.Ordinal));
+        Assert.Contains(messages, message => message.StartsWith(refusal, StringComparison.Ordinal)
+            && message.Contains("menu", StringComparison.Ordinal));
+    }
+
+    /// <summary>A document that says it was written but stays dirty refuses the run too.</summary>
+    [Fact]
+    public void ADocumentLeftDirtyStopsPlay()
+    {
+        var (_, document) = project.OpenFake("menu");
+        document.Edit();
+        document.StaysDirty = true;
+
+        Run("gaya.turian.play");
+
+        Assert.False(Play.IsActive);
+        Assert.Contains("Cannot play: these documents are not saved: menu.", project.Reported());
+    }
+
+    /// <summary>Build and Run and Export save the contributed documents before their task is submitted.</summary>
+    [Theory]
+    [InlineData("gaya.turian.buildAndRun", "Build & run")]
+    [InlineData("gaya.turian.export", "Export")]
+    public void BuildsSaveTheDocumentsFirst(string command, string task)
+    {
+        var release = Occupy(task);
+        var (_, document) = project.OpenFake("menu");
+        document.Edit();
+        try
+        {
+            Run(command);
+
+            Assert.Equal([false], document.Saves);
+            Assert.False(document.IsDirty);
+            Assert.Single(tasks.Snapshot());
+        }
+        finally
+        {
+            release.SetResult();
+        }
+    }
+
+    /// <summary>Play Startup Scene saves the documents, opens the scene and starts it.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayStartupSceneSavesTheDocumentsFirst(bool hasProject)
+    {
+        var (_, document) = project.OpenFake("menu");
+        document.Edit();
+        var session = services.GetRequiredService<ProjectSession>();
+        if (hasProject)
+        {
+            typeof(ProjectSession).GetProperty(nameof(ProjectSession.Settings))!
+                .SetValue(session, project.Settings.Settings);
+            var (_, scene) = project.Source("level.prefab");
+            database.MergeDatabase(new Dictionary<Guid, AssetRecord>
+            {
+                [scene.Id] = new()
+                {
+                    AssetId = scene.Id,
+                    AssetTypeName = typeof(Prefab).FullName!,
+                    ProjectRootPath = project.Root,
+                    SourceRelativePath = scene.RelativePath,
+                },
+            });
+        }
+
+        Run("gaya.turian.playStartupScene");
+
+        Assert.Equal([false], document.Saves);
+        Assert.Equal(hasProject, Play.IsActive);
+        Run("gaya.turian.playStartupScene");
+        Assert.Single(document.Saves);
     }
 }

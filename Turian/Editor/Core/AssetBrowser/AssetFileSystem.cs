@@ -290,22 +290,26 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
     }
 
     /// <summary>Creates a new empty folder.</summary>
-    public bool CreateFolder(string targetDirectory, string folderName)
+    public bool CreateFolder(string targetDirectory, string folderName) =>
+        CreateFolderAt(targetDirectory, folderName) is not null;
+
+    internal string? CreateFolderAt(string targetDirectory, string folderName)
     {
         if (!TryNormalizeName(folderName, string.Empty, out var name))
         {
-            return false;
+            return null;
         }
 
         try
         {
-            Directory.CreateDirectory(GetUniquePath(targetDirectory, name, isDirectory: true));
-            return true;
+            var path = GetUniquePath(targetDirectory, name, isDirectory: true);
+            Directory.CreateDirectory(path);
+            return path;
         }
         catch (Exception ex)
         {
             Log.Logger.LogError(ex, "Failed to create folder in {Path}", targetDirectory);
-            return false;
+            return null;
         }
     }
 
@@ -313,11 +317,14 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
     /// <param name="targetDirectory">Absolute path of the directory to create the material in.</param>
     /// <param name="materialName">Name for the new material.</param>
     /// <returns><c>true</c> when the material was written.</returns>
-    public async Task<bool> CreateEmptyMaterialAsync(string targetDirectory, string materialName)
+    public async Task<bool> CreateEmptyMaterialAsync(string targetDirectory, string materialName) =>
+        await WriteEmptyMaterialAsync(targetDirectory, materialName).ConfigureAwait(false) is not null;
+
+    internal async Task<string?> WriteEmptyMaterialAsync(string targetDirectory, string materialName)
     {
         if (!TryNormalizeName(materialName, materialExtension, out var name))
         {
-            return false;
+            return null;
         }
 
         try
@@ -327,23 +334,26 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
 
             // The content file and its meta carry the same id, so the importer adopts the asset
             // the watcher sees rather than minting a second id for it.
-            await Serializer.SaveAsync(path, material);
-            await Serializer.SaveAsync($"{path}.meta", material);
-            return true;
+            await Serializer.SaveAsync(path, material).ConfigureAwait(false);
+            await Serializer.SaveAsync($"{path}.meta", material).ConfigureAwait(false);
+            return path;
         }
         catch (Exception ex)
         {
             Log.Logger.LogError(ex, "Failed to create material in {Path}", targetDirectory);
-            return false;
+            return null;
         }
     }
 
     /// <summary>Creates a new serialized empty scene file.</summary>
-    public async Task<bool> CreateEmptySceneAsync(string targetDirectory, string sceneName)
+    public async Task<bool> CreateEmptySceneAsync(string targetDirectory, string sceneName) =>
+        await WriteEmptySceneAsync(targetDirectory, sceneName).ConfigureAwait(false) is not null;
+
+    internal async Task<string?> WriteEmptySceneAsync(string targetDirectory, string sceneName)
     {
         if (!TryNormalizeName(sceneName, sceneExtension, out var name))
         {
-            return false;
+            return null;
         }
 
         try
@@ -351,13 +361,13 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
             var path = GetUniquePath(targetDirectory, name, isDirectory: false);
             var fileName = Path.GetFileNameWithoutExtension(path);
             var root = new Node { Name = string.IsNullOrEmpty(fileName) ? defaultScene : fileName };
-            await Serializer.SaveAsync(path, root);
-            return true;
+            await Serializer.SaveAsync(path, root).ConfigureAwait(false);
+            return path;
         }
         catch (Exception ex)
         {
             Log.Logger.LogError(ex, "Failed to create scene in {Path}", targetDirectory);
-            return false;
+            return null;
         }
     }
 

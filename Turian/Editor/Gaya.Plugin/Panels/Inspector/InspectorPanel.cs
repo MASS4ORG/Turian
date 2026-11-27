@@ -77,11 +77,16 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         PrepareForm(gui, target);
         DrawValidation(gui, target);
 
-        RenderForm(gui, target);
+        // Everything that can write to the selection, so an edit of several subjects is one step.
+        using (GroupSubjectEdits(gui, target))
+        {
+            RenderForm(gui, target);
 
-        referenceDrawer.DrawPendingPicker(gui);
-        DrawAddComponentMenu(gui);
-        gui.CascadeMenu(ref overrideMenuOpen, overrideMenuAt, menu => overrideMenu?.Invoke(menu));
+            referenceDrawer.DrawPendingPicker(gui);
+            DrawAddComponentMenu(gui);
+            gui.CascadeMenu(ref overrideMenuOpen, overrideMenuAt, menu => overrideMenu?.Invoke(menu));
+        }
+
         if (removeRequest is { } removing)
         {
             removeRequest = null;

@@ -17,6 +17,18 @@ public sealed partial class AssetTypeCatalog
         }
     }
 
+    /// <summary>
+    /// Registers the built-in kinds and brick appearances, and lets the workspace's document kinds claim files.
+    /// </summary>
+    /// <param name="providers">Appearances supplied by Studio bricks.</param>
+    /// <param name="documentKinds">The kinds whose files open as documents.</param>
+    public AssetTypeCatalog(IEnumerable<IAssetPresentationProvider> providers,
+        WorkspaceDocumentKindRegistry documentKinds) : this(providers)
+    {
+        ArgumentNullException.ThrowIfNull(documentKinds);
+        this.documentKinds = documentKinds;
+    }
+
     /// <summary>Adds or replaces a payload presentation; closest concrete or generic base registration wins.</summary>
     public void Register(AssetTypePresentation presentation)
     {
@@ -45,7 +57,7 @@ public sealed partial class AssetTypeCatalog
     {
         ArgumentNullException.ThrowIfNull(entry);
         if (entry.IsDirectory || presentations.Count == 0) { return null; }
-        if (Resolve(entry.AbsolutePath)?.Id == "turian.dataAsset"
+        if (Resolve(entry.AbsolutePath)?.Id == AssetTypeIds.DataAsset
             && TypeRegistry.TryGetType(PayloadTypeId(entry.AbsolutePath), out var type)
             && PresentationFor(type) is { } payload) { return payload; }
         return PresentationFor(entry.AssetMetadata?.GetType());

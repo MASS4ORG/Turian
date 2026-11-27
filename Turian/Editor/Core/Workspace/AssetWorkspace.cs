@@ -37,7 +37,7 @@ public sealed partial class AssetWorkspace : IDisposable
         this.settings = settings;
         this.services = services;
         this.kinds = services?.GetService<WorkspaceDocumentKindRegistry>() ?? new WorkspaceDocumentKindRegistry(kinds);
-        types = services?.GetService<AssetTypeCatalog>() ?? new AssetTypeCatalog();
+        types = services?.GetService<AssetTypeCatalog>() ?? new AssetTypeCatalog([], this.kinds);
 
         this.kinds.Added += OnKindAdded;
         this.kinds.Removed += OnKindRemoved;
@@ -252,10 +252,7 @@ public sealed partial class AssetWorkspace : IDisposable
     }
 
     /// <summary>Writes every dirty document's edits to disk, continuing past one that fails.</summary>
-    /// <returns>
-    /// False when a contributed or read-only document was not written. An asset whose write failed stays dirty without
-    /// counting.
-    /// </returns>
+    /// <returns>False when a document was not written or still has unsaved edits afterwards.</returns>
     public bool SaveAll()
     {
         var saved = true;
@@ -271,7 +268,8 @@ public sealed partial class AssetWorkspace : IDisposable
             }
         }
 
-        return saved;
+        // A writer can report success and leave a document modified, so what is still dirty decides.
+        return saved && !HasUnsavedChanges;
     }
 
     /// <summary>Drops a document's unsaved edits and reads its source again.</summary>

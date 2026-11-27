@@ -21,11 +21,12 @@ sealed class AssetBrowserHarness : IDisposable
     internal readonly EditorNotifications Notifications = new();
     internal readonly ExternalEditorLauncher Launcher;
     internal readonly AssetOpenService Opener;
-    internal readonly UserPanelCatalog Panels;
     internal readonly SettingsService Settings = new();
     internal readonly AssetManager Assets = new();
     internal readonly AssetWorkspace Workspace;
-    internal readonly ILogger PanelLog = Substitute.For<ILogger>();
+    internal readonly WorkspaceDocumentKindRegistry Kinds = new();
+    internal readonly AssetCreationCatalog Creation;
+    readonly ServiceProvider workspaceServices;
     readonly BuildManager build;
     readonly SKSurface surface;
     readonly Font font = Font.FromFamilyName("sans-serif", 14);
@@ -53,17 +54,18 @@ sealed class AssetBrowserHarness : IDisposable
         Undo = new UndoService(tree, Inspector, assets, loader);
         Labels = new AssetLabelService(Importer, Undo);
         var files = new AssetFileSystem(settings, Importer);
-        var types = new AssetTypeCatalog();
+        var types = new AssetTypeCatalog([], Kinds);
         var inspections = new AssetInspectionService(Importer, types, settings, loader, NullLogger.Instance);
-        var workspace = Workspace = new AssetWorkspace(assets, settings);
+        workspaceServices = new ServiceCollection().AddSingleton(Kinds).AddSingleton(types).AddSingleton(Undo)
+            .AddSingleton(Notifications).BuildServiceProvider();
+        var workspace = Workspace = new AssetWorkspace(assets, settings, services: workspaceServices);
         Launcher = new ExternalEditorLauncher(Registry, Notifications, NullLogger.Instance)
         { OpenWithSystem = static _ => Task.CompletedTask };
-        Panels = new UserPanelCatalog(build, PanelLog);
         Opener = new AssetOpenService(types, workspace, inspections, Inspector,
-            new CodeOpener(settings, Launcher, Notifications, NullLogger.Instance), NullLogger.Instance, Panels, Importer);
+            new CodeOpener(settings, Launcher, Notifications, NullLogger.Instance), NullLogger.Instance, Importer);
+        Creation = new AssetCreationCatalog(files, settings, build, NullLogger.Instance);
         Preferences.ViewMode = mode;
-        Panel = new AssetBrowserPanel(files, settings, Opener, inspections, Inspector, Reveal,
-            new AssetCreationCatalog(files, settings, build, NullLogger.Instance), Preferences,
+        Panel = new AssetBrowserPanel(files, settings, Opener, inspections, Inspector, Reveal, Creation, Preferences,
             Substitute.For<IEditorSettings>(), types, null!,
             new AssetFileOperations(files, Undo), new BricksController(null, null, null, NullLogger.Instance),
             new ConfirmDialogChrome(new StudioLocalization()), build, importer: Importer, labelService: Labels,
@@ -132,9 +134,10 @@ sealed class AssetBrowserHarness : IDisposable
     public void Dispose()
     {
         Panel.Dispose();
+        Creation.Dispose();
+        workspaceServices.Dispose();
         Importer.Dispose();
         Undo.Dispose();
-        Panels.Dispose();
         build.Dispose();
         font.Dispose();
         surface.Dispose();

@@ -24,6 +24,14 @@ public interface IDocumentHistory
     /// <param name="redo">Makes the change again.</param>
     void Record(string label, Action undo, Action redo);
 
+    /// <summary>
+    /// Makes the changes recorded until the result is disposed one step, such as one edit applied to several objects.
+    /// A group opened inside another joins it, and a group without changes records nothing.
+    /// </summary>
+    /// <param name="label">What the step is, for the Edit menu.</param>
+    /// <returns>The open group; disposing it ends it.</returns>
+    IDisposable BeginGroup(string label);
+
     /// <summary>Reverts the latest step.</summary>
     void Undo();
 

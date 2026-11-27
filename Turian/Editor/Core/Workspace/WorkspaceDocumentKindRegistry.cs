@@ -17,6 +17,28 @@ public sealed class WorkspaceDocumentKindRegistry
     /// <summary>The kinds in force, in registration order, which is the order they are offered a source.</summary>
     public IReadOnlyList<IWorkspaceDocumentKind> Kinds => kinds;
 
+    /// <summary>The first kind that edits a source file, or null when none claims it.</summary>
+    /// <param name="sourcePath">Absolute path of the source file.</param>
+    public IWorkspaceDocumentKind? KindFor(string sourcePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        return kinds.FirstOrDefault(kind => Claims(kind, sourcePath));
+    }
+
+    // A kind that cannot check a source does not claim it.
+    internal static bool Claims(IWorkspaceDocumentKind kind, string sourcePath)
+    {
+        try
+        {
+            return kind.CanOpen(sourcePath);
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.LogWarning(ex, "Document kind {Kind} could not check {Path}", kind.Id, sourcePath);
+            return false;
+        }
+    }
+
     /// <summary>Raised after a kind was added.</summary>
     public event Action<IWorkspaceDocumentKind>? Added;
 

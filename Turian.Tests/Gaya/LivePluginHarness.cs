@@ -27,12 +27,13 @@ static class PluginAssemblies
         }
         """;
 
-    /// <summary>Compiles <paramref name="source"/> to a file.</summary>
-    public static void Emit(string path, string assemblyName, string source)
+    /// <summary>Compiles <paramref name="source"/> to a file, referencing any further assemblies given.</summary>
+    public static void Emit(string path, string assemblyName, string source, params string[] further)
     {
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Append(typeof(ILivePlugin).Assembly.Location)
             .Append(typeof(Gaya.EditorSettingAttribute).Assembly.Location)
+            .Concat(further)
             .Distinct()
             .Select(static reference => MetadataReference.CreateFromFile(reference));
         var compilation = CSharpCompilation.Create(assemblyName, [CSharpSyntaxTree.ParseText(source)], references,

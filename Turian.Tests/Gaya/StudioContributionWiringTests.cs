@@ -73,6 +73,16 @@ public sealed class StudioContributionWiringTests
         Assert.Equal(2, panels.All.Count);
     }
 
+    /// <summary>The Build Profiles window is built with the studio's services, including the one that saves.</summary>
+    [Fact]
+    public void BuildProfilesIsBuiltFromTheStudioServices()
+    {
+        var descriptor = StudioContributionsTests.Configure().Panels
+            .Single(static panel => panel.Id == GayaPlugin.BuildProfilesPanelId);
+
+        Assert.IsType<BuildProfilesPanel>(descriptor.Factory(new AnyService()));
+    }
+
     /// <summary>A disposed panel catalog stays empty however often it is refreshed.</summary>
     [Fact]
     public void ADisposedPanelCatalogStaysEmpty()

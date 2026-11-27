@@ -57,12 +57,6 @@ public class AssetManager
     public event Action<bool>? DirtyStateChanged;
 
     /// <summary>
-    /// Writes the source of an asset an editor owns; returns null when it owns none, otherwise whether the write
-    /// succeeded. A failed write keeps the asset modified.
-    /// </summary>
-    public Func<Asset, bool?>? SourceWriter { get; set; }
-
-    /// <summary>
     /// Gets the currently active asset.
     /// </summary>
     public Asset? ActiveAsset => activeAsset;
@@ -207,12 +201,6 @@ public class AssetManager
 
         var trackedAsset = GetTrackedAsset(asset);
         if (trackedAsset is null)
-        {
-            return false;
-        }
-
-        // A source an editor writes itself, such as a UI document, is clean only once that write succeeded.
-        if (SourceWriter?.Invoke(trackedAsset) == false)
         {
             return false;
         }
