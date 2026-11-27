@@ -313,7 +313,7 @@ sealed partial class AssetBrowserPanel
     void Activate(AssetEntry entry)
     {
         if (entry.IsDirectory) { NavigateTo(entry.AbsolutePath); ClearFilters(); }
-        else if (!entry.IsReadOnly)
+        else
         {
             opener.Open(entry);
         }

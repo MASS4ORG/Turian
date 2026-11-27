@@ -208,25 +208,24 @@ public sealed class WorkspaceDocumentSaveTests : IDisposable
         Assert.False(unsaved.Any);
     }
 
-    /// <summary>An asset tab opened read-only is never written.</summary>
+    /// <summary>An asset tab opened read-only takes no edits, so it never turns dirty and is never written.</summary>
     [Fact]
-    public void ReadOnlyAssetTabsRefuseSave()
+    public void ReadOnlyAssetTabsTakeNoEditsAndAreNeverWritten()
     {
         var (path, _) = project.Source("level.prefab");
         var tab = Workspace.Open(path, readOnly: true)!;
         var saved = 0;
         project.Assets.AssetSaved += _ => saved++;
         Assert.True(tab.IsReadOnly);
-        Assert.True(Workspace.Save(tab).Succeeded);
 
         project.Assets.AlterAsset(tab.Asset!);
 
-        Assert.False(Workspace.Save(tab).Succeeded);
-        Assert.False(Workspace.SaveAll());
-        Assert.False(Workspace.Close(tab, UnsavedChanges.Save));
+        Assert.False(tab.IsDirty);
+        Assert.False(project.Assets.SaveAsset(tab.Asset!));
+        Assert.True(Workspace.Save(tab).Succeeded);
+        Assert.True(Workspace.SaveAll());
+        Assert.True(Workspace.Close(tab, UnsavedChanges.Save));
         Assert.Equal(0, saved);
-        Assert.True(tab.IsDirty);
-        Assert.NotEmpty(project.Reported());
     }
 
     /// <summary>An asset tab reports a write the asset writers could not complete.</summary>

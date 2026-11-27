@@ -142,7 +142,7 @@ sealed partial class InspectorPanel
     FormModel BuildModel(object target) => target switch
     {
         FormInspection inspection => inspection.Model,
-        Node => InspectorForms.BuildForNodes(frameNodes, inspector.CreateMutationNotifier()),
+        Node => InspectorForms.BuildForNodes(frameNodes, inspector.CreateMutationNotifier(), ShowsReadOnlyScene),
         _ when IsSubject(target) => BuildSubjectForm(target),
         _ => InspectorForms.Build(target, _ => assets.AlterAssetForSelectedNode()),
     };

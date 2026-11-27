@@ -28,7 +28,7 @@ public sealed partial class AssetWorkspace
             return open;
         }
 
-        var isReadOnly = readOnly || services?.GetService<AssetImporter>()?.IsSourceReadOnly(path) == true;
+        var isReadOnly = readOnly || IsReadOnlySource(path);
         var history = new DocumentHistory();
         IWorkspaceDocument opened;
         try
@@ -62,6 +62,9 @@ public sealed partial class AssetWorkspace
             deactivatingAssets = false;
         }
     }
+
+    bool IsReadOnlySource(string? path) =>
+        path is not null && services?.GetService<AssetImporter>()?.IsSourceReadOnly(path) == true;
 
     internal string? SourcePathOf(Asset? asset) =>
         asset is null or TemporaryScene || settings.Settings?.ProjectAbsoluteDir is not { Length: > 0 } project
@@ -104,6 +107,11 @@ public sealed partial class AssetWorkspace
         {
             assets.CloseAsset(asset);
             asset.MarkSaved();
+            if (document.IsReadOnly)
+            {
+                assets.SetReadOnly(asset.Id);
+            }
+
             assets.OpenAsset(asset);
         }
         finally

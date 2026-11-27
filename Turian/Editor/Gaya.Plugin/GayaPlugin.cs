@@ -102,7 +102,8 @@ public sealed class GayaPlugin : IPlugin
             {
                 DocumentKinds = context.DocumentKinds,
             },
-            context.Logger, sp.GetRequiredService<EditorNotifications>()));
+            context.Logger, sp.GetRequiredService<EditorNotifications>(),
+            sp.GetRequiredService<WorkspaceDocumentKindRegistry>()));
 
     static void RegisterPanels(IPluginContext context)
     {

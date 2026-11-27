@@ -6,8 +6,12 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed partial class InspectorPanel
 {
+    // The open scene takes no edits, so its nodes are shown without anything that changes them.
+    bool ShowsReadOnlyScene => assets.ActiveAsset is { } scene && assets.IsReadOnly(scene.Id);
+
     bool CanDropScript(ScriptDragPayload drop) =>
-        frameNodes.Count > 0 && frameNodes.All(node => ComponentRegistry.CanAddTo(node, drop.ComponentType));
+        !ShowsReadOnlyScene && frameNodes.Count > 0
+        && frameNodes.All(node => ComponentRegistry.CanAddTo(node, drop.ComponentType));
 
     void DropScript(ScriptDragPayload drop) => AddComponent(drop.ComponentType);
 

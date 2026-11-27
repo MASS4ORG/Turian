@@ -60,11 +60,12 @@ public static class InspectorForms
     /// </summary>
     /// <param name="node">The node to inspect.</param>
     /// <param name="mutationNotifier">Called with the mutated object after any field is written.</param>
-    public static FormModel BuildForNode(Node node, Action<object>? mutationNotifier = null)
+    /// <param name="readOnly">Disables edits and actions throughout the form.</param>
+    public static FormModel BuildForNode(Node node, Action<object>? mutationNotifier = null, bool readOnly = false)
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        var options = Options(mutationNotifier);
+        var options = Options(mutationNotifier, readOnly);
         var sections = new List<FormSection> { WithActiveSwitch(FormBuilder.Section(node, node.Name, options), options) };
         sections.AddRange(node.Components.Select(component => WithActiveSwitch(
             FormBuilder.Section(component, component.GetType().Name, options, removable: true), options)));
@@ -73,7 +74,8 @@ public static class InspectorForms
     }
 
     /// <summary>Builds shared node fields and components matched by type and occurrence across every selected node.</summary>
-    public static FormModel BuildForNodes(IReadOnlyList<Node> nodes, Action<object>? mutationNotifier = null)
+    public static FormModel BuildForNodes(IReadOnlyList<Node> nodes, Action<object>? mutationNotifier = null,
+        bool readOnly = false)
     {
         ArgumentNullException.ThrowIfNull(nodes);
         if (nodes.Count == 0)
@@ -83,10 +85,10 @@ public static class InspectorForms
 
         if (nodes.Count == 1)
         {
-            return BuildForNode(nodes[0], mutationNotifier);
+            return BuildForNode(nodes[0], mutationNotifier, readOnly);
         }
 
-        var models = nodes.Select(node => BuildForNode(node, mutationNotifier)).ToArray();
+        var models = nodes.Select(node => BuildForNode(node, mutationNotifier, readOnly)).ToArray();
         var sections = new List<FormSection>
         {
             CombineSections(models.Select(model => model.Sections[0]).ToArray(), $"{nodes.Count} Objects"),

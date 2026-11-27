@@ -171,7 +171,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             }
         }
 
-        if (target is Node)
+        if (target is Node && !ShowsReadOnlyScene)
         {
             RenderAddComponent(gui);
         }
@@ -308,6 +308,12 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     static void RenderName(Gui gui, FormField name)
     {
         var current = name.HasMixedValue ? string.Empty : name.GetValue() as string ?? string.Empty;
+        if (name.IsReadOnly)
+        {
+            gui.DrawText(current, Theme.Text(13), Theme.Ink, centerInRect: false);
+            return;
+        }
+
         var edited = current;
         gui.TextInput(ref edited, id: "inspector/header/name",
             placeholder: name.HasMixedValue ? "—" : "").ExpandWidth().Height(Theme.Scale(20f)).Padding(4);

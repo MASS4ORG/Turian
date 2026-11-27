@@ -12,6 +12,7 @@ sealed class LivePluginBridge : IDisposable
     readonly LivePluginContext context;
     readonly ILogger log;
     readonly EditorNotifications? notifications;
+    readonly WorkspaceDocumentKindRegistry? workspaceKinds;
 
     // In activation order, so lifetimes are released newest first.
     readonly List<(Assembly Assembly, List<IDisposable> Lifetimes)> active = [];
@@ -25,14 +26,17 @@ sealed class LivePluginBridge : IDisposable
     /// <param name="context">The services and registries handed to every plugin.</param>
     /// <param name="log">Where a plugin that fails is reported.</param>
     /// <param name="notifications">Where a plugin that fails to activate is shown to the user.</param>
+    /// <param name="workspaceKinds">Read around each activation to log the document kinds a plugin added.</param>
     public LivePluginBridge(Func<IReadOnlyList<Assembly>> assemblies, Func<string?> project,
-        LivePluginContext context, ILogger log, EditorNotifications? notifications = null)
+        LivePluginContext context, ILogger log, EditorNotifications? notifications = null,
+        WorkspaceDocumentKindRegistry? workspaceKinds = null)
     {
         this.assemblies = assemblies;
         this.project = project;
         this.context = context;
         this.log = log;
         this.notifications = notifications;
+        this.workspaceKinds = workspaceKinds;
     }
 
     /// <summary>Brings the active plugins in line with the assembly set. Cheap when nothing changed.</summary>
@@ -101,9 +105,13 @@ sealed class LivePluginBridge : IDisposable
         {
             try
             {
+                var before = DocumentKindIds();
                 var plugin = (ILivePlugin)Activator.CreateInstance(type)!;
                 lifetimes.Add(plugin.Activate(context)
                               ?? throw new InvalidOperationException("Activate returned no lifetime."));
+                var added = DocumentKindIds().Except(before).ToList();
+                log.LogInformation("Editor plugin {Plugin} activated; document kinds added: {Kinds}", type.FullName,
+                    added.Count == 0 ? "none" : string.Join(", ", added));
             }
             catch (Exception ex)
             {
@@ -131,6 +139,8 @@ sealed class LivePluginBridge : IDisposable
         }
     }
 
+    string[] DocumentKindIds() => [.. workspaceKinds?.Kinds.Select(static kind => kind.Id) ?? []];
+
     IEnumerable<Type> PluginTypes(Assembly assembly)
     {
         Type?[] types;
@@ -140,6 +150,9 @@ sealed class LivePluginBridge : IDisposable
         }
         catch (ReflectionTypeLoadException ex)
         {
+            log.LogWarning(
+                "Editor plugins: some types in {Assembly} could not be loaded, so plugins among them are unavailable: "
+                + "{Problem}", assembly.FullName, ex.LoaderExceptions.FirstOrDefault()?.Message);
             types = ex.Types;
         }
         catch (Exception ex)

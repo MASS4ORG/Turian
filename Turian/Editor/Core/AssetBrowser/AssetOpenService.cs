@@ -18,17 +18,26 @@ public sealed class AssetOpenService(
     // Starts the desktop program for a file.
     internal Action<ProcessStartInfo> Launch { get; set; } = static start => Process.Start(start)?.Dispose();
 
-    /// <summary>Opens what a browser row points at.</summary>
-    /// <param name="entry">The row; directories and rows without metadata do nothing.</param>
-    /// <returns>What was done.</returns>
-    public AssetActivation Open(AssetEntry entry)
+    /// <summary>
+    /// Whether opening a browser row does anything. A read-only file opens only as a studio document, which shows it
+    /// without writing it; it is never handed to a program that could.
+    /// </summary>
+    /// <param name="entry">The row.</param>
+    /// <returns>False for directories and read-only files the studio has no document for.</returns>
+    public bool CanOpen(AssetEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-
-        return entry.IsDirectory
-            ? AssetActivation.None
-            : Open(entry.AbsolutePath, entry.AssetMetadata, entry.IsReadOnly);
+        return !entry.IsDirectory
+               && (!entry.IsReadOnly || types.ActivationFor(entry.AbsolutePath) == AssetActivation.Edit);
     }
+
+    /// <summary>Opens what a browser row points at.</summary>
+    /// <param name="entry">The row; one that <see cref="CanOpen"/> refuses does nothing.</param>
+    /// <returns>What was done.</returns>
+    public AssetActivation Open(AssetEntry entry) =>
+        CanOpen(entry)
+            ? Open(entry.AbsolutePath, entry.AssetMetadata, entry.IsReadOnly)
+            : AssetActivation.None;
 
     /// <summary>Opens a source file, using its metadata when the studio is the one to edit it.</summary>
     /// <param name="absolutePath">Absolute path of the source file.</param>
@@ -48,7 +57,7 @@ public sealed class AssetOpenService(
                 return OpenDocument(absolutePath, isReadOnly);
 
             case AssetActivation.Edit when metadata is not null:
-                workspace.Open(metadata);
+                workspace.Open(metadata, isReadOnly);
                 return AssetActivation.Edit;
 
             case AssetActivation.Inspect:
@@ -60,6 +69,9 @@ public sealed class AssetOpenService(
                 return AssetActivation.ExternalProgram;
 
             case AssetActivation.ExternalProgram:
+                log.LogInformation(
+                    "No studio editor claims {Path}, so the system program opens it; a brick's editor is missing when "
+                    + "its brick or its code failed to load", absolutePath);
                 OpenExternally(absolutePath);
                 return AssetActivation.ExternalProgram;
 

@@ -311,7 +311,8 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
 
         if (tasks.Get(id) is { Status: BackgroundTaskStatus.Failed })
         {
-            log.LogWarning("User scripts are unavailable. Fix the errors in Output, then recompile scripts");
+            log.LogWarning("User scripts are unavailable, as are the editors of bricks compiled with them. "
+                + "Fix the errors in Output, then recompile scripts");
         }
 
         return tasks.Get(id) is { Status: BackgroundTaskStatus.Completed };

@@ -79,11 +79,12 @@ public sealed partial class AssetWorkspace : IDisposable
 
     /// <summary>
     /// Opens an asset, or activates it when it is already open. An asset whose source a contributed kind claims opens
-    /// as that kind's document.
+    /// as that kind's document, and one inside an installed brick opens read-only.
     /// </summary>
     /// <param name="asset">The asset to open.</param>
+    /// <param name="readOnly">Whether the source may not be written, for a document opened by this call.</param>
     /// <returns>The document for it.</returns>
-    public AssetWrapper Open(Asset asset)
+    public AssetWrapper Open(Asset asset, bool readOnly = false)
     {
         ArgumentNullException.ThrowIfNull(asset);
 
@@ -94,14 +95,27 @@ public sealed partial class AssetWorkspace : IDisposable
             return open;
         }
 
-        if (SourcePathOf(asset) is { } path && KindFor(path) is { } kind
-            && OpenContributed(kind, path, asset.Id, readOnly: false) is { } contributed)
+        var path = SourcePathOf(asset);
+        if (path is not null && KindFor(path) is { } kind
+            && OpenContributed(kind, path, asset.Id, readOnly) is { } contributed)
         {
             return contributed;
         }
 
+        // Marked before the asset opens, so nothing that follows it can change it.
+        if (Find(asset) is null && (readOnly || IsReadOnlySource(path)))
+        {
+            assets.SetReadOnly(asset.Id);
+        }
+
         assets.OpenAsset(asset);
-        return Find(asset) ?? Track(asset);
+        var document = Find(asset) ?? Track(asset);
+        if (assets.IsReadOnly(asset.Id))
+        {
+            document.OpenReadOnly();
+        }
+
+        return document;
     }
 
     /// <summary>
@@ -140,13 +154,7 @@ public sealed partial class AssetWorkspace : IDisposable
             return open;
         }
 
-        var document = Open(asset);
-        if (readOnly)
-        {
-            document.OpenReadOnly();
-        }
-
-        return document;
+        return Open(asset, readOnly);
     }
 
     /// <summary>Opens a new empty scene backed by a temporary prefab for this editing session.</summary>
