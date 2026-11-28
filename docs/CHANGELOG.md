@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-11-28
+
 - Added: editor brick panels #70
 - Added: per-document-type layouts
 - Added: asset reimport signal on the asset database #422
@@ -259,7 +261,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v5.4.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v5.5.0...HEAD
+[5.5.0]: https://github.com/MASS4ORG/Turian/compare/v5.4.0...v5.5.0
 [5.4.0]: https://github.com/MASS4ORG/Turian/compare/v5.3.0...v5.4.0
 [5.3.0]: https://github.com/MASS4ORG/Turian/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/MASS4ORG/Turian/compare/v5.1.0...v5.2.0
