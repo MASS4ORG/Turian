@@ -17,6 +17,8 @@ public sealed class GayaPlugin : IPlugin
 
         args = context.CommandLineArgs;
         RegisterServices(context);
+        RegisterDocumentFollowers(context);
+        RegisterLivePlugins(context);
         RegisterSettings(context);
         ViewportThemeTokens.Register(context.Themes);
         RegisterPanels(context);
@@ -65,8 +67,11 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<ExternalEditorFieldEditor>(), sp.GetRequiredService<IExternalEditorRegistry>()));
 
         context.Services.AddSingleton(sp => new UserPanelBridge(
-            sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands, context.Menus,
-            context.Logger));
+            sp.GetRequiredService<UserPanelCatalog>(), context.Panels, context.Commands, context.Menus, context.Logger));
+
+        context.Services.AddSingleton(sp => new NewAssetMenuBridge(
+            sp.GetRequiredService<AssetCreationCatalog>(), sp.GetRequiredService<EditorAssemblySet>(),
+            context.Commands, context.Menus));
 
         context.Services.AddSingleton<OutputRevealService>();
 
@@ -76,22 +81,33 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<BuildManager>()));
     }
 
+    // What follows the open tabs: the running scene's tab, each tab's selection and the workbench's documents.
+    static void RegisterDocumentFollowers(IPluginContext context)
+    {
+        context.Services.AddSingleton(static sp => new PlayingDocument(
+            sp.GetRequiredService<PlayModeService>(), sp.GetRequiredService<IDocumentService>()));
+        context.Services.AddSingleton(static sp => new DocumentSelectionMemory(
+            sp.GetRequiredService<IDocumentService>(), sp.GetRequiredService<NodeInspectorController>(),
+            sp.GetRequiredService<SceneTreeController>(), sp.GetRequiredService<InspectorSourceCatalog>()));
+        context.Services.AddSingleton(static sp => new DocumentWorkspaceBridge(
+            sp.GetRequiredService<AssetWorkspace>(), sp.GetRequiredService<IDocumentService>()));
+    }
+
+    // Project editor bricks load when a project opens, so their plugins get the registries kept from this call.
+    static void RegisterLivePlugins(IPluginContext context) =>
+        context.Services.AddSingleton(sp => new LivePluginBridge(
+            () => sp.GetRequiredService<EditorAssemblySet>().Current,
+            () => sp.GetRequiredService<SettingsService>().Settings?.ProjectAbsoluteDir,
+            new LivePluginContext(sp, context.Panels, context.Commands, context.Menus)
+            {
+                DocumentKinds = context.DocumentKinds,
+            },
+            context.Logger, sp.GetRequiredService<EditorNotifications>(),
+            sp.GetRequiredService<WorkspaceDocumentKindRegistry>()));
+
     static void RegisterPanels(IPluginContext context)
     {
-        context.Panels.Register(new PanelDescriptor(
-            SceneTreePanelId, "Scene Tree", PanelPlacement.Left,
-            static sp => new SceneTreePanel(
-                sp.GetRequiredService<SceneTreeController>(),
-                sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetManager>(),
-                sp.GetRequiredService<PrefabAuthoring>(),
-                sp.GetRequiredService<PrefabStage>(),
-                sp.GetRequiredService<SettingsService>(),
-                sp.GetRequiredService<UndoService>(),
-                sp.GetRequiredService<PrefabOverrideOperations>(),
-                sp.GetRequiredService<ConfirmDialogChrome>(),
-                sp.GetRequiredService<StudioLocalization>(),
-                sp.GetRequiredService<AssetDatabase>())));
+        SceneDocumentPanels.Register(context);
 
         var inspectorInstances = new InspectorInstances(context.Panels);
         inspectorInstances.RegisterInitial(InspectorPanelId);
@@ -103,36 +119,6 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<InspectorInstances>().CreateAdditional()))
         { MenuLabel = "New Inspector" });
         context.Menus.Add(new MenuItemDescriptor(MenuIds.View, "gaya.turian.inspector.new", "8"));
-
-        context.Panels.Register(new PanelDescriptor(
-            ViewportPanelId, "Scene", PanelPlacement.Center,
-            static sp => new ScenePanel(
-                new SceneViewport(
-                    sp.GetRequiredService<Vulkan>(),
-                    sp.GetRequiredService<AssetDatabase>(),
-                    sp.GetRequiredService<SceneTreeController>(),
-                    sp.GetRequiredService<NodeInspectorController>(),
-                    sp.GetRequiredService<GizmoDrawerCatalog>(),
-                    sp.GetRequiredService<PlayModeService>(),
-                    sp.GetRequiredService<EditorCameraSettings>(),
-                    sp.GetRequiredService<ILogger>(),
-                    sp.GetRequiredService<UndoService>(),
-                    sp.GetRequiredService<LocaleService>()),
-                sp.GetRequiredService<SceneTreeController>(),
-                sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetWorkspace>(),
-                sp.GetRequiredService<PrefabStage>())));
-
-        context.Panels.Register(new PanelDescriptor(
-            "gaya.turian.game", "Game", PanelPlacement.Center,
-            static sp => new GamePanel(
-                new GameViewport(
-                    sp.GetRequiredService<Vulkan>(),
-                    sp.GetRequiredService<AssetDatabase>(),
-                    sp.GetRequiredService<SceneTreeController>(),
-                    sp.GetRequiredService<PlayModeService>(),
-                    sp.GetRequiredService<ILogger>(),
-                    sp.GetRequiredService<EditorCameraSettings>()))));
 
         context.Panels.Register(new PanelDescriptor(
             AssetsPanelId, "Assets", PanelPlacement.Bottom,
@@ -195,7 +181,8 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<NodeInspectorController>(),
                     sp.GetRequiredService<AssetRevealService>()),
                 sp.GetRequiredService<BuildManager>(),
-                sp.GetRequiredService<BackgroundTaskRunner>()))
+                sp.GetRequiredService<BackgroundTaskRunner>(),
+                sp.GetRequiredService<UnsavedWork>()))
         { OpenByDefault = false });
     }
 
@@ -203,7 +190,8 @@ public sealed class GayaPlugin : IPlugin
         TestRunnerPanelId, "Test Runner", PanelPlacement.Center,
         static sp => new TestRunnerPanel(sp.GetRequiredService<SettingsService>(),
             sp.GetRequiredService<BackgroundTaskRunner>(), sp.GetRequiredService<PlayModeService>(),
-            sp.GetRequiredService<BuildManager>(), sp.GetRequiredService<ILogger>()))
+            sp.GetRequiredService<BuildManager>(), sp.GetRequiredService<UnsavedWork>(),
+            sp.GetRequiredService<ILogger>()))
     { OpenByDefault = false });
 
     static void RegisterShellChrome(IPluginContext context)
@@ -395,7 +383,9 @@ public sealed class GayaPlugin : IPlugin
 
         services.GetRequiredService<UndoService>().Flush();
         services.GetRequiredService<AssetAutoSave>().Flush();
+        services.GetRequiredService<LivePluginBridge>().Sync();
         services.GetRequiredService<UserMenuBridge>().Sync();
+        services.GetRequiredService<NewAssetMenuBridge>().Sync();
         services.GetRequiredService<ProjectSettingsMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<PlatformSettingsBridge>().Sync();
@@ -418,6 +408,9 @@ public sealed class GayaPlugin : IPlugin
         }
 
         services.GetRequiredService<ProjectSession>().SaveSession();
+
+        // Released while every service is still alive, and after the session recorded the open documents.
+        services.GetRequiredService<LivePluginBridge>().Dispose();
         services.GetRequiredService<IEditorSettings>().Save();
     }
 
@@ -443,10 +436,21 @@ public sealed class GayaPlugin : IPlugin
         services.GetRequiredService<OutputLogBridge>();
         services.GetRequiredService<SceneDocumentBinder>().Attach();
 
+        // The followers subscribe before the bridge starts publishing tabs, so none misses an event.
+        services.GetRequiredService<PlayingDocument>();
+        services.GetRequiredService<DocumentSelectionMemory>();
+        services.GetRequiredService<DocumentWorkspaceBridge>();
+
         // An undone or redone asset edit is saved like any other edit to it.
         services.GetRequiredService<UndoService>().AssetRestored +=
             services.GetRequiredService<AssetAutoSave>().MarkChanged;
+
+        // Brick document kinds and panels have to be there before a project's documents are restored.
+        var livePlugins = services.GetRequiredService<LivePluginBridge>();
+        services.GetRequiredService<ProjectSession>().Restoring += livePlugins.Sync;
+        livePlugins.Sync();
         services.GetRequiredService<UserMenuBridge>().Sync();
+        services.GetRequiredService<NewAssetMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<PlatformSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();

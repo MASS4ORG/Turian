@@ -83,10 +83,19 @@ public sealed class AssemblySlotManager
                          .Where(path => !string.Equals(Path.GetFullPath(path), fullPath, StringComparison.Ordinal))
                          .Order(StringComparer.Ordinal))
             {
-                userAssemblies.Add(newContext.LoadFromFileBytes(path));
+                var loaded = newContext.LoadFromFileBytes(path);
+                if (BrokenAssemblies.Initialize(loaded, logger))
+                {
+                    userAssemblies.Add(loaded);
+                }
             }
 
             var primary = newContext.LoadFromFileBytes(fullPath);
+            if (!BrokenAssemblies.Initialize(primary, logger))
+            {
+                throw new InvalidOperationException($"{Path.GetFileName(fullPath)} cannot be initialized");
+            }
+
             userAssemblies.Add(primary);
 
             // Success – unload the old context first

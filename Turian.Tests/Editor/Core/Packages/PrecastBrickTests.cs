@@ -188,4 +188,26 @@ public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixtu
         Assert.Contains(CsProjectGenerator.DiscoverAssemblies(new BuildAppSettings { Title = "Game", ProjectAbsoluteDir = project }).Definitions,
             a => a.Name == "Mateo.Inventory");
     }
+
+    /// <summary>
+    /// A payload built with an older minor of this engine's major still loads, and one built with a newer minor does
+    /// not: a minor release only adds API.
+    /// </summary>
+    [Theory]
+    [InlineData(-1, true)]
+    [InlineData(1, false)]
+    public void PayloadsLoadFromTheMinorTheyWereBuiltWithOn(int minorOffset, bool loads)
+    {
+        var engine = ProjectPackages.EngineVersion;
+        var built = BrickArchive.ReadManifest(fixture.Packed, ["turian"]).Precast!;
+        built.BuiltWith[ProjectPackages.HostName] = new SemanticVersion(engine.Major, Math.Max(0, engine.Minor + minorOffset), 0);
+        var packed = BrickService.Pack(fixture.Folder, Path.Combine(root, "minor"), built);
+
+        var project = Path.Combine(root, "project");
+        Directory.CreateDirectory(Path.Combine(project, "Assets"));
+        var brick = BrickService.Add(project, "user.mateo.inventory", $"file:{packed.Path}").Packages
+            .Single(static p => p.Id == "user.mateo.inventory");
+
+        Assert.Equal(loads, BrickAssemblies.IsPrecast(brick));
+    }
 }

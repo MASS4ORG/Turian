@@ -3,15 +3,20 @@ using MASS4.Bricks;
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Checks that every asset id in a project and its packages is claimed once. Scenes reference assets by id alone,
-/// so a package reusing an id — two versions of one package, or a copied folder — would make references ambiguous.
+/// Checks that no package reuses an asset id. Scenes reference assets by id alone, so a package reusing one — two
+/// versions of one package, or a copied folder — would make references ambiguous.
 /// </summary>
 public static class PackageAssetIds
 {
-    /// <summary>Fails when two meta files, in the project's <c>Assets</c> or its packages, share an asset id.</summary>
+    const string projectOwner = "the project";
+
+    /// <summary>
+    /// Fails when a package's meta file shares an asset id with another meta file. Ids repeated within the project's
+    /// <c>Assets</c> are left to the asset database, so they never cost the project its packages.
+    /// </summary>
     /// <param name="assetsDirectory">The project's <c>Assets</c> folder.</param>
     /// <param name="packages">The resolved packages.</param>
-    /// <exception cref="PackageException">An id is claimed twice.</exception>
+    /// <exception cref="PackageException">A package's id is claimed twice.</exception>
     public static void EnsureUnique(string assetsDirectory, IReadOnlyList<ResolvedPackage> packages)
     {
         ArgumentNullException.ThrowIfNull(packages);
@@ -22,7 +27,7 @@ public static class PackageAssetIds
 
         var owners = new Dictionary<Guid, string>();
         var roots = packages.Select(static p => (p.RootPath, Owner: $"package {p.Id}"))
-            .Prepend((assetsDirectory, Owner: "the project"));
+            .Prepend((assetsDirectory, Owner: projectOwner));
 
         foreach (var (root, owner) in roots.Where(static r => Directory.Exists(r.Item1)))
         {
@@ -35,7 +40,7 @@ public static class PackageAssetIds
                 }
 
                 var claim = $"{owner} ({meta})";
-                if (!owners.TryAdd(id, claim))
+                if (!owners.TryAdd(id, claim) && owner != projectOwner)
                 {
                     throw new PackageException($"Asset id {id} is claimed by {owners[id]} and by {claim}.");
                 }

@@ -14,7 +14,7 @@ public sealed class PrefabAuthoring(
     /// <summary>Saves <paramref name="node"/> as a new prefab next to <paramref name="directory"/>'s other assets.</summary>
     /// <param name="node">The node to save; it becomes an instance of the new prefab.</param>
     /// <param name="directory">The folder to write the prefab to.</param>
-    /// <returns>The new prefab's path, or null when it could not be imported.</returns>
+    /// <returns>The new prefab's path, or null when it could not be imported or the scene is read-only.</returns>
     public string? CreatePrefab(Node node, string directory)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -28,7 +28,7 @@ public sealed class PrefabAuthoring(
         Action? restoreLinkedIds = null;
         try
         {
-            undo.Perform("Create Prefab", [node],
+            var created = undo.Perform("Create Prefab", [node],
                 () =>
                 {
                     if (restoreLinkedIds is not null)
@@ -48,7 +48,7 @@ public sealed class PrefabAuthoring(
                     trashed = files.MoveToTrash(path);
                     restoreOriginalIds();
                 });
-            return path;
+            return created ? path : null;
         }
         catch (InvalidOperationException exception)
         {

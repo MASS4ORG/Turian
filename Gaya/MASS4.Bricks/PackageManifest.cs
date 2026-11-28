@@ -26,7 +26,10 @@ public sealed record PackageSample(string DisplayName, string Path, string? Desc
 /// </summary>
 public sealed class PackagePrecast
 {
-    /// <summary>Host → the exact host version the assemblies were compiled against; consumers on another major or minor version ignore the payload.</summary>
+    /// <summary>
+    /// Host → the exact host version the assemblies were compiled against; consumers on another major, or on an older
+    /// minor than the one built with, ignore the payload.
+    /// </summary>
     public Dictionary<string, SemanticVersion> BuiltWith { get; set; } = [];
 
     /// <summary>Names of the assemblies games run with (<c>Precast~/lib</c>).</summary>
@@ -34,6 +37,27 @@ public sealed class PackagePrecast
 
     /// <summary>Names of the assemblies only the editor loads (<c>Precast~/editor</c>).</summary>
     public List<string> EditorAssemblies { get; set; } = [];
+
+    /// <summary>
+    /// Whether a host running <paramref name="running"/> loads assemblies compiled against <paramref name="built"/>:
+    /// the same major and the same or an older minor, since a minor release only adds to the host's API.
+    /// </summary>
+    /// <param name="built">The host version the assemblies were compiled against.</param>
+    /// <param name="running">The host version that would load them.</param>
+    /// <returns>Whether the assemblies load.</returns>
+    public static bool Loads(SemanticVersion built, SemanticVersion running)
+    {
+        ArgumentNullException.ThrowIfNull(built);
+        ArgumentNullException.ThrowIfNull(running);
+        return built.Major == running.Major && built.Minor <= running.Minor;
+    }
+
+    /// <summary>Whether <paramref name="host"/> running <paramref name="running"/> loads this payload; one that records no version for the host is loaded.</summary>
+    /// <param name="host">The host's name, as <see cref="BuiltWith"/> keys it.</param>
+    /// <param name="running">The host version that would load the payload.</param>
+    /// <returns>Whether the payload loads.</returns>
+    public bool LoadsOn(string host, SemanticVersion running) =>
+        !BuiltWith.TryGetValue(host, out var built) || Loads(built, running);
 }
 
 /// <summary>

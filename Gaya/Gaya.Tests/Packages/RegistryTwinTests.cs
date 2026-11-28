@@ -248,7 +248,7 @@ public sealed class RegistryTwinTests : IDisposable
     {
         Publish("user.mateo.rules", "1.1.0", mateo);
         PublishVariant("user.mateo.rules", "1.1.0", "engine1.2",
-            new PackagePrecast { BuiltWith = { ["engine"] = SemanticVersion.Parse("1.1.0") } });
+            new PackagePrecast { BuiltWith = { ["engine"] = SemanticVersion.Parse("1.3.0") } });
         Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
 
         var resolution = await Resolver(host: "1.2.0").ResolveAsync(project, TestContext.Current.CancellationToken);
@@ -419,9 +419,11 @@ public sealed class RegistryTwinTests : IDisposable
             error.Message, StringComparison.Ordinal);
     }
 
-    /// <summary>Cached precast assemblies are checked against the running host before reuse.</summary>
+    /// <summary>
+    /// Cached precast assemblies from an older minor of the running host are reused: a minor release only adds API.
+    /// </summary>
     [Fact]
-    public async Task CachedPrecastFromAnotherMinorFallsBackToSource()
+    public async Task CachedPrecastFromAnOlderMinorIsReused()
     {
         Publish("user.mateo.rules", "1.1.0", mateo);
         PublishVariant("user.mateo.rules", "1.1.0", "engine1.2",
@@ -431,8 +433,41 @@ public sealed class RegistryTwinTests : IDisposable
 
         var resolution = await Resolver(host: "1.3.0").ResolveAsync(project, TestContext.Current.CancellationToken);
 
+        Assert.Equal("engine1.2", resolution.Packages[0].Manifest.Variant);
+        Assert.Empty(resolution.Warnings);
+    }
+
+    /// <summary>Cached precast assemblies from a newer minor than the running host are left for the source.</summary>
+    [Fact]
+    public async Task CachedPrecastFromANewerMinorFallsBackToSource()
+    {
+        Publish("user.mateo.rules", "1.1.0", mateo);
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.3",
+            new PackagePrecast { BuiltWith = { ["engine"] = SemanticVersion.Parse("1.3.0") } });
+        Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
+        (await Resolver(host: "1.3.0").ResolveAsync(project, TestContext.Current.CancellationToken)).Lock.Save(project);
+
+        var resolution = await Resolver(host: "1.2.0").ResolveAsync(project, TestContext.Current.CancellationToken);
+
         Assert.Null(resolution.Packages[0].Manifest.BakeOf);
-        Assert.Contains("which engine 1.3.0 does not load", Assert.Single(resolution.Warnings), StringComparison.Ordinal);
+        Assert.Contains("which engine 1.2.0 does not load", Assert.Single(resolution.Warnings), StringComparison.Ordinal);
+    }
+
+    /// <summary>A payload loads on the same major at the minor it was built with or a later one, never an earlier one.</summary>
+    [Theory]
+    [InlineData("1.2.0", "1.2.0", true)]
+    [InlineData("1.2.0", "1.2.7", true)]
+    [InlineData("1.2.3", "1.2.0", true)]
+    [InlineData("1.0.0", "1.4.0", true)]
+    [InlineData("1.3.0", "1.2.9", false)]
+    [InlineData("1.2.0", "2.0.0", false)]
+    [InlineData("2.0.0", "1.9.0", false)]
+    public void PayloadsLoadOnTheSameMajorFromTheirMinorOn(string built, string running, bool loads)
+    {
+        var precast = new PackagePrecast { BuiltWith = { ["engine"] = SemanticVersion.Parse(built) } };
+
+        Assert.Equal(loads, precast.LoadsOn("engine", SemanticVersion.Parse(running)));
+        Assert.True(precast.LoadsOn("other", SemanticVersion.Parse(running)));
     }
 
     /// <summary>A bake with an invalid registry signature is refused before source fallback.</summary>

@@ -29,7 +29,11 @@ sealed class UnsavedChangesGuard(
         {
             if (choice == UnsavedChanges.Save)
             {
-                unsaved.SaveAll();
+                // A document that could not be written stays open and dirty, so the project is not left.
+                if (!unsaved.SaveAll())
+                {
+                    return;
+                }
             }
             else
             {

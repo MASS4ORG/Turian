@@ -18,7 +18,9 @@ public sealed class GayaApplication(
     IReadOnlyList<IPlugin>? plugins = null,
     EditorSettings? settings = null,
     ThemeService? themes = null,
-    ILogger? logger = null) : IDisposable
+    ILogger? logger = null,
+    DocumentService? documents = null,
+    DocumentKindRegistry? documentKinds = null) : IDisposable
 {
     ILogger Logger => logger ?? NullLogger.Instance;
 
@@ -39,6 +41,12 @@ public sealed class GayaApplication(
 
     /// <summary>Chrome contributions drawn outside the dock space.</summary>
     public ChromeRegistry Chrome { get; } = chrome;
+
+    /// <summary>The open documents and the active one; the workbench follows it.</summary>
+    public DocumentService Documents { get; } = documents ?? new DocumentService();
+
+    /// <summary>Document kinds plugins registered.</summary>
+    public DocumentKindRegistry DocumentKinds { get; } = documentKinds ?? new DocumentKindRegistry();
 
     /// <summary>Key sequences the workbench dispatches, with the user's overrides applied.</summary>
     public ShortcutService Shortcuts { get; } = shortcuts;
@@ -122,7 +130,10 @@ public static class PluginHost
         var chrome = new ChromeRegistry();
         var shortcuts = new ShortcutService(logger, settings);
         var focus = new FocusTracker();
+        var documents = new DocumentService();
+        var documentKinds = new DocumentKindRegistry();
 
+        services.AddSingleton<IDocumentService>(documents);
         services.AddSingleton<ICommandCatalog>(commands);
         services.AddSingleton<IShortcutService>(shortcuts);
         services.AddSingleton<IFocusTracker>(focus);
@@ -138,7 +149,7 @@ public static class PluginHost
         foreach (var (attr, type) in ordered)
         {
             var plugin = (IPlugin)Activator.CreateInstance(type)!;
-            var context = new PluginContext(services, panels, commands, menus, chrome,
+            var context = new PluginContext(services, panels, documentKinds, commands, menus, chrome,
                 shortcuts, settings, themes, logger, args);
             logger.LogDebug("Configuring plugin {PluginId} ({DisplayName})", attr.Id, attr.DisplayName);
             plugin.Configure(context);
@@ -163,7 +174,8 @@ public static class PluginHost
 
         logger.LogInformation("Gaya loaded {Count} plugin(s): {Plugins}", loaded.Count, string.Join(", ", loaded));
         var app = new GayaApplication(provider, panels, commands, menus, chrome, shortcuts,
-            focus, loaded, [.. instances.Select(static entry => entry.Plugin)], settings, themes, logger);
+            focus, loaded, [.. instances.Select(static entry => entry.Plugin)], settings, themes, logger,
+            documents, documentKinds);
         app.LivePlugins = new LivePluginHost(app, provider.GetRequiredService<StudioBricks>(), logger);
         return app;
     }
@@ -299,6 +311,7 @@ public static class PluginHost
     sealed class PluginContext(
         IServiceCollection services,
         IPanelRegistry panels,
+        IDocumentKindRegistry documentKinds,
         ICommandRegistry commands,
         IMenuRegistry menus,
         IChromeRegistry chrome,
@@ -311,6 +324,7 @@ public static class PluginHost
         public IThemeTokenRegistry Themes => themes;
         public IServiceCollection Services => services;
         public IPanelRegistry Panels => panels;
+        public IDocumentKindRegistry DocumentKinds => documentKinds;
         public ICommandRegistry Commands => commands;
         public IMenuRegistry Menus => menus;
         public IChromeRegistry Chrome => chrome;

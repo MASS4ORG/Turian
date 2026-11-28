@@ -67,10 +67,15 @@ public static class PrecastAssemblies
             try
             {
                 var assembly = Assembly.Load(new AssemblyName(name));
+                if (!BrokenAssemblies.Initialize(assembly, logger))
+                {
+                    continue;
+                }
+
                 TypeRegistry.ScanAssembly(assembly);
                 Register(assembly);
             }
-            catch (Exception ex) when (ex is FileNotFoundException or FileLoadException or BadImageFormatException)
+            catch (Exception ex) when (BrokenAssemblies.IsLoadFailure(ex))
             {
                 logger.LogWarning(ex, "Could not load brick assembly {AssemblyName}", name);
             }

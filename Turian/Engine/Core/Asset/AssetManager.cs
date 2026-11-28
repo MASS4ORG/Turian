@@ -8,6 +8,7 @@ public class AssetManager
     readonly HashSet<Asset> assets = [];
     readonly Dictionary<Guid, Asset> assetsById = [];
     readonly Dictionary<Guid, Node?> selectedNodesByAssetId = [];
+    readonly HashSet<Guid> readOnlyAssetIds = [];
     Asset? activeAsset;
     Node? selectedNode;
 
@@ -120,6 +121,17 @@ public class AssetManager
     }
 
     /// <summary>
+    /// Keeps an asset from being modified or saved until it is closed, such as one opened from an installed brick.
+    /// Alterations are still announced, so an editor can take the change back.
+    /// </summary>
+    /// <param name="assetId">The asset id.</param>
+    public void SetReadOnly(Guid assetId) => _ = readOnlyAssetIds.Add(assetId);
+
+    /// <summary>Whether <see cref="SetReadOnly"/> keeps the asset from being modified or saved.</summary>
+    /// <param name="assetId">The asset id.</param>
+    public bool IsReadOnly(Guid assetId) => readOnlyAssetIds.Contains(assetId);
+
+    /// <summary>
     /// Closes an asset and updates the active asset if needed.
     /// </summary>
     /// <param name="asset"></param>
@@ -139,6 +151,7 @@ public class AssetManager
         }
 
         selectedNodesByAssetId.Remove(asset.Id);
+        readOnlyAssetIds.Remove(asset.Id);
 
         if (ReferenceEquals(activeAsset, asset))
         {
@@ -200,7 +213,7 @@ public class AssetManager
         ArgumentNullException.ThrowIfNull(asset);
 
         var trackedAsset = GetTrackedAsset(asset);
-        if (trackedAsset is null)
+        if (trackedAsset is null || IsReadOnly(trackedAsset.Id))
         {
             return false;
         }
@@ -236,7 +249,11 @@ public class AssetManager
         }
 
         activeAsset ??= trackedAsset;
-        trackedAsset.MarkModified();
+        if (!IsReadOnly(trackedAsset.Id))
+        {
+            trackedAsset.MarkModified();
+        }
+
         AssetAltered?.Invoke(trackedAsset);
         DirtyStateChanged?.Invoke(HasDirtyAssets);
         return true;

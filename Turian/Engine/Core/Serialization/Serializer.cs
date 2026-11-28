@@ -67,7 +67,7 @@ public static class Serializer
 
         var amObjectType = typeof(IdObject);
         var derivedTypes = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(static a => !CollectibleAssemblies.IsReleased(a))
+            .Where(static a => !CollectibleAssemblies.IsReleased(a) && !BrokenAssemblies.IsBroken(a))
             .SelectMany(a =>
             {
                 try
@@ -84,9 +84,17 @@ public static class Serializer
         foreach (var derivedType in derivedTypes)
         {
             var converterType = typeof(ObjectJsonSerializer<>).MakeGenericType(derivedType);
-            if (Activator.CreateInstance(converterType) is JsonConverter converterInstance)
+            try
             {
-                options.Converters.Add(converterInstance);
+                if (Activator.CreateInstance(converterType) is JsonConverter converterInstance)
+                {
+                    options.Converters.Add(converterInstance);
+                }
+            }
+            catch (Exception ex) when (BrokenAssemblies.IsLoadFailure(ex))
+            {
+                // A type whose assembly cannot initialize has no converter; the assembly is skipped from now on.
+                BrokenAssemblies.Mark(derivedType.Assembly, ex, Log.Logger);
             }
         }
 

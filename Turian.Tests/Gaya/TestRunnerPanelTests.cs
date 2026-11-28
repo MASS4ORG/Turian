@@ -4,8 +4,11 @@ namespace Turian.Tests;
 [Collection(SerialTests.Name)]
 public sealed class TestRunnerPanelTests : IDisposable
 {
-    readonly string root = Directory.CreateTempSubdirectory("turian-test-panel-").FullName;
-    readonly SettingsService settings = new();
+    readonly DocumentProject project = new();
+    string root => project.Root;
+    SettingsService settings => project.Settings;
+    readonly AssetImporter importer;
+    readonly AssetAutoSave autoSave;
     readonly BackgroundTaskManager tasks = new() { Retention = TimeSpan.Zero };
     readonly ServiceProvider services = new ServiceCollection().BuildServiceProvider();
     readonly BuildManager build;
@@ -24,6 +27,11 @@ public sealed class TestRunnerPanelTests : IDisposable
         settings.Set(project);
         ProjectPackages.OptOutOfDefault(root, ProjectPackages.RenderBrick);
         build = new BuildManager(project, NullLogger.Instance);
+        importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), settings, build);
+        importer.StopMonitoring();
+        var inspections = new AssetInspectionService(importer, new AssetTypeCatalog(), settings,
+            Substitute.For<IAssetLoader>(), NullLogger.Instance);
+        autoSave = new AssetAutoSave(inspections, TimeSpan.FromHours(1));
         var host = Substitute.For<IPlaySceneHost>();
         host.CurrentSceneRoot.Returns(new Node());
         play = new PlayModeService(host, new AssetDatabase(), services, NullLogger.Instance);
@@ -39,6 +47,7 @@ public sealed class TestRunnerPanelTests : IDisposable
         var shell = Substitute.For<IShellHost>();
         using var panelServices = new ServiceCollection().AddSingleton(settings).AddSingleton(play).AddSingleton(build)
             .AddSingleton(new BackgroundTaskRunner(tasks, NullLogger.Instance)).AddSingleton(shell)
+            .AddSingleton(new UnsavedWork(this.project.Workspace, autoSave, this.project.Notifications))
             .AddSingleton<ILogger>(NullLogger.Instance).BuildServiceProvider();
         var descriptor = Assert.Single(panels, static item => item.Id == GayaPlugin.TestRunnerPanelId);
         Assert.False(descriptor.OpenByDefault);
@@ -103,14 +112,26 @@ public sealed class TestRunnerPanelTests : IDisposable
     {
         await new ProjectBootstrapper().CreateAsync(root);
         ProjectPackages.OptOutOfDefault(root, ProjectPackages.RenderBrick);
+        var (_, document) = project.OpenFake("menu");
+        document.Edit();
+        var path = Path.Combine(root, "Assets", "stats.dataasset");
+        var meta = new DataAssetAsset { Id = Guid.NewGuid(), RelativePath = "Assets/stats.dataasset" };
+        Serializer.Save(path + ".meta", meta);
+        autoSave.MarkChanged(new AssetInspection(meta, path, new ObjectReferencesTests.Stats { Health = 7 },
+            "Stats", IsPayload: true));
         Assert.Equal(BackgroundTaskStatus.Completed, await Execute("tests/discover"));
+        Assert.False(document.IsDirty);
+        Assert.False(autoSave.HasPending);
+        Assert.Contains("7", File.ReadAllText(path), StringComparison.Ordinal);
         Frame();
         Frame();
         Assert.Equal(SceneTestStatus.NotRun, Assert.Single(Report.Tests).Status);
         var source = Path.Combine(root, "Tests", "SceneTests.cs");
         await File.WriteAllTextAsync(source, File.ReadAllText(source).Replace("Equal(3L", "Equal(4L", StringComparison.Ordinal),
             TestContext.Current.CancellationToken);
+        document.Edit();
         Assert.Equal(BackgroundTaskStatus.Failed, await Execute("tests/run"));
+        Assert.False(document.IsDirty);
         Frame();
         Frame();
         var test = Assert.Single(Report.Tests);
@@ -127,6 +148,20 @@ public sealed class TestRunnerPanelTests : IDisposable
         Assert.Empty(Report.Tests);
     }
 
+    /// <summary>Failed saves stop either test action and identify the unsaved document.</summary>
+    [Theory]
+    [InlineData("tests/discover")]
+    [InlineData("tests/run")]
+    public void FailedSaveStopsTests(string action)
+    {
+        var (_, document) = project.OpenFake("menu");
+        document.Edit();
+        document.StaysDirty = true;
+        Click(action);
+        Assert.Empty(tasks.Snapshot());
+        Assert.Contains("Cannot run component tests: these documents are not saved: menu.", project.Reported());
+    }
+
     /// <summary>An empty project starts with runnable discovery and no stale test rows.</summary>
     [Fact]
     public void EmptyProjectsHaveNoResults()
@@ -140,10 +175,11 @@ public sealed class TestRunnerPanelTests : IDisposable
     public void Dispose()
     {
         play.Stop();
+        importer.Dispose();
         build.Dispose();
         services.Dispose();
         surface.Dispose();
         font.Dispose();
-        PrecastBrickFixture.DeleteTree(root);
+        project.Dispose();
     }
 }

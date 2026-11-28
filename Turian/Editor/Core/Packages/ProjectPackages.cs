@@ -109,6 +109,7 @@ public static class ProjectPackages
 
         var resolution = NewResolver(locked, update).ResolveAsync(projectRoot).GetAwaiter().GetResult();
         PackageAssetIds.EnsureUnique(Path.Combine(projectRoot, "Assets"), resolution.Packages);
+        BrickAssemblies.ApplyDependencyRule(resolution.Packages, Log.Logger);
         foreach (var warning in resolution.Warnings)
         {
             Log.Logger.LogWarning("{Warning}", warning);

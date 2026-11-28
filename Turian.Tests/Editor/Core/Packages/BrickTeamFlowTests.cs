@@ -39,6 +39,20 @@ public sealed class BrickTeamFlowTests : IDisposable
         Assert.Throws<PackageException>(() => BrickStub.Write(real, stub));
     }
 
+    /// <summary>UI style sheets are text sources, so a stub keeps them instead of replacing them with placeholders.</summary>
+    [Fact]
+    public void StubsKeepUiStyleSheets()
+    {
+        var real = RealBrick();
+        const string sheet = "button { color = #fff; }\n";
+        File.WriteAllText(Path.Combine(real, "Runtime", "Menu.pss"), sheet);
+        var stub = Path.Combine(root, "stub");
+
+        BrickStub.Write(real, stub);
+
+        Assert.Equal(sheet, File.ReadAllText(Path.Combine(stub, "Runtime", "Menu.pss")));
+    }
+
     /// <summary>A stub that lost an asset, changed its kind or renamed a type is reported against the real brick.</summary>
     [Fact]
     public void DriftedStubsAreReported()

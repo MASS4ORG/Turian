@@ -11,6 +11,8 @@ public sealed class BuildProfilesPanelTests : IDisposable
     readonly UndoService undo;
     readonly AssetAutoSave autoSave;
     readonly BuildProfilesPanel panel;
+    readonly AssetWorkspace documents;
+    readonly BackgroundTaskManager tasks = new();
     readonly Gui gui;
     readonly IInputHandler input = Substitute.For<IInputHandler>();
     readonly SKSurface surface = SKSurface.Create(new SKImageInfo(1000, 800));
@@ -39,9 +41,10 @@ public sealed class BuildProfilesPanelTests : IDisposable
         var inspections = new AssetInspectionService(importer, new AssetTypeCatalog(), settings,
             loader, NullLogger.Instance);
         autoSave = new AssetAutoSave(inspections, TimeSpan.FromHours(1));
+        documents = new AssetWorkspace(assets, settings, [new FakeDocumentKind()]);
         panel = new BuildProfilesPanel(settings, inspections, autoSave, undo,
             new ReferenceDrawer(new ReferencePicker(database, tree, loader), selection, new AssetRevealService()),
-            build, new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance));
+            build, new BackgroundTaskRunner(tasks, NullLogger.Instance), new UnsavedWork(documents, autoSave));
         input.MousePosition.Returns(new Vector2(-1));
         input.GetTypedCharacters().Returns(string.Empty);
         gui = new Gui { Input = input };
@@ -107,6 +110,27 @@ public sealed class BuildProfilesPanelTests : IDisposable
         Assert.Equal(BuildTaskState.Failed, result.State);
         Assert.Contains("missing-device", result.Message);
         Assert.False(Assert.Single(BuildProfiles.List(settings.Settings!)).IsActive);
+    }
+
+    /// <summary>Building writes the open documents first, and builds nothing while one cannot be written.</summary>
+    [Fact]
+    public void BuildingIsRefusedWhileADocumentCannotBeWritten()
+    {
+        ProjectSettingsFiles.CreateBuildProfile(settings.Settings!, new BuildProfile { Name = "Player" });
+        var listing = Assert.Single(BuildProfiles.List(settings.Settings!));
+        var source = Path.Combine(root, "Assets", "menu.fake");
+        File.WriteAllText(source, string.Empty);
+        File.WriteAllText(source + ".meta", Serializer.Serialize(
+            new Asset { Id = Guid.NewGuid(), RelativePath = "Assets/menu.fake" }));
+        var document = (FakeDocument)documents.Open(source)!.Document!;
+        document.Edit();
+        document.SaveFailure = "locked";
+
+        typeof(BuildProfilesPanel).GetMethod("Build", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(panel, [listing.Id, false]);
+
+        Assert.Equal([false], document.Saves);
+        Assert.Empty(tasks.Snapshot());
     }
 
     void AddTarget(int index)
@@ -295,6 +319,7 @@ public sealed class BuildProfilesPanelTests : IDisposable
     public void Dispose()
     {
         panel.Dispose();
+        documents.Dispose();
         undo.Dispose();
         importer.Dispose();
         build.Dispose();

@@ -1,34 +1,38 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Discovers the settings pages user code contributes with <see cref="Gaya.EditorSettingAttribute"/>: an
-/// annotated class with a public parameterless constructor becomes a page in the editor's settings.
-/// Framework-agnostic — it yields paths and instances, and a shell turns those into whatever its
-/// settings panel is made of.
+/// Discovers the settings pages user code and editor bricks contribute with
+/// <see cref="Gaya.EditorSettingAttribute"/>: an annotated class with a public parameterless constructor becomes a page
+/// in the editor's settings. Framework-agnostic — it yields paths and instances, and a shell turns those into whatever
+/// its settings panel is made of.
 /// </summary>
 /// <remarks>
-/// Rescanning creates fresh instances, because a recompile replaces the types they came from. The
-/// values the user had set are restored from the settings file when the page is registered again.
+/// A page keeps its instance while its assembly stays in force, and a recompile creates fresh ones. The values the
+/// user had set are restored from the settings file when a page is registered again.
 /// </remarks>
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed class UserSettingsCatalog
 {
     readonly BuildManager buildManager;
+    readonly EditorAssemblySet assemblies;
     readonly ILogger log;
 
     readonly List<UserSettingsPage> pages = [];
-    ReflectionAssembly? scanned;
-    bool scannedOnce;
+    readonly Dictionary<ReflectionAssembly, IReadOnlyList<UserSettingsPage>> scanned = [];
+    IReadOnlyList<ReflectionAssembly>? scannedUsers;
+    IReadOnlyList<ReflectionAssembly>? scannedEditors;
 
     /// <summary>Creates the catalog over the build manager that owns the user assembly.</summary>
-    /// <param name="buildManager">Supplies the currently loaded user assembly.</param>
+    /// <param name="buildManager">Supplies the currently loaded user assemblies.</param>
     /// <param name="log">Where a page that cannot be created is reported.</param>
-    public UserSettingsCatalog(BuildManager buildManager, ILogger log)
+    /// <param name="assemblies">The editor assemblies; one over <paramref name="buildManager"/> when omitted.</param>
+    public UserSettingsCatalog(BuildManager buildManager, ILogger log, EditorAssemblySet? assemblies = null)
     {
         ArgumentNullException.ThrowIfNull(buildManager);
         ArgumentNullException.ThrowIfNull(log);
 
         this.buildManager = buildManager;
+        this.assemblies = assemblies ?? new EditorAssemblySet(buildManager);
         this.log = log;
     }
 
@@ -36,8 +40,8 @@ public sealed class UserSettingsCatalog
     public event Action? Changed;
 
     /// <summary>
-    /// The pages user code currently contributes. Rescans when the user assembly has been swapped
-    /// since the last call, which is what makes the settings follow a recompile.
+    /// The pages currently contributed. Rescans when an assembly joined or left since the last call, which is what
+    /// makes the settings follow a recompile or a brick change.
     /// </summary>
     public IReadOnlyList<UserSettingsPage> Pages
     {
@@ -48,40 +52,48 @@ public sealed class UserSettingsCatalog
         }
     }
 
-    /// <summary>Rescans if the user assembly changed. Cheap when it has not.</summary>
+    /// <summary>Rescans if the contributing assemblies changed. Cheap when they have not.</summary>
     public void EnsureRefreshed()
     {
-        var current = buildManager.ActiveUserAssembly;
-        if (scannedOnce && ReferenceEquals(current, scanned))
+        var users = buildManager.ActiveUserAssembly is null ? [] : buildManager.ActiveUserAssemblies;
+        var editors = assemblies.Current;
+        if (ReferenceEquals(users, scannedUsers) && ReferenceEquals(editors, scannedEditors))
         {
             return;
         }
 
-        scanned = current;
-        scannedOnce = true;
-        Rescan(current);
+        scannedUsers = users;
+        scannedEditors = editors;
+        Rescan([.. users.Concat(editors).Distinct()]);
     }
 
-    void Rescan(ReflectionAssembly? assembly)
+    void Rescan(IReadOnlyList<ReflectionAssembly> current)
     {
-        var previous = pages.Count;
-        pages.Clear();
-
-        if (assembly is not null)
+        foreach (var gone in scanned.Keys.Except(current).ToList())
         {
-            foreach (var userAssembly in buildManager.ActiveUserAssemblies)
+            scanned.Remove(gone);
+        }
+
+        var next = new List<UserSettingsPage>();
+        foreach (var assembly in current)
+        {
+            if (!scanned.TryGetValue(assembly, out var found))
             {
-                pages.AddRange(Scan(userAssembly, log));
+                scanned.Add(assembly, found = Scan(assembly, log));
             }
+
+            next.AddRange(found);
         }
 
-        log.LogDebug("User settings: {Count} page(s) from {Assembly}", pages.Count,
-            assembly?.GetName().Name ?? "no user assembly");
-
-        if (previous != 0 || pages.Count != 0)
+        if (next.SequenceEqual(pages))
         {
-            Changed?.Invoke();
+            return;
         }
+
+        pages.Clear();
+        pages.AddRange(next);
+        log.LogDebug("User settings: {Count} page(s) from {Assemblies} assemblies", pages.Count, current.Count);
+        Changed?.Invoke();
     }
 
     /// <summary>

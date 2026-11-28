@@ -72,6 +72,10 @@ public sealed partial class AssetImporter : IDisposable
         this.settingsService = settingsService;
 
         assetImporters = BuildImporterList();
+        if (build is not null)
+        {
+            build.UserAssembliesChanged += ImportDeferredAfterCompile;
+        }
 
         if (this.settingsService is { HasSettings: true, Settings: not null })
         {

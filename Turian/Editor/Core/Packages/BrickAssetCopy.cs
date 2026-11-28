@@ -16,7 +16,7 @@ public sealed record CopiedAsset(string Source, string Target, Guid OldId, Guid 
 /// </summary>
 public static class BrickAssetCopy
 {
-    static readonly string[] RemappedExtensions = [".prefab", ".dataasset", ".asset", ".json", ".ui", ".uss", ".meta", ".mat", ".material"];
+    static readonly string[] RemappedExtensions = [".prefab", ".dataasset", ".asset", ".json", ".ui", ".pss", ".meta", ".mat", ".material"];
 
     /// <summary>The brick's importable assets: every file with a <c>.meta</c> beside it, outside <c>~</c> folders.</summary>
     /// <param name="brick">The installed brick.</param>

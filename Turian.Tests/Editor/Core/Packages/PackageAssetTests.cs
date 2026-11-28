@@ -70,6 +70,31 @@ public sealed class PackageAssetTests : IDisposable
         Assert.Throws<PackageException>(() => PackageAssetIds.EnsureUnique(assets, [Package("com.acme.a", "a")]));
     }
 
+    /// <summary>
+    /// An id repeated within the project, as after copying an asset folder, leaves the packages resolvable; the asset
+    /// database keeps the first claim.
+    /// </summary>
+    [Fact]
+    public void IdsRepeatedInsideTheProjectDoNotCostItsPackages()
+    {
+        var shared = Guid.NewGuid();
+        Meta(Path.Combine(assets, "Textures", "Icon.png"), shared);
+        Meta(Path.Combine(assets, "UI", "Textures", "Icon.png"), shared);
+        Meta(Path.Combine(root, "a", "Other.png"), Guid.NewGuid());
+
+        PackageAssetIds.EnsureUnique(assets, [Package("com.acme.a", "a")]);
+
+        var database = new AssetDatabase();
+        database.SetPackageRoots(project, [Path.Combine(root, "a")]);
+        database.BuildDatabase(assets);
+        Assert.Equal(2, database.Assets.Count);
+
+        Meta(Path.Combine(root, "a", "Icon.png"), shared);
+        var error = Assert.Throws<PackageException>(() =>
+            PackageAssetIds.EnsureUnique(assets, [Package("com.acme.a", "a")]));
+        Assert.Contains("com.acme.a", error.Message, StringComparison.Ordinal);
+    }
+
     ResolvedPackage Package(string id, string folder) =>
         new(id, new PackageManifest { Name = id, Version = SemanticVersion.Parse("1.0.0") }, Path.Combine(root, folder),
             PackageOrigin.File, $"file:../{folder}", null, null, 1, false);

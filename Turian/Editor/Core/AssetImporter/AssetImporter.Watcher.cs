@@ -57,7 +57,7 @@ public sealed partial class AssetImporter
         {
             asset = CreateOrLoadAssetMetadata(filePath, metaFilePath);
         }
-        catch (UnresolvableTypeIdException ex)
+        catch (Exception ex) when (IsUnavailableType(ex))
         {
             WarnUnavailableType(metaFilePath, ex);
             return;
@@ -75,13 +75,18 @@ public sealed partial class AssetImporter
             overwriteExisting ? "updated" : "created",
             metaFilePath);
 
+        var batched = pendingBatch is not null;
         FinishAssetImport(asset, filePath, notify: true);
+        if (!batched)
+        {
+            assetDatabase.NotifyAssetReimported(asset.Id);
+        }
     }
 
     bool TryRegisterMetadata(string path)
     {
         try { return RegisterExistingMetaFile(path); }
-        catch (UnresolvableTypeIdException ex)
+        catch (Exception ex) when (IsUnavailableType(ex))
         {
             WarnUnavailableType(path, ex);
             return true;
@@ -119,7 +124,14 @@ public sealed partial class AssetImporter
 
         if (File.Exists(metaPath))
         {
-            RegisterExistingMetaFile(metaPath);
+            try
+            {
+                _ = RegisterExistingMetaFile(metaPath);
+            }
+            catch (Exception ex) when (IsUnavailableType(ex))
+            {
+                WarnUnavailableType(metaPath, ex);
+            }
         }
         else
         {
@@ -130,14 +142,33 @@ public sealed partial class AssetImporter
     }
 
     /// <summary>
-    /// The type comes from a brick or assembly that is not installed; rewriting the meta would lose its id, so the
-    /// asset is left as it is.
+    /// The type comes from a brick or assembly that is not installed or not loaded yet; rewriting the meta would lose
+    /// its id, so the asset is left as it is and imported again once a compile may have registered the type.
     /// </summary>
-    void WarnUnavailableType(string metaFilePath, UnresolvableTypeIdException ex) =>
+    void WarnUnavailableType(string metaFilePath, Exception ex)
+    {
+        _ = deferredImports.Add(GetAssetPathFromMeta(metaFilePath));
+        var typeId = ex is UnresolvableTypeIdException unresolved ? unresolved
+            : ex.InnerException is not null ? FindUnresolvable(ex) : null;
         logger.LogWarning(
-            "Asset meta file {MetaFilePath} names type {TypeId}, which nothing provides; the asset is skipped",
+            "Asset meta file {MetaFilePath} names type {TypeId}, which cannot be loaded: {Reason}; the asset is skipped until it can",
             metaFilePath,
-            ex.TypeId);
+            typeId?.TypeId.ToString() ?? "unknown",
+            BrokenAssemblies.MissingAssembly(ex) ?? ex.GetBaseException().Message);
+    }
+
+    static UnresolvableTypeIdException? FindUnresolvable(Exception ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is UnresolvableTypeIdException found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Completes an import: rebuilds the database, registers the asset's children and persists the
@@ -265,13 +296,13 @@ public sealed partial class AssetImporter
                     return existing;
                 }
             }
-            catch (UnresolvableTypeIdException)
+            catch (Exception ex) when (IsUnavailableType(ex))
             {
                 throw;
             }
             catch
             {
-                // ignored - fallback to re-creating metadata
+                // Only a meta that cannot be parsed reaches here; it is replaced.
             }
         }
 

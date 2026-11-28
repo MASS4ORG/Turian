@@ -13,24 +13,25 @@ namespace Turian.Editor.Core;
 /// a preference.
 /// </remarks>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class UserPanelCatalog
+public sealed class UserPanelCatalog : IDisposable
 {
-    readonly BuildManager buildManager;
+    readonly EditorAssemblySet assemblies;
     readonly ILogger log;
 
     readonly List<UserPanelPage> pages = [];
-    ReflectionAssembly? scanned;
-    bool scannedOnce;
+    readonly Dictionary<ReflectionAssembly, IReadOnlyList<UserPanelPage>> scanned = [];
+    bool disposed;
 
     /// <summary>Creates the catalog over the build manager that owns the user assembly.</summary>
     /// <param name="buildManager">Supplies the currently loaded user assembly.</param>
     /// <param name="log">Where a page that cannot be created is reported.</param>
-    public UserPanelCatalog(BuildManager buildManager, ILogger log)
+    /// <param name="assemblies">The assemblies to scan; one over <paramref name="buildManager"/> when omitted.</param>
+    public UserPanelCatalog(BuildManager buildManager, ILogger log, EditorAssemblySet? assemblies = null)
     {
         ArgumentNullException.ThrowIfNull(buildManager);
         ArgumentNullException.ThrowIfNull(log);
 
-        this.buildManager = buildManager;
+        this.assemblies = assemblies ?? new EditorAssemblySet(buildManager);
         this.log = log;
     }
 
@@ -50,40 +51,96 @@ public sealed class UserPanelCatalog
         }
     }
 
-    /// <summary>Rescans if the user assembly changed. Cheap when it has not.</summary>
+    /// <summary>Refreshes panels when their contributing assemblies change.</summary>
     public void EnsureRefreshed()
     {
-        var current = buildManager.ActiveUserAssembly;
-        if (scannedOnce && ReferenceEquals(current, scanned))
+        if (disposed)
         {
             return;
         }
 
-        scanned = current;
-        scannedOnce = true;
-        Rescan(current);
+        Refresh(assemblies.Current);
     }
 
-    void Rescan(ReflectionAssembly? assembly)
+    internal IReadOnlyList<UserPanelPage> Refresh(IReadOnlyCollection<ReflectionAssembly> current)
     {
-        var previous = pages.Count;
-        pages.Clear();
+        var removed = RemoveAssemblies(current, out var changed);
+        changed |= AddAssemblies(current);
 
-        if (assembly is not null)
+        if (!changed)
         {
-            foreach (var userAssembly in buildManager.ActiveUserAssemblies)
-            {
-                pages.AddRange(Scan(userAssembly, log));
-            }
+            return pages;
         }
 
-        log.LogDebug("User panels: {Count} page(s) from {Assembly}", pages.Count,
-            assembly?.GetName().Name ?? "no user assembly");
-
+        var previous = pages.Count;
+        pages.Clear();
+        pages.AddRange(scanned.Values.SelectMany(static value => value));
         if (previous != 0 || pages.Count != 0)
         {
             Changed?.Invoke();
         }
+
+        DisposePages(removed);
+        return pages;
+    }
+
+    List<UserPanelPage> RemoveAssemblies(IReadOnlyCollection<ReflectionAssembly> current, out bool changed)
+    {
+        var gone = scanned.Keys.Except(current).ToArray();
+        changed = gone.Length > 0;
+        var removed = new List<UserPanelPage>();
+        foreach (var assembly in gone)
+        {
+            removed.AddRange(scanned[assembly]);
+            scanned.Remove(assembly);
+        }
+
+        return removed;
+    }
+
+    bool AddAssemblies(IReadOnlyCollection<ReflectionAssembly> current)
+    {
+        var changed = false;
+        foreach (var assembly in current)
+        {
+            if (!scanned.ContainsKey(assembly))
+            {
+                scanned.Add(assembly, Scan(assembly, log));
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    void DisposePages(IEnumerable<UserPanelPage> removed)
+    {
+        foreach (var page in removed)
+        {
+            if (page.Target is IDisposable disposable)
+            {
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "User panel {Panel} could not be disposed", page.Id);
+                }
+            }
+        }
+    }
+
+    /// <summary>Releases the catalog's panel instances.</summary>
+    public void Dispose()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
+        Refresh([]);
     }
 
     /// <summary>

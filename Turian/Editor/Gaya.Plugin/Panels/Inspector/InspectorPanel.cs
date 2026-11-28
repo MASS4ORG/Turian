@@ -3,12 +3,14 @@ namespace Gaya.Plugin.Turian;
 /// <summary>
 /// Edits the selected node: its own members, then one section per component, built by
 /// <see cref="InspectorForms"/> and drawn by <see cref="FormRenderer"/>. An asset selected in the
-/// browser is edited here too — its data payload, or the import settings its importer declares.
+/// browser is edited here too — its data payload, or the import settings its importer declares — and so is a selection
+/// an <see cref="IInspectorSource"/> describes, whose own setters record its undo steps.
 /// </summary>
 sealed partial class InspectorPanel(NodeInspectorController inspector, AssetManager assets,
     ReferencePicker references, AssetRevealService reveal, AssetInspectionService inspections,
     InspectorSettings settings, Vulkan vulkan, AssetPreviewCatalog previews, UndoService undo, AssetAutoSave autoSave,
-    PrefabOverrideOperations prefabOperations, PrefabStage prefabStage, AssetDatabase database, LayerFilter? layers = null)
+    PrefabOverrideOperations prefabOperations, PrefabStage prefabStage, AssetDatabase database,
+    LayerFilter? layers = null, InspectorSourceCatalog? sources = null, IDocumentService? documents = null)
     : IPanel, IDisposable
 {
     readonly ReferenceDrawer referenceDrawer = new(references, inspector, reveal);
@@ -41,30 +43,6 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     Vector2 overrideMenuAt;
     Action<FlyoutBuilder>? overrideMenu;
     Component? removeRequest;
-    object? lockedTarget;
-    object? frameTarget;
-    IReadOnlyList<Node> frameNodes = [];
-    IReadOnlyList<Node> builtNodes = [];
-    IReadOnlyList<Node> lockedNodes = [];
-    int selectionComponents;
-    IReadOnlyList<AssetInspection> frameAssets = [];
-    IReadOnlyList<AssetInspection> builtAssets = [];
-    IReadOnlyList<AssetInspection> lockedAssets = [];
-
-    /// <summary>
-    /// Whether this instance keeps showing <see cref="lockedTarget"/> instead of following the shared
-    /// selection, so one instance can stay put while another follows clicks.
-    /// </summary>
-    public bool Locked
-    {
-        get => lockedTarget is not null;
-        set
-        {
-            lockedTarget = value ? inspector.SelectedNode ?? inspector.SelectedObject : null;
-            lockedNodes = value ? inspector.SelectedNodes : [];
-            lockedAssets = value ? [.. inspector.Selection.Objects.OfType<AssetInspection>()] : [];
-        }
-    }
 
     /// <inheritdoc />
     public void Render(Gui gui)
@@ -76,6 +54,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         var target = FrameSelection(gui);
         if (target is null)
         {
+            ReleaseSubjectForm();
             return;
         }
 
@@ -98,11 +77,16 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         PrepareForm(gui, target);
         DrawValidation(gui, target);
 
-        RenderForm(gui, target);
+        // Everything that can write to the selection, so an edit of several subjects is one step.
+        using (GroupSubjectEdits(gui, target))
+        {
+            RenderForm(gui, target);
 
-        referenceDrawer.DrawPendingPicker(gui);
-        DrawAddComponentMenu(gui);
-        gui.CascadeMenu(ref overrideMenuOpen, overrideMenuAt, menu => overrideMenu?.Invoke(menu));
+            referenceDrawer.DrawPendingPicker(gui);
+            DrawAddComponentMenu(gui);
+            gui.CascadeMenu(ref overrideMenuOpen, overrideMenuAt, menu => overrideMenu?.Invoke(menu));
+        }
+
         if (removeRequest is { } removing)
         {
             removeRequest = null;
@@ -143,18 +127,6 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         };
     }
 
-    object? FrameSelection(Gui gui)
-    {
-        // Both passes draw the same selection; clicks become visible in the next frame.
-        if (gui.Pass == Pass.Pass1Build)
-        {
-            frameTarget = lockedTarget ?? inspector.SelectedNode ?? inspector.SelectedObject;
-            frameNodes = Locked ? lockedNodes : inspector.SelectedNodes;
-            frameAssets = Locked ? lockedAssets : [.. inspector.Selection.Objects.OfType<AssetInspection>()];
-        }
-        return frameTarget;
-    }
-
     void PrepareForm(Gui gui, object target)
     {
         if (!trackingEdits)
@@ -171,9 +143,6 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             RebuildForm(target, components);
         }
     }
-
-    bool NeedsRebuild(object target, int components, int allComponents) => !ReferenceEquals(builtFor, target)
-        || components != builtComponents || allComponents != selectionComponents || !builtNodes.SequenceEqual(frameNodes);
 
     void RenderForm(Gui gui, object target)
     {
@@ -202,7 +171,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             }
         }
 
-        if (target is Node)
+        if (target is Node && !ShowsReadOnlyScene)
         {
             RenderAddComponent(gui);
         }
@@ -212,7 +181,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     {
         if (gui.Pass == Pass.Pass1Build)
         {
-            validationWarnings = TagsAndLayersValidation.Warnings(target, layerFilter.Settings);
+            validationWarnings = ValidationWarnings(target);
         }
 
         for (var i = 0; i < validationWarnings.Count; i++)
@@ -222,77 +191,6 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
                 gui.DrawText(validationWarnings[i], Theme.Text(11f), Theme.InkDim);
             }
         }
-    }
-
-    void RebuildForm(object target, int components)
-    {
-        model = target switch
-        {
-            FormInspection inspection => inspection.Model,
-            Node => InspectorForms.BuildForNodes(frameNodes, inspector.CreateMutationNotifier()),
-            _ => InspectorForms.Build(target, _ => assets.AlterAssetForSelectedNode()),
-        };
-        FoldSigningKeys();
-        builtFor = target;
-        builtComponents = components;
-        selectionComponents = frameNodes.Sum(node => node.Components.Count);
-        builtNodes = frameNodes;
-
-        // A component title not seen before starts folded when the setting says so; the node's
-        // own section (index 0) is never one of them — its header is always open. A title the
-        // user has already toggled keeps whatever they left it at.
-        if (!settings.AutoExpandComponents)
-        {
-            foreach (var section in model.Sections.Skip(1))
-            {
-                collapsed.Add(section.Title);
-            }
-        }
-    }
-
-    // A registry's signing keys start folded the first time they are shown; after that the user's choice stands.
-    void FoldSigningKeys()
-    {
-        if (!foldedSigning && model.Sections.Any(static s => s.Title == BrickInspections.SigningTitle))
-        {
-            foldedSigning = true;
-            _ = collapsed.Add(BrickInspections.SigningTitle);
-        }
-    }
-
-    bool CanDropScript(ScriptDragPayload drop) =>
-        frameNodes.Count > 0 && frameNodes.All(node => ComponentRegistry.CanAddTo(node, drop.ComponentType));
-
-    void DropScript(ScriptDragPayload drop) => AddComponent(drop.ComponentType);
-
-    void AddComponent(Type type)
-    {
-        undo.BeginGesture();
-        try
-        {
-            foreach (var node in frameNodes)
-            {
-                undo.RecordObject(node, "Add Component");
-            }
-
-            inspector.AddComponents(frameNodes, type);
-        }
-        finally { undo.EndGesture(); }
-    }
-
-    void RemoveComponents(Component representative)
-    {
-        undo.BeginGesture();
-        try
-        {
-            foreach (var node in frameNodes)
-            {
-                undo.RecordObject(node, "Remove Component");
-            }
-
-            inspector.RemoveComponents(frameNodes, representative);
-        }
-        finally { undo.EndGesture(); }
     }
 
     /// <summary>A labelled button, dimmed and inert while it has nothing to do.</summary>
@@ -410,6 +308,12 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     static void RenderName(Gui gui, FormField name)
     {
         var current = name.HasMixedValue ? string.Empty : name.GetValue() as string ?? string.Empty;
+        if (name.IsReadOnly)
+        {
+            gui.DrawText(current, Theme.Text(13), Theme.Ink, centerInRect: false);
+            return;
+        }
+
         var edited = current;
         gui.TextInput(ref edited, id: "inspector/header/name",
             placeholder: name.HasMixedValue ? "—" : "").ExpandWidth().Height(Theme.Scale(20f)).Padding(4);
@@ -497,7 +401,8 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     void DrawField(Gui gui, FormField field, string id)
     {
         var member = field.CollectionMember ?? field.Name;
-        fieldOverridden = overrides.IsOverridden(field.Target, member);
+        var bindings = BindingsOf(field);
+        fieldOverridden = IsMarked(field, member, bindings);
         try
         {
             using (gui.Node(-1, -1, $"{id}/prefab").ExpandWidth().Direction(Axis.Vertical).Gap(2f).Enter())
@@ -513,6 +418,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
                 }
 
                 gui.FormField(field, id, FormContext);
+                DecorateProperty(gui, bindings);
             }
         }
         finally
@@ -620,21 +526,6 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         menu.Item("Paste Component as New", () => PasteComponentAsNew(copied), enabled: copied is not null);
     }
 
-    void MoveComponent(Component component, bool up)
-    {
-        undo.BeginGesture();
-        try
-        {
-            foreach (var node in frameNodes)
-            {
-                undo.RecordObject(node, up ? "Move Component Up" : "Move Component Down");
-            }
-
-            inspector.MoveComponents(frameNodes, component, up);
-        }
-        finally { undo.EndGesture(); }
-    }
-
     void OpenOverrideMenu(Gui gui, Action<FlyoutBuilder> build)
     {
         overrideMenu = build;
@@ -691,67 +582,6 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         }
     }
 
-    void RenderAddComponent(Gui gui)
-    {
-        using (gui.Node(-1, Theme.Scale(26f), "inspector/addComponent").ExpandWidth()
-                   .Padding(24, 3).AlignContentY(0.5f).Enter())
-        {
-            var interactable = gui.GetInteractable();
-            var hot = interactable.OnHover();
-
-            if (gui.Pass == Pass.Pass2Render)
-            {
-                gui.DrawBackgroundRect(hot ? Theme.Border : Theme.Panel, 3);
-                addAnchor = gui.CurrentNode.Rect;
-            }
-
-            gui.DrawText("Add Component", Theme.Text(12), Theme.Ink);
-
-            if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick())
-            {
-                addMenuAt = new Vector2(addAnchor.X, addAnchor.Y + addAnchor.H);
-                addOpen = !addOpen;
-            }
-        }
-    }
-
-    /// <summary>
-    /// The component menu, nested the way each type's <c>[ComponentContextMenu]</c> path describes it.
-    /// Drawn at the top level of the panel rather than under the button: a menu opened from inside the
-    /// inspector's scrolled subtree is clipped by it.
-    /// </summary>
-    void DrawAddComponentMenu(Gui gui) =>
-        gui.CascadeMenu(ref addOpen, addMenuAt, BuildAddComponentMenu);
-
-    void BuildAddComponentMenu(FlyoutBuilder menu) =>
-        BuildComponentLevel(menu, [.. inspector.GetAvailableComponents(targets: frameNodes)], depth: 0);
-
-    /// <summary>
-    /// Emits one level of the component menu: types whose path ends here become items, and the rest are
-    /// gathered by their next path segment into a submenu that recurses.
-    /// </summary>
-    void BuildComponentLevel(FlyoutBuilder menu, IReadOnlyList<ComponentTypeDescriptor> candidates,
-        int depth)
-    {
-        foreach (var candidate in candidates.Where(c => Segments(c).Length == depth + 1)
-                     .OrderBy(c => c.DisplayName, StringComparer.OrdinalIgnoreCase))
-        {
-            var type = candidate.ComponentType;
-            menu.Item(candidate.DisplayName, () => AddComponent(type));
-        }
-
-        foreach (var group in candidates.Where(c => Segments(c).Length > depth + 1)
-                     .GroupBy(c => Segments(c)[depth], StringComparer.Ordinal)
-                     .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            var nested = group.ToList();
-            menu.Submenu(group.Key, sub => BuildComponentLevel(sub, nested, depth + 1));
-        }
-    }
-
-    static string[] Segments(ComponentTypeDescriptor candidate) =>
-        candidate.MenuPath.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
     void Fold(string title)
     {
         if (!collapsed.Add(title))
@@ -764,6 +594,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     public void Dispose()
     {
         assets.AssetAltered -= OnAssetAltered;
+        ReleaseSubjectForm();
         referenceRegistration?.Dispose();
         preview.Dispose();
     }

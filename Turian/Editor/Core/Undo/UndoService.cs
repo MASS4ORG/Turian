@@ -11,7 +11,7 @@ namespace Turian.Editor.Core;
 /// its steps move to the rebuilt objects. Nothing is recorded while Play Mode shows the running scene.
 /// </remarks>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class UndoService : IDisposable
+public sealed partial class UndoService : IDisposable
 {
     readonly SceneTreeController sceneTree;
     readonly NodeInspectorController inspector;
@@ -123,7 +123,7 @@ public sealed class UndoService : IDisposable
 
     /// <summary>
     /// Performs a change that reaches beyond scene objects, such as rewriting a prefab file, as one undoable step.
-    /// Nothing is recorded when the change throws.
+    /// Nothing is recorded when the change throws, and nothing runs for a read-only document.
     /// </summary>
     /// <param name="label">What the change is.</param>
     /// <param name="objects">
@@ -134,7 +134,8 @@ public sealed class UndoService : IDisposable
     /// <param name="revert">Undoes the change.</param>
     /// <param name="keepValues">Whether <paramref name="objects"/> keep their current values.</param>
     /// <param name="document">The document the step belongs to; the current one when null.</param>
-    public void Perform(string label, IEnumerable<IdObject> objects, Action perform, Action revert,
+    /// <returns>False when the document is read-only, so nothing was done.</returns>
+    public bool Perform(string label, IEnumerable<IdObject> objects, Action perform, Action revert,
         bool keepValues = false, Guid? document = null)
     {
         ArgumentNullException.ThrowIfNull(objects);
@@ -143,6 +144,12 @@ public sealed class UndoService : IDisposable
 
         Flush();
         var owner = document ?? CurrentDocument ?? ProjectDocument;
+        if (assets.IsReadOnly(owner))
+        {
+            Log.Logger.LogWarning("{Change} was not done: the document is read-only", label);
+            return false;
+        }
+
         var before = Capture(objects);
 
         if (keepValues)
@@ -167,8 +174,28 @@ public sealed class UndoService : IDisposable
             { UndoEffect = revert, RedoEffect = perform }, mergeable: false);
         }
 
+        JoinGesture();
         WatchSelection();
         Changed?.Invoke();
+        return true;
+    }
+
+    // Within a gesture, a performed change joins the step the gesture already made in the same document.
+    void JoinGesture()
+    {
+        if (gestures == 0)
+        {
+            return;
+        }
+
+        if (history.UndoSteps is [.., var earlier, var latest] && earlier.Id == gestureStep
+            && earlier.Document == latest.Document)
+        {
+            history.JoinLatest();
+            return;
+        }
+
+        gestureStep = history.UndoSteps[^1].Id;
     }
 
     /// <summary>Starts a gesture, such as a gizmo drag: everything it changes, however long, is one step.</summary>
@@ -218,9 +245,14 @@ public sealed class UndoService : IDisposable
         }
     }
 
-    /// <summary>Records what changed since the last call as one step. The studio calls it once a frame.</summary>
+    /// <summary>
+    /// Records what changed since the last call as one step, or takes it back in a read-only document. The studio
+    /// calls it once a frame.
+    /// </summary>
     public void Flush()
     {
+        var tookBackBefore = tookBack;
+        tookBack = false;
         if (!altered && recorded.Count == 0)
         {
             return;
@@ -245,6 +277,12 @@ public sealed class UndoService : IDisposable
         WatchSelection();
         if (before.Count == 0)
         {
+            return;
+        }
+
+        if (assets.IsReadOnly(owner!.Value))
+        {
+            TakeBack(owner.Value, before, report: !tookBackBefore);
             return;
         }
 

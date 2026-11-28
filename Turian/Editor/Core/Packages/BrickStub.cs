@@ -8,7 +8,7 @@ namespace Turian.Editor.Core;
 /// </summary>
 public static class BrickStub
 {
-    static readonly string[] KeptExtensions = [".meta", ".json", ".dataasset", ".asset", ".prefab", ".ui", ".uss", ".mat", ".txt", ".md"];
+    static readonly string[] KeptExtensions = [".meta", ".json", ".dataasset", ".asset", ".prefab", ".ui", ".pss", ".mat", ".txt", ".md"];
 
     /// <summary>Writes a stub of the brick at <paramref name="packageRoot"/> into <paramref name="outputDirectory"/>.</summary>
     /// <param name="packageRoot">The real brick's folder.</param>

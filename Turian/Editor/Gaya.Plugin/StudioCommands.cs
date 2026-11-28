@@ -67,15 +67,15 @@ static class StudioCommands
     {
         Add(context, MenuIds.Edit, "0", 0, new CommandDescriptor(
             "gaya.turian.undo", "Edit: Undo",
-            static sp => sp.GetRequiredService<UndoService>().Undo(),
-            static sp => sp.GetRequiredService<UndoService>().CanUndo)
-        { DynamicLabel = static sp => StepLabel(sp, "Undo", sp.GetRequiredService<UndoService>().UndoLabel) });
+            static sp => ActiveHistory(sp).Undo(),
+            static sp => ActiveHistory(sp).CanUndo)
+        { DynamicLabel = static sp => StepLabel(sp, "Undo", ActiveHistory(sp).UndoLabel) });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.undo", KeyboardKey.Z, KeyModifiers.Ctrl));
         Add(context, MenuIds.Edit, "0", 1, new CommandDescriptor(
             "gaya.turian.redo", "Edit: Redo",
-            static sp => sp.GetRequiredService<UndoService>().Redo(),
-            static sp => sp.GetRequiredService<UndoService>().CanRedo)
-        { DynamicLabel = static sp => StepLabel(sp, "Redo", sp.GetRequiredService<UndoService>().RedoLabel) });
+            static sp => ActiveHistory(sp).Redo(),
+            static sp => ActiveHistory(sp).CanRedo)
+        { DynamicLabel = static sp => StepLabel(sp, "Redo", ActiveHistory(sp).RedoLabel) });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Z, KeyModifiers.Ctrl | KeyModifiers.Shift));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Y, KeyModifiers.Ctrl));
 
@@ -185,6 +185,11 @@ static class StudioCommands
             static sp => sp.GetRequiredService<AboutDialogChrome>().Open())
         { DynamicLabel = Localized("About") });
     }
+
+    // With no document open, project-wide steps such as moving files stay reachable.
+    static IDocumentHistory ActiveHistory(IServiceProvider services) =>
+        services.GetRequiredService<AssetWorkspace>().Active?.History
+        ?? new UndoServiceHistory(services.GetRequiredService<UndoService>);
 
     /// <summary>"Undo Rename" or plain "Undo" when there is nothing to name.</summary>
     static string StepLabel(IServiceProvider services, string action, string? step)
@@ -420,7 +425,7 @@ static class StudioCommands
 
     /// <summary>
     /// Starts or stops the in-process session. Edits are written first so the copy the session runs
-    /// loads the same assets that are on disk.
+    /// loads the same assets that are on disk, and nothing starts while a document cannot be written.
     /// </summary>
     static void TogglePlay(IServiceProvider services)
     {
@@ -432,7 +437,10 @@ static class StudioCommands
             return;
         }
 
-        services.GetRequiredService<AssetManager>().SaveAllAssets();
+        if (!SaveBefore(services, "play"))
+        {
+            return;
+        }
 
         if (!playMode.Start())
         {
@@ -443,7 +451,7 @@ static class StudioCommands
     static void PlayStartupScene(IServiceProvider services)
     {
         var playMode = services.GetRequiredService<PlayModeService>();
-        if (playMode.IsActive)
+        if (playMode.IsActive || !SaveBefore(services, "play"))
         {
             return;
         }
@@ -454,12 +462,14 @@ static class StudioCommands
         }
 
         FocusGamePanel(services);
-        services.GetRequiredService<AssetManager>().SaveAllAssets();
         if (!playMode.Start())
         {
             services.GetRequiredService<ILogger>().LogWarning("Cannot play the startup scene");
         }
     }
+
+    static bool SaveBefore(IServiceProvider services, string action) =>
+        services.GetRequiredService<UnsavedWork>().SaveBefore(action);
 
     static void FocusGamePanel(IServiceProvider services)
     {
@@ -490,7 +500,10 @@ static class StudioCommands
             return;
         }
 
-        services.GetRequiredService<AssetManager>().SaveAllAssets();
+        if (!SaveBefore(services, "build and run"))
+        {
+            return;
+        }
 
         // A device platform runs the game on the device: export, install and start it there.
         if (build.ActiveProfileDeploys)
@@ -518,11 +531,18 @@ static class StudioCommands
 
     static void Export(IServiceProvider services)
     {
+        if (!SaveBefore(services, "export"))
+        {
+            return;
+        }
+
         var build = services.GetRequiredService<BuildManager>();
         RunExport(services.GetRequiredService<BackgroundTaskRunner>(), () => build.ExportAsync());
     }
 
-    /// <summary>Runs an export as a blocking background task that the status bar shows.</summary>
+    /// <summary>
+    /// Runs an export as a blocking background task that the status bar shows. The caller saves the project first.
+    /// </summary>
     /// <param name="runner">The studio's background task runner.</param>
     /// <param name="export">Starts the export.</param>
     public static void RunExport(BackgroundTaskRunner runner, Func<Task<BuildTaskStatus>> export)

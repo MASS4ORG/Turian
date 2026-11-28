@@ -19,7 +19,11 @@ public sealed class GameStatisticsTests(VulkanFixture fixture) : IClassFixture<V
         using var services = new ServiceCollection().BuildServiceProvider();
         var play = new PlayModeService(tree, database, services, NullLogger.Instance);
         using var viewport = new GameViewport(fixture.Vulkan, database, tree, play, NullLogger.Instance);
-        using var panel = new GamePanel(viewport);
+        var documents = new DocumentService();
+        using var playing = new PlayingDocument(play, documents);
+        var tab = new SceneDocument(new AssetWrapper(new Prefab { Id = Guid.NewGuid(), RelativePath = "Assets/a.prefab" }));
+        documents.Open(tab);
+        using var panel = new GamePanel(viewport, tab, playing, play, new StudioLocalization());
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(-1));
         var gui = new Gui { Input = input };

@@ -3,22 +3,30 @@ namespace Turian.Tests;
 /// <summary>Tests for saving authored assets as they are edited, with no Apply step.</summary>
 public class AssetAutoSaveTests : IDisposable
 {
-    readonly string path = Path.Combine(Path.GetTempPath(), $"turian-autosave-{Guid.NewGuid():N}.dataasset");
+    readonly string root = Directory.CreateTempSubdirectory("turian-autosave-").FullName;
+    readonly string path;
+    readonly BuildManager build;
+    readonly AssetImporter importer;
     readonly AssetInspectionService inspections;
 
-    /// <summary>The importer is only reached after the file is written; its failure is logged, not thrown.</summary>
-    public AssetAutoSaveTests() =>
-        inspections = new AssetInspectionService(importer: null!, new AssetTypeCatalog(), new SettingsService(),
-            loader: null!, NullLogger.Instance);
+    /// <summary>Creates the inspection service over a real importer in a temporary folder.</summary>
+    public AssetAutoSaveTests()
+    {
+        path = Path.Combine(root, "stats.dataasset");
+        build = new BuildManager(new AppSettings { ProjectAbsoluteDir = root }, NullLogger.Instance);
+        var settings = new SettingsService();
+        importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), settings, build);
+        importer.StopMonitoring();
+        inspections = new AssetInspectionService(importer, new AssetTypeCatalog(), settings,
+            Substitute.For<IAssetLoader>(), NullLogger.Instance);
+    }
 
-    /// <summary>Deletes the written file.</summary>
+    /// <summary>Deletes the temporary folder.</summary>
     public void Dispose()
     {
-        if (File.Exists(path))
-        {
-            File.Delete(path);
-        }
-
+        importer.Dispose();
+        build.Dispose();
+        Directory.Delete(root, recursive: true);
         GC.SuppressFinalize(this);
     }
 
@@ -67,6 +75,43 @@ public class AssetAutoSaveTests : IDisposable
 
         Assert.False(unsaved.Any);
         Assert.False(File.Exists(path));
+    }
+
+    /// <summary>
+    /// An edit the writer refuses stays unsaved work: the frame flush does not retry it, a forced flush does and reports
+    /// it, and a new edit of the asset replaces it.
+    /// </summary>
+    [Fact]
+    public void Flush_KeepsARefusedEditUntilItIsWrittenOrReplaced()
+    {
+        var autoSave = new AssetAutoSave(inspections, TimeSpan.Zero);
+        autoSave.MarkChanged(Inspection(isPayload: true, new object()));
+
+        Assert.False(autoSave.Flush());
+        Assert.Equal(path, Assert.Single(autoSave.Rejected));
+        Assert.True(autoSave.HasPending);
+        Assert.False(autoSave.Flush());
+        Assert.False(autoSave.Flush(force: true));
+
+        autoSave.MarkChanged(Inspection(isPayload: true, new ObjectReferencesTests.Stats { Health = 9 }));
+        Assert.Empty(autoSave.Rejected);
+        Assert.True(autoSave.Flush());
+        Assert.False(autoSave.HasPending);
+        Assert.Contains("9", File.ReadAllText(path), StringComparison.Ordinal);
+    }
+
+    /// <summary>Choosing not to save also forgets an edit the writer refused.</summary>
+    [Fact]
+    public void Discard_ForgetsARefusedEdit()
+    {
+        var autoSave = new AssetAutoSave(inspections, TimeSpan.Zero);
+        autoSave.MarkChanged(Inspection(isPayload: true, new object()));
+        autoSave.Flush();
+
+        autoSave.Discard();
+
+        Assert.False(autoSave.HasPending);
+        Assert.Empty(autoSave.Rejected);
     }
 
     /// <summary>Choosing to save writes the pending edits at once.</summary>

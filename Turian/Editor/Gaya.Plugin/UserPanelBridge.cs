@@ -47,19 +47,12 @@ sealed class UserPanelBridge : IDisposable
 
     void Publish()
     {
-        foreach (var id in published)
-        {
-            menus.Remove(id);
-            commands.Remove(id);
-            panels.Remove(id);
-        }
-
-        published.Clear();
+        Unpublish();
 
         foreach (var page in catalog.Pages)
         {
             panels.Register(new PanelDescriptor(page.Id, page.Name, PanelPlacement.Floating,
-                _ => page.Target as IPanel ?? new UserPanel(page))
+                _ => page.Target is IPanel panel ? new BorrowedPanel(panel) : new UserPanel(page))
             {
                 OpenByDefault = false,
             });
@@ -110,6 +103,32 @@ sealed class UserPanelBridge : IDisposable
     static string MenuIdFor(string menu) =>
         WellKnownMenus.TryGetValue(menu, out var id) ? id : $"menubar/{menu}";
 
+    /// <summary>Lends a user panel to the workbench without letting it dispose the panel.</summary>
+    sealed class BorrowedPanel(IPanel target) : IPanel
+    {
+        /// <inheritdoc />
+        public void Render(Gui gui) => target.Render(gui);
+
+        /// <inheritdoc />
+        public void RenderHeader(Gui gui, PanelHeaderContext context) => target.RenderHeader(gui, context);
+    }
+
+    void Unpublish()
+    {
+        foreach (var id in published)
+        {
+            menus.Remove(id);
+            commands.Remove(id);
+            panels.Remove(id);
+        }
+
+        published.Clear();
+    }
+
     /// <inheritdoc />
-    public void Dispose() => catalog.Changed -= Publish;
+    public void Dispose()
+    {
+        catalog.Changed -= Publish;
+        Unpublish();
+    }
 }

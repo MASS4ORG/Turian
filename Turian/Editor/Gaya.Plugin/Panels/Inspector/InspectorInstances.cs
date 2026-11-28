@@ -38,7 +38,9 @@ sealed class InspectorInstances(IPanelRegistry panels)
                 sp.GetRequiredService<PrefabOverrideOperations>(),
                 sp.GetRequiredService<PrefabStage>(),
                 sp.GetRequiredService<AssetDatabase>(),
-                sp.GetRequiredService<LayerFilter>())));
+                sp.GetRequiredService<LayerFilter>(),
+                sp.GetRequiredService<InspectorSourceCatalog>(),
+                sp.GetRequiredService<IDocumentService>())));
 
     }
 }

@@ -26,14 +26,10 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     readonly ILogger log;
     readonly WorkbenchLayoutStore layoutStore;
     readonly AppearanceBridge appearanceBridge;
-    readonly Dictionary<string, IPanel> panelInstances = [];
     readonly Dictionary<string, IChromeItem> chromeInstances = [];
-    readonly HashSet<string> knownPanels = [];
-    readonly Dictionary<string, ParkedPanel> parkedPanels = [];
     Dictionary<string, PanelDescriptor> descriptors;
 
     int panelsRevision;
-    int savedRevision;
     bool paletteOpen;
     int styleSheetsVersion = -1;
     Gui? styledGui;
@@ -63,12 +59,17 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         descriptors = app.Panels.All.ToDictionary(static descriptor => descriptor.Id);
         panelsRevision = app.Panels.Revision;
 
-        Layout = RestoreOrSeedLayout();
-        savedRevision = Layout.Revision;
-    }
+        savedLayouts = this.layoutStore.Load();
+        activeSlot = SlotFor(app.Documents.Active?.Kind);
+        frameSlot = activeSlot;
+        foreach (var kind in app.DocumentKinds.All)
+        {
+            SlotFor(kind.Id);
+        }
 
-    /// <summary>The dock arrangement currently on screen.</summary>
-    public DockLayout Layout { get; }
+        RegisterLayoutCommands();
+        SubscribeDocuments();
+    }
 
     /// <summary>The persisted preferences exposed by the Appearance settings page.</summary>
     public AppearanceSettings Appearance { get; }
@@ -144,245 +145,11 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         ExcaliburStyles.SetBaseSheet(gui, app.Themes.Look);
     }
 
-    /// <summary>
-    /// Loads the saved layout and reconciles it against the panels actually registered — panels not
-    /// registered yet are parked until they are, never-seen ones that open by default are folded in at
-    /// their declared placement — or seeds a fresh layout when there is nothing usable on disk.
-    /// </summary>
-    DockLayout RestoreOrSeedLayout()
-    {
-        var restored = layoutStore.Load();
-        if (restored is null)
-        {
-            return SeedLayout();
-        }
-
-        knownPanels.UnionWith(restored.KnownPanels);
-        foreach (var (panelId, parked) in restored.ParkedPanels)
-        {
-            parkedPanels[panelId] = parked;
-        }
-
-        // A layout that knows no panels predates closed panels being remembered: it holds every panel
-        // that was ever registered, wanted or not, so only those that open by default are kept.
-        var layout = restored.Layout;
-        var legacy = restored.KnownPanels.Count == 0;
-        foreach (var panelId in layout.PanelIds.ToList())
-        {
-            if (descriptors.TryGetValue(panelId, out var descriptor))
-            {
-                if (legacy && !descriptor.OpenByDefault)
-                {
-                    layout.Remove(panelId);
-                }
-            }
-            else if (legacy)
-            {
-                layout.Remove(panelId);
-            }
-            else
-            {
-                Park(layout, panelId);
-            }
-        }
-
-        foreach (var descriptor in app.Panels.All)
-        {
-            Reconcile(layout, descriptor);
-        }
-
-        log.LogDebug("Restored workbench layout from {Path}", layoutStore.Path);
-        return layout;
-    }
-
-    /// <summary>
-    /// Brings a registered panel into the layout if it belongs there: back to where it was parked, or at
-    /// its declared placement the first time it is seen. A known panel that is absent was closed.
-    /// </summary>
-    void Reconcile(DockLayout layout, PanelDescriptor descriptor)
-    {
-        if (layout.Contains(descriptor.Id))
-        {
-            knownPanels.Add(descriptor.Id);
-            return;
-        }
-
-        if (parkedPanels.ContainsKey(descriptor.Id) || (knownPanels.Add(descriptor.Id) && descriptor.OpenByDefault))
-        {
-            Place(layout, descriptor);
-        }
-    }
-
-    /// <summary>
-    /// Adds a panel where it was parked, falling back to its declared placement. Rejoining a tab group
-    /// keeps that group's active tab.
-    /// </summary>
-    void Place(DockLayout layout, PanelDescriptor descriptor)
-    {
-        var panelId = descriptor.Id;
-        knownPanels.Add(panelId);
-
-        if (parkedPanels.Remove(panelId, out var parked))
-        {
-            if (parked.TabbedWith is { } sibling && layout.FindLeaf(sibling) is { } leaf)
-            {
-                var active = leaf.PanelIds.ElementAtOrDefault(leaf.ActiveIndex);
-                layout.DockInto(panelId, leaf, DockZone.Center);
-                if (active is not null)
-                {
-                    layout.Activate(active);
-                }
-
-                return;
-            }
-
-            if (parked.FloatBounds is { } bounds)
-            {
-                layout.Float(panelId, bounds);
-                return;
-            }
-
-            layout.EnsurePanel(panelId, parked.Zone, FractionFor(descriptor.DefaultPlacement));
-            return;
-        }
-
-        if (descriptor.DefaultPlacement == PanelPlacement.Floating)
-        {
-            layout.Float(panelId, new Rect(180, 140, WorkbenchLayoutStore.DefaultLeftWidth, WorkbenchLayoutStore.DefaultBottomHeight));
-        }
-        else
-        {
-            layout.EnsurePanel(panelId, ZoneFor(descriptor.DefaultPlacement), FractionFor(descriptor.DefaultPlacement));
-        }
-    }
-
-    /// <summary>Records where a panel sits and takes it out of the layout until it registers again.</summary>
-    void Park(DockLayout layout, string panelId)
-    {
-        if (layout.FindLeaf(panelId) is not { } leaf)
-        {
-            return;
-        }
-
-        var window = layout.Floating.FirstOrDefault(candidate => candidate.Root.Leaves().Contains(leaf));
-        parkedPanels[panelId] = new ParkedPanel(leaf.Zone,
-            leaf.PanelIds.FirstOrDefault(id => id != panelId),
-            window?.Bounds);
-        layout.Remove(panelId);
-    }
-
-    /// <summary>
-    /// Reconciles the panel set against whatever plugins currently register — a user assembly's own
-    /// panels come and go with a recompile, the same way its commands and menu items already do. Cheap
-    /// when nothing changed: a revision compare against <see cref="PanelRegistry"/>.
-    /// </summary>
-    void SyncPanels()
-    {
-        if (app.Panels.Revision == panelsRevision)
-        {
-            return;
-        }
-
-        panelsRevision = app.Panels.Revision;
-        var current = app.Panels.All;
-        ReleaseReplacedPanels(current);
-
-        foreach (var goneId in descriptors.Keys.Except(current.Select(static d => d.Id)).ToList())
-        {
-            if (panelInstances.Remove(goneId, out var panel) && panel is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
-
-            // A recompile unregisters a user panel and registers it again moments later.
-            Park(Layout, goneId);
-        }
-
-        descriptors = current.ToDictionary(static descriptor => descriptor.Id);
-
-        foreach (var descriptor in current)
-        {
-            Reconcile(Layout, descriptor);
-        }
-    }
-
-    void ReleaseReplacedPanels(IReadOnlyList<PanelDescriptor> current)
-    {
-        foreach (var descriptor in current)
-        {
-            if (!descriptors.TryGetValue(descriptor.Id, out var previous)
-                || ReferenceEquals(previous, descriptor))
-            {
-                continue;
-            }
-
-            if (panelInstances.Remove(descriptor.Id, out var panel) && panel is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
-        }
-    }
-
-    /// <summary>Builds the initial arrangement from the declared placement of each panel that opens by default.</summary>
-    DockLayout SeedLayout()
-    {
-        var layout = new DockLayout();
-        knownPanels.UnionWith(app.Panels.All.Select(static descriptor => descriptor.Id));
-        var opening = app.Panels.All.Where(static descriptor => descriptor.OpenByDefault).ToList();
-
-        // Center first: the edges wrap whatever is already there, so seeding an edge into an empty
-        // layout would make that panel the center.
-        foreach (var descriptor in opening.Where(static d => d.DefaultPlacement == PanelPlacement.Center))
-        {
-            layout.DockAtEdge(descriptor.Id, DockZone.Center);
-        }
-
-        foreach (var descriptor in opening.Where(static d => d.DefaultPlacement != PanelPlacement.Center))
-        {
-            if (descriptor.DefaultPlacement == PanelPlacement.Floating)
-            {
-                layout.Float(descriptor.Id, new Rect(180, 140, WorkbenchLayoutStore.DefaultLeftWidth, WorkbenchLayoutStore.DefaultBottomHeight));
-                continue;
-            }
-
-            layout.DockAtEdge(descriptor.Id, ZoneFor(descriptor.DefaultPlacement),
-                FractionFor(descriptor.DefaultPlacement));
-        }
-
-        return layout;
-    }
-
-    static DockZone ZoneFor(PanelPlacement placement) => placement switch
-    {
-        PanelPlacement.Left => DockZone.Left,
-        PanelPlacement.Right => DockZone.Right,
-        PanelPlacement.Bottom => DockZone.Bottom,
-        _ => DockZone.Center
-    };
-
-    float FractionFor(PanelPlacement placement) => placement switch
-    {
-        PanelPlacement.Left => WorkbenchLayoutStore.DefaultLeftWidth / 1600f,
-        PanelPlacement.Right => WorkbenchLayoutStore.DefaultRightWidth / 1600f,
-        PanelPlacement.Bottom => WorkbenchLayoutStore.DefaultBottomHeight / 950f,
-        _ => 0.25f
-    };
-
-    /// <summary>Writes the layout out if the user has changed it since it was last saved.</summary>
-    public void SaveLayoutIfChanged()
-    {
-        if (Layout.Revision == savedRevision)
-        {
-            return;
-        }
-
-        savedRevision = Layout.Revision;
-        layoutStore.Save(new WorkbenchLayoutState(Layout, knownPanels, parkedPanels));
-    }
-
     /// <summary>Persists the layout and the settings, and releases panels that own resources.</summary>
     public void Dispose()
     {
+        app.Documents.ActivationSwitched -= OnActivationSwitched;
+        app.Documents.ClosingDocument -= OnDocumentClosing;
         SaveLayoutIfChanged();
         app.Settings.Save();
         appearanceBridge.Dispose();
@@ -440,6 +207,32 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     public void Render(Gui gui)
     {
         ArgumentNullException.ThrowIfNull(gui);
+
+        // Both passes draw the same document and layout, even when a click in the second one switches them.
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            frameDocument = app.Documents.Active;
+            frameSlot = activeSlot;
+        }
+
+        rendering = true;
+        try
+        {
+            Draw(gui);
+        }
+        finally
+        {
+            rendering = false;
+        }
+
+        if (gui.Pass == Pass.Pass2Render)
+        {
+            RunAfterFrame();
+        }
+    }
+
+    void Draw(Gui gui)
+    {
         if (gui.Pass == Pass.Pass1Build)
         {
             app.LivePlugins?.Refresh();
@@ -467,7 +260,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
                 }
                 else
                 {
-                    gui.DockSpace(Layout, PanelInfo, RenderPanel, RenderTabStripActions);
+                    var guarded = SnapshotGuarded(gui);
+                    gui.DockSpace(frameSlot.Layout, PanelInfo, RenderPanel, RenderTabStripActions);
+                    ReviewClosed(gui, guarded);
                 }
             }
 

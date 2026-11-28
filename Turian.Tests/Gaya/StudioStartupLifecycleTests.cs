@@ -37,6 +37,7 @@ public sealed class StudioStartupLifecycleTests
             services.AddSingleton(Substitute.For<IShortcutService>());
             services.AddSingleton(Substitute.For<IFocusTracker>());
             services.AddSingleton(Substitute.For<IEditorSettings>());
+            services.AddSingleton<IDocumentService>(new DocumentService());
             var context = Substitute.For<IPluginContext>();
             context.Services.Returns(services);
             context.Logger.Returns(logger);

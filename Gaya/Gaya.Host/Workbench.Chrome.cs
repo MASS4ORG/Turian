@@ -58,12 +58,12 @@ public sealed partial class Workbench
     }
 
     /// <summary>
-    /// Every registered panel as a check item, ticked while the panel is docked, then the theme list
-    /// and whatever the plugins contributed to the View menu.
+    /// Every registered panel the active layout may hold as a check item, ticked while the panel is docked, then the
+    /// theme list and whatever the plugins contributed to the View menu.
     /// </summary>
     void BuildViewMenu(FlyoutBuilder builder)
     {
-        foreach (var descriptor in app.Panels.All)
+        foreach (var descriptor in app.Panels.All.Where(d => d.AllowedIn(activeSlot.Kind)))
         {
             var panelId = descriptor.Id;
             builder.CheckItem(T(descriptor.Title), () => Layout.Contains(panelId), _ => TogglePanel(panelId));
@@ -140,14 +140,14 @@ public sealed partial class Workbench
     /// <param name="panelId">The panel to show.</param>
     public void ShowPanel(string panelId)
     {
-        if (!descriptors.TryGetValue(panelId, out var descriptor))
+        if (!descriptors.TryGetValue(panelId, out var descriptor) || !descriptor.AllowedIn(activeSlot.Kind))
         {
             return;
         }
 
         if (!Layout.Contains(panelId))
         {
-            Place(Layout, descriptor);
+            Place(activeSlot, descriptor);
         }
 
         Layout.Activate(panelId);
@@ -160,18 +160,18 @@ public sealed partial class Workbench
     /// <param name="panelId">The panel to toggle.</param>
     public void TogglePanel(string panelId)
     {
-        if (!descriptors.TryGetValue(panelId, out var descriptor))
+        if (!descriptors.TryGetValue(panelId, out var descriptor) || !descriptor.AllowedIn(activeSlot.Kind))
         {
             return;
         }
 
         if (Layout.Contains(panelId))
         {
-            Layout.Remove(panelId);
+            ClosePanel(panelId);
         }
         else
         {
-            Place(Layout, descriptor);
+            Place(activeSlot, descriptor);
         }
     }
 
@@ -262,32 +262,4 @@ public sealed partial class Workbench
     /// <summary>Width reserved on the right of the status bar for the workbench's own readout.</summary>
     const float statusSummaryWidth = 300f;
 
-    IPanel Resolve(PanelDescriptor descriptor)
-    {
-        if (panelInstances.TryGetValue(descriptor.Id, out var panel))
-        {
-            return panel;
-        }
-
-        try
-        {
-            panel = descriptor.Factory(app.Services);
-        }
-        catch (Exception ex)
-        {
-            log.LogError(ex, "Panel {PanelId} could not be created", descriptor.Id);
-            panel = new BrokenPanel(descriptor.Id);
-        }
-
-        panelInstances[descriptor.Id] = panel;
-        return panel;
-    }
-
-    /// <summary>Stands in for a panel whose factory threw, so one bad plugin cannot close the editor.</summary>
-    sealed class BrokenPanel(string panelId) : IPanel
-    {
-        public void Render(Gui gui) =>
-            gui.DrawText($"{panelId} failed to load — see the log.", ThemeTokens.Current.Text(12),
-                ThemeTokens.Current.Error);
-    }
 }

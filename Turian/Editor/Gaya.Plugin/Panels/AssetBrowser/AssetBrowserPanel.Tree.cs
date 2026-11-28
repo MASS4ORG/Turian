@@ -114,7 +114,7 @@ sealed partial class AssetBrowserPanel
 
     void TreeActivation(AssetEntry entry, int clicks)
     {
-        if (clicks >= 2 && !entry.IsReadOnly)
+        if (clicks >= 2 && opener.CanOpen(entry))
         {
             opener.Open(entry);
         }

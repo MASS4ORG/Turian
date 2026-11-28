@@ -17,6 +17,12 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     public AppSettings? Settings { get; private set; }
 
     /// <summary>
+    /// Raised on the thread completing an open, after the project's assemblies loaded and before its documents are
+    /// restored, so a shell can put brick contributions in place first.
+    /// </summary>
+    public event Action? Restoring;
+
+    /// <summary>
     /// Opens the project folder at <paramref name="projectPath"/>, after checking it with
     /// <see cref="ProjectValidator"/> and converting it if it still has a <c>project.data</c>.
     /// </summary>
@@ -101,7 +107,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         {
             LoadEnabledBricks();
         }
-        catch (MASS4.Bricks.PackageException)
+        catch (PackageException)
         {
             // ProjectPackages has logged what is missing and what to do.
             log.LogWarning("The bricks' types are unavailable until the project's bricks resolve");
@@ -132,6 +138,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
 
         log.LogInformation("Opened project {Project}", Settings!.ProjectAbsoluteDir);
 
+        Restoring?.Invoke();
         RestoreSession(Settings);
         if (openScene is not null)
         {
@@ -181,7 +188,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     /// new brick, rescans the assets with the current brick folders, and recompiles the scripts. Assemblies of a
     /// removed brick stay loaded until the editor restarts.
     /// </summary>
-    /// <exception cref="MASS4.Bricks.PackageException">The bricks cannot be resolved.</exception>
+    /// <exception cref="PackageException">The bricks cannot be resolved.</exception>
     public void ApplyBrickChanges()
     {
         if (Settings is null)
@@ -304,7 +311,8 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
 
         if (tasks.Get(id) is { Status: BackgroundTaskStatus.Failed })
         {
-            log.LogWarning("User scripts are unavailable. Fix the errors in Output, then recompile scripts");
+            log.LogWarning("User scripts are unavailable, as are the editors of bricks compiled with them. "
+                + "Fix the errors in Output, then recompile scripts");
         }
 
         return tasks.Get(id) is { Status: BackgroundTaskStatus.Completed };

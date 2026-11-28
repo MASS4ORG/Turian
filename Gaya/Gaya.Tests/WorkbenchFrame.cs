@@ -12,7 +12,12 @@ sealed class WorkbenchFrame : IDisposable
     readonly GayaApplication application;
 
     /// <summary>Creates an isolated workbench with temporary settings and layout files.</summary>
-    public WorkbenchFrame(float? zoom = null, IWindowIdentity? identity = null)
+    /// <param name="zoom">A font scale to apply, or null for the default.</param>
+    /// <param name="identity">The window identity service to register, if any.</param>
+    /// <param name="layoutPath">A layout file the caller owns, to restart over; a private temporary one when null.</param>
+    /// <param name="configure">Contributes panels and kinds before the workbench is built, as plugins do.</param>
+    public WorkbenchFrame(float? zoom = null, IWindowIdentity? identity = null, string? layoutPath = null,
+        Action<GayaApplication>? configure = null)
     {
         Directory.CreateDirectory(directory);
         var settings = new EditorSettings(NullLogger.Instance, Path.Combine(directory, "settings.json"));
@@ -27,10 +32,11 @@ sealed class WorkbenchFrame : IDisposable
 
         var services = registrations.BuildServiceProvider();
         application = new GayaApplication(services, new PanelRegistry(), new CommandRegistry(),
-            new MenuRegistry(), Chrome, new ShortcutService(NullLogger.Instance),
+            new MenuRegistry(), Chrome, Shortcuts,
             new FocusTracker(), [], settings: settings, themes: themes);
+        configure?.Invoke(application);
         Workbench = new Workbench(application, null,
-            new WorkbenchLayoutStore(NullLogger.Instance, Path.Combine(directory, "layout.json")));
+            new WorkbenchLayoutStore(NullLogger.Instance, layoutPath ?? Path.Combine(directory, "layout.json")));
         if (zoom is { } scale)
         {
             application.Themes.SetScale(ThemeTokens.Default.FontSize, scale);
@@ -45,6 +51,8 @@ sealed class WorkbenchFrame : IDisposable
     public SettingsFieldEditors FieldEditors { get; } = new();
     /// <summary>The contributions rendered by the workbench.</summary>
     public ChromeRegistry Chrome { get; } = new();
+    /// <summary>The key bindings the workbench dispatches.</summary>
+    public ShortcutService Shortcuts { get; } = new(NullLogger.Instance);
     /// <summary>The input state supplied to both passes.</summary>
     public IInputHandler Input { get; } = Substitute.For<IInputHandler>();
     /// <summary>The persistent GUI context for the headless frames.</summary>
@@ -65,6 +73,10 @@ sealed class WorkbenchFrame : IDisposable
     public ThemeService Themes => application.Themes;
     /// <summary>The panels rendered by the workbench.</summary>
     public PanelRegistry Panels => application.Panels;
+    /// <summary>The open documents the workbench follows.</summary>
+    public DocumentService Documents => application.Documents;
+    /// <summary>The document kinds the workbench seeds layouts for.</summary>
+    public DocumentKindRegistry DocumentKinds => application.DocumentKinds;
 
     /// <summary>Draws both passes, optionally mutating contributions after layout is calculated.</summary>
     public void Draw(Action? betweenPasses = null)

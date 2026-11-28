@@ -185,3 +185,6 @@ $positive = $success;
 $negative = $error;
 $text-selection = $selection;
 $overlay = $scrim;
+
+// The selected tab is filled with the accent, which is also the color Guinevere paints the unsaved dot with
+tab:selected dirty { background-color = $ink-on-accent; }

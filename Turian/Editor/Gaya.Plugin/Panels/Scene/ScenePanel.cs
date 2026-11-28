@@ -1,13 +1,12 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// The scene viewport: a transform-gizmo toolbar over the rendered scene, under a breadcrumb back to the scene
-/// while a prefab is open in prefab mode. Falls back to naming the active document when the open asset is not a
-/// scene.
+/// One scene tab's viewport: a transform-gizmo toolbar over the rendered scene, under a breadcrumb back to the scene
+/// while a prefab is open in prefab mode. Falls back to naming the tab's document when its asset is not a scene.
 /// </summary>
 sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
-    NodeInspectorController inspector, AssetWorkspace workspace, PrefabStage prefabStage)
-    : IPanel, IDisposable
+    NodeInspectorController inspector, SceneDocument document, PrefabStage prefabStage)
+    : IPanel, ISuspendablePanel, IDisposable
 {
     static ThemeTokens Theme => ThemeTokens.Current;
 
@@ -71,15 +70,14 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
 
     void DrawDocumentPlaceholder(Gui gui)
     {
-        var document = workspace.Active;
-        if (document?.Asset is null)
+        if (document.Wrapper.Asset is not { } asset)
         {
             return;
         }
 
-        gui.DrawText(document.DisplayTitle, Theme.Text(14), Theme.Ink, centerInRect: false);
-        gui.DrawText(document.Asset.RelativePath, Theme.Text(11), Theme.InkDim, centerInRect: false);
-        gui.DrawText(document.Asset is Prefab ? "Loading the scene…" : "Asset editor (S4)", Theme.Text(11), Theme.InkDim,
+        gui.DrawText(document.Wrapper.DisplayTitle, Theme.Text(14), Theme.Ink, centerInRect: false);
+        gui.DrawText(asset.RelativePath, Theme.Text(11), Theme.InkDim, centerInRect: false);
+        gui.DrawText(asset is Prefab ? "Loading the scene…" : "Asset editor (S4)", Theme.Text(11), Theme.InkDim,
             centerInRect: false);
     }
 
@@ -105,7 +103,7 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
             }
 
             gui.ThemedIcon(Icons.SceneNode, Theme.Text(11));
-            gui.DrawText(workspace.Active?.Title ?? string.Empty, Theme.Text(11), Theme.Ink, centerInRect: false);
+            gui.DrawText(document.Title, Theme.Text(11), Theme.Ink, centerInRect: false);
         }
 
         if (returnTo >= 0)
@@ -135,6 +133,9 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
             return hot && interactable.OnClick();
         }
     }
+
+    /// <inheritdoc />
+    public void Suspend() => viewport.Suspend();
 
     /// <inheritdoc />
     public void Dispose() => viewport.Dispose();

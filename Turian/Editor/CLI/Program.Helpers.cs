@@ -60,7 +60,7 @@ public static partial class Program
         var appSettings = new AppSettings().Load(settings) as AppSettings
             ?? throw new InvalidOperationException("Failed to create AppSettings for CLI asset import.");
 
-        var buildManager = new BuildManager(appSettings, Log.Logger);
+        var buildManager = new BuildManager(appSettings, Log.Logger) { EditorAssembliesOptional = true };
         try
         {
             buildManager.UpdateSettings(settings);

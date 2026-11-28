@@ -80,6 +80,9 @@ public interface IPluginContext
     /// <summary>Dockable panel contributions.</summary>
     IPanelRegistry Panels { get; }
 
+    /// <summary>Document kinds, each with a dock layout of its own, that panels may be bound to.</summary>
+    IDocumentKindRegistry DocumentKinds { get; }
+
     /// <summary>Invokable command contributions (menus, key bindings and the palette call these).</summary>
     ICommandRegistry Commands { get; }
 

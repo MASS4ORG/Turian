@@ -138,6 +138,10 @@ public static partial class CsProjectGenerator
         projectRoot
             .AddNugetPackageReferences(settings.PackageReferences)
             .AddAssemblyReferences(settings, assembly.References);
+        if (assembly is { EditorOnly: true, NoEngineReferences: false })
+        {
+            AddEditorHostReferences(projectRoot, Path.GetDirectoryName(typeof(IAssetImporter).Assembly.Location)!);
+        }
 
         var group = projectRoot.AddPropertyGroup();
         group.AddProperty("AssemblyName", assembly.Name);

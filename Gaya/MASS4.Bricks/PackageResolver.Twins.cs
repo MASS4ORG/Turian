@@ -150,7 +150,7 @@ public sealed partial class PackageResolver
 
     /// <summary>
     /// Why this host cannot load a bake, which is then left for its source: precast assemblies built by another
-    /// major or minor version of a host, or a bake recorded as built by another major of the build host.
+    /// major or a newer minor of a host, or a bake recorded as built by another major of the build host.
     /// </summary>
     string? Unloadable(ResolvedPackage twin, RegistryVersion entry) =>
         VariantMajorProblem(twin) ?? PrecastProblem(twin) ?? BuildMajorProblem(twin, entry);
@@ -181,7 +181,7 @@ public sealed partial class PackageResolver
         foreach (var (host, running) in options.Hosts)
         {
             if (twin.Manifest.Precast?.BuiltWith.TryGetValue(host, out var built) == true
-                && (built.Major != running.Major || built.Minor != running.Minor))
+                && !PackagePrecast.Loads(built, running))
             {
                 return $"{twin.Id} {twin.Version} ({PackageVariant.Of(twin.Manifest, twin.Integrity!)}) was baked with {host} {built}, which {host} {running} does not load.";
             }

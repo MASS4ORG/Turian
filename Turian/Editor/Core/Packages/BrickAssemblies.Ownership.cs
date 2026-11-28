@@ -6,8 +6,12 @@ public static partial class BrickAssemblies
 {
     static readonly Lock OwnershipLock = new();
     static readonly HashSet<string> GameAssemblies = new(StringComparer.Ordinal);
+    static readonly HashSet<string> EditorAssemblyNames = new(StringComparer.Ordinal);
     static readonly ConditionalWeakTable<ReflectionAssembly, string> Names = new();
     static HashSet<string>? enabledAssemblies;
+    static int editorGeneration;
+
+    internal static int EditorGeneration => Volatile.Read(ref editorGeneration);
 
     /// <summary>
     /// Records the prebuilt assemblies of game bricks, including those the studio loaded for its own bricks, so editor
@@ -17,11 +21,15 @@ public static partial class BrickAssemblies
     public static void RecordGameBricks(IEnumerable<ResolvedPackage> bricks)
     {
         ArgumentNullException.ThrowIfNull(bricks);
-        var names = bricks.Where(static brick => brick.Manifest.EffectiveScopes.Contains(PackageScope.Project))
+        var packages = bricks.ToList();
+        var names = packages.Where(static brick => brick.Manifest.EffectiveScopes.Contains(PackageScope.Project))
             .SelectMany(AssemblyNames).ToList();
+        var editorNames = packages.SelectMany(EditorAssemblies).Select(Path.GetFileNameWithoutExtension).OfType<string>();
         lock (OwnershipLock)
         {
             GameAssemblies.UnionWith(names);
+            EditorAssemblyNames.UnionWith(editorNames);
+            Interlocked.Increment(ref editorGeneration);
         }
     }
 
@@ -36,6 +44,7 @@ public static partial class BrickAssemblies
         lock (OwnershipLock)
         {
             enabledAssemblies = names;
+            Interlocked.Increment(ref editorGeneration);
         }
     }
 
@@ -66,6 +75,22 @@ public static partial class BrickAssemblies
         lock (OwnershipLock)
         {
             enabledAssemblies = null;
+            Interlocked.Increment(ref editorGeneration);
+        }
+    }
+
+    internal static bool IsEditorAssembly(ReflectionAssembly assembly)
+    {
+        if (assembly.IsCollectible)
+        {
+            return false;
+        }
+
+        var name = Names.GetValue(assembly, static loaded => loaded.GetName().Name ?? string.Empty);
+        lock (OwnershipLock)
+        {
+            return EditorAssemblyNames.Contains(name)
+                && (!GameAssemblies.Contains(name) || enabledAssemblies?.Contains(name) == true);
         }
     }
 

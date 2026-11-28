@@ -23,6 +23,7 @@ public sealed class BuildManager : IDisposable
     bool pendingHotReload;
     Process? playProcess;
     bool disposed;
+    volatile ReflectionAssembly[] panelUserAssemblies = [];
 
     // ── Public surface ─────────────────────────────────────────────────────────
 
@@ -76,6 +77,12 @@ public sealed class BuildManager : IDisposable
     /// <summary>Registers MSBuild defaults.  Call once before the first compilation.</summary>
     public static void MsBuildLocatorRegisterDefaults() => MSBuildLocator.RegisterDefaults();
 
+    /// <summary>
+    /// Whether a compile may go on when an editor-only assembly fails to build. A host without the editor's libraries,
+    /// such as the command line, sets it so the runtime code still loads.
+    /// </summary>
+    public bool EditorAssembliesOptional { get; set; }
+
     /// <summary>Updates project settings (e.g. after the user opens a different project).</summary>
     public void UpdateSettings(IAppSettings newSettings)
     {
@@ -89,6 +96,7 @@ public sealed class BuildManager : IDisposable
         if (!string.Equals(currentRoot, updatedRoot, StringComparison.OrdinalIgnoreCase))
         {
             slotManager.Unload();
+            panelUserAssemblies = [];
             slotManager = new AssemblySlotManager(updatedRoot, logger);
             Serializer.ResetOptions();
             UserAssembliesChanged?.Invoke();
@@ -104,6 +112,24 @@ public sealed class BuildManager : IDisposable
 
     /// <summary>Every user assembly in force: the default one and one per assembly definition.</summary>
     public IReadOnlyList<ReflectionAssembly> ActiveUserAssemblies => slotManager.UserAssemblies;
+
+    internal IReadOnlyList<ReflectionAssembly> PanelUserAssemblies => panelUserAssemblies;
+
+    internal static HashSet<string> RuntimeBrickAssemblyNames(
+        IEnumerable<ProjectAssembly> definitions, string assetsDirectory)
+    {
+        var root = Path.GetFullPath(assetsDirectory);
+        return definitions.Where(assembly => !assembly.EditorOnly && assembly.DefinitionPath is not null
+                && OutsideAssets(root, assembly.DefinitionPath))
+            .Select(static assembly => assembly.Name).ToHashSet(StringComparer.Ordinal);
+    }
+
+    static bool OutsideAssets(string root, string definitionPath)
+    {
+        var relative = Path.GetRelativePath(root, definitionPath);
+        return Path.IsPathRooted(relative) || relative.StartsWith(".." + Path.DirectorySeparatorChar,
+            StringComparison.Ordinal);
+    }
 
     /// <summary>
     /// All assemblies visible to editor discovery: the editor's, the open project's bricks and the user assemblies,
@@ -265,11 +291,15 @@ public sealed class BuildManager : IDisposable
             {
                 var assemblyPath = await CompileIntoInactiveSlot(forceRecompile).ConfigureAwait(false);
 
+                var runtimeBricks = RuntimeBrickAssemblyNames(CsProjectGenerator.DiscoverAssemblies(settings).Definitions,
+                    settings.AssetsAbsoluteDir);
                 if (!slotManager.TrySwapAndLoad(assemblyPath))
                 {
                     throw new InvalidOperationException("Assembly swap failed. Previous assembly retained.");
                 }
 
+                panelUserAssemblies = [.. slotManager.UserAssemblies
+                    .Where(assembly => !runtimeBricks.Contains(assembly.GetName().Name ?? string.Empty))];
                 UserAssembliesChanged?.Invoke();
 
                 return $"Loaded: {assemblyPath}";
@@ -412,6 +442,7 @@ public sealed class BuildManager : IDisposable
         StopPlayProcessInternal(notify: false);
         TaskRunner.Dispose();
         slotManager.Unload();
+        panelUserAssemblies = [];
         UserAssembliesChanged?.Invoke();
     }
 
@@ -422,7 +453,8 @@ public sealed class BuildManager : IDisposable
         RequireProjectLoaded("compile");
 
         var compiler = new CompileUserCode(settings, logger, slotManager.InactiveSlotDirectory, forceRecompile,
-            slotManager.ActiveSlotDirectory);
+            slotManager.ActiveSlotDirectory,
+            EditorAssembliesOptional);
         return await compiler.ExecuteAsync().ConfigureAwait(false);
     }
 

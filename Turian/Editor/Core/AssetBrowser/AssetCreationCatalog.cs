@@ -4,7 +4,14 @@ namespace Turian.Editor.Core;
 /// <param name="MenuPath">Slash-separated path, e.g. <c>Gameplay/Puzzle Data</c>.</param>
 /// <param name="DefaultName">The name a freshly created one gets.</param>
 /// <param name="PayloadType">The <see cref="DataAsset"/> type to write, or null for a built-in kind.</param>
-public sealed record AssetCreationKind(string MenuPath, string DefaultName, Type? PayloadType = null);
+public sealed record AssetCreationKind(string MenuPath, string DefaultName, Type? PayloadType = null)
+{
+    /// <summary>
+    /// Writes a new asset of this kind into a directory and returns its path, or null when it could not. A brick uses
+    /// it for sources that are not <see cref="DataAsset"/> payloads; the importer gives the new file its meta.
+    /// </summary>
+    public Func<string, string?>? Creator { get; init; }
+}
 
 /// <summary>
 /// What the asset browser can create: built-in assets and constructible
@@ -20,7 +27,7 @@ public sealed class AssetCreationCatalog : IDisposable
     readonly SettingsService settings;
     readonly BuildManager buildManager;
     readonly ILogger log;
-    readonly IReadOnlyList<IAssetCreationProvider> providers;
+    readonly List<IAssetCreationProvider> providers;
 
     readonly List<AssetCreationKind> kinds = [];
     ReflectionAssembly[] scanned = [];
@@ -44,8 +51,29 @@ public sealed class AssetCreationCatalog : IDisposable
         this.settings = settings;
         this.buildManager = buildManager;
         this.log = log;
-        this.providers = providers?.ToArray() ?? [];
+        this.providers = [.. providers ?? []];
         buildManager.UserAssembliesChanged += Invalidate;
+    }
+
+    /// <summary>
+    /// Raised when the offered kinds may differ from those read last, possibly on a background thread, so a menu built
+    /// from <see cref="Kinds"/> reads them again.
+    /// </summary>
+    public event Action? Changed;
+
+    /// <summary>Adds the entries of a brick that is active, on the UI thread.</summary>
+    /// <param name="provider">The brick's entries.</param>
+    /// <returns>The registration; disposing it removes them.</returns>
+    public IDisposable Add(IAssetCreationProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        providers.Add(provider);
+        Invalidate();
+        return new ContributionLifetime(() =>
+        {
+            providers.Remove(provider);
+            Invalidate();
+        });
     }
 
     /// <summary>The kinds currently offered, built-ins first.</summary>
@@ -74,11 +102,25 @@ public sealed class AssetCreationCatalog : IDisposable
         kinds.Add(new AssetCreationKind("Folder", fileSystem.DefaultFolderName));
         kinds.Add(new AssetCreationKind("Scene", fileSystem.DefaultSceneName));
         kinds.Add(new AssetCreationKind("Material", fileSystem.DefaultMaterialName));
-        // Providers outlive brick changes until restart, so their kinds follow the same enabled-brick filter.
+        // Providers from dependency injection outlive brick changes until restart, so their kinds follow the same
+        // enabled-brick filter.
         kinds.AddRange(Scan(current, log)
-            .Concat(providers.SelectMany(static provider => provider.Kinds)
-                .Where(static kind => kind.PayloadType is null || !BrickAssemblies.IsRetired(kind.PayloadType.Assembly)))
-            .DistinctBy(static kind => kind.PayloadType));
+            .Concat(providers.SelectMany(KindsOf)
+                .Where(static kind => OwnerOf(kind) is not { } owner || !BrickAssemblies.IsRetired(owner)))
+            .DistinctBy(static kind => (kind.PayloadType, kind.PayloadType is null ? kind.MenuPath : null)));
+    }
+
+    IReadOnlyList<AssetCreationKind> KindsOf(IAssetCreationProvider provider)
+    {
+        try
+        {
+            return [.. provider.Kinds];
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "New menu: {Provider} could not list its entries", provider.GetType().FullName);
+            return [];
+        }
     }
 
     /// <inheritdoc />
@@ -93,6 +135,7 @@ public sealed class AssetCreationCatalog : IDisposable
         scanned = [];
         scannedOnce = false;
         kinds.Clear();
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -102,45 +145,59 @@ public sealed class AssetCreationCatalog : IDisposable
     /// <param name="kind">What to create.</param>
     /// <param name="targetDirectory">Absolute directory to create it in.</param>
     /// <returns>True when the asset was written.</returns>
-    public bool Create(AssetCreationKind kind, string targetDirectory)
+    public bool Create(AssetCreationKind kind, string targetDirectory) => CreateAt(kind, targetDirectory) is not null;
+
+    /// <summary>
+    /// <see cref="Create"/> for a caller that goes on with the new asset, such as one that opens it.
+    /// </summary>
+    /// <param name="kind">What to create.</param>
+    /// <param name="targetDirectory">Absolute directory to create it in.</param>
+    /// <returns>The new file or folder's path, or null when it was not written.</returns>
+    public string? CreateAt(AssetCreationKind kind, string targetDirectory)
     {
         ArgumentNullException.ThrowIfNull(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetDirectory);
 
         try
         {
-            if (kind.PayloadType is not null)
+            if (kind.Creator is not null)
             {
-                return CreateDataAsset(kind, targetDirectory);
+                return kind.Creator(targetDirectory);
             }
 
-            return kind.MenuPath switch
-            {
-                "Folder" => fileSystem.CreateFolder(targetDirectory, kind.DefaultName),
-                "Scene" => fileSystem.CreateEmptySceneAsync(targetDirectory, kind.DefaultName)
-                    .GetAwaiter().GetResult(),
-                "Material" => fileSystem.CreateEmptyMaterialAsync(targetDirectory, kind.DefaultName)
-                    .GetAwaiter().GetResult(),
-                _ => false
-            };
+            return kind.PayloadType is not null
+                ? CreateDataAsset(kind, targetDirectory)
+                : CreateBuiltIn(kind, targetDirectory);
         }
         catch (Exception ex)
         {
             log.LogError(ex, "Could not create a {Kind} in {Directory}", kind.MenuPath, targetDirectory);
-            return false;
+            return null;
         }
     }
 
-    bool CreateDataAsset(AssetCreationKind kind, string targetDirectory)
+    string? CreateBuiltIn(AssetCreationKind kind, string targetDirectory) => kind.MenuPath switch
+    {
+        "Folder" => fileSystem.CreateFolderAt(targetDirectory, kind.DefaultName),
+        "Scene" => fileSystem.WriteEmptySceneAsync(targetDirectory, kind.DefaultName).GetAwaiter().GetResult(),
+        "Material" => fileSystem.WriteEmptyMaterialAsync(targetDirectory, kind.DefaultName).GetAwaiter().GetResult(),
+        _ => null,
+    };
+
+    // The assembly a contributed kind comes from, which decides whether its brick is still active.
+    static ReflectionAssembly? OwnerOf(AssetCreationKind kind) =>
+        kind.PayloadType?.Assembly ?? kind.Creator?.Method.DeclaringType?.Assembly;
+
+    string? CreateDataAsset(AssetCreationKind kind, string targetDirectory)
     {
         if (settings.Settings is not { } appSettings)
         {
-            return false;
+            return null;
         }
 
         if (Activator.CreateInstance(kind.PayloadType!) is not DataAsset payload)
         {
-            return false;
+            return null;
         }
 
         var assetPath = UniquePath(targetDirectory, kind.DefaultName);
@@ -155,7 +212,7 @@ public sealed class AssetCreationCatalog : IDisposable
         Serializer.SaveAsync(assetPath, payload).GetAwaiter().GetResult();
         Serializer.SaveAsync(assetPath + ".meta", meta).GetAwaiter().GetResult();
         ProjectSettingsFiles.RegisterCreated(appSettings, payload, meta.Id);
-        return true;
+        return assetPath;
     }
 
     /// <summary>
